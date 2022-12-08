@@ -3,6 +3,20 @@ import esm
 import numpy as np
 import gc
 from tqdm import tqdm
+import logging
+
+# Create logger
+logger = logging.getLogger()
+
+def logger_setup():   
+    fhandler = logging.FileHandler(filename='\logs\mylog.log', mode='a')
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fhandler.setFormatter(formatter)
+    logger.addHandler(fhandler)
+    logger.setLevel(logging.DEBUG)
+    logger.debug("started run")
+ 
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")  # Use GPU is avaliable
 
@@ -12,28 +26,33 @@ def print_gpu():
     print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
     print('Cached:   ', round(torch.cuda.memory_cached(0)/1024**3,1), 'GB')
 
-def main():
+def create_emmbeding(log_file=False,debuge=False):
+    if log_file:
+        logger_setup()
+    logger.info(f"debuge mode {debuge}")
     # Load ESM-2 model
-    model, alphabet = torch.hub.load("facebookresearch/esm:main", "esm2_t30_150M_UR50D")
+    primary_seq_path = "./data/seq_primar.txt"
+    model_name = "esm2_t30_150M_UR50D"
+    model, alphabet = torch.hub.load("facebookresearch/esm:main", model_name)
     batch_converter = alphabet.get_batch_converter()
     model = model.to(device)
     model.eval()  # disables dropout for deterministic results
+    logger.info(f'Finished loading model - {model_name}')
     print('Finished loading model.')
-
-    from tqdm import tqdm
     # Prepare data (first 2 sequences from ESMStructuralSplitDataset superfamily / 4)
     all_data = []
     # Using readlines()
-    file = open('/Users/shaharcohen/Studies/MSc/research/DeepPEF/data/seq_primar.txt', 'r')
+    file = open(primary_seq_path, 'r')
     index = 0
     while True:
         next_line = file.readline()
-        if not next_line or index==10:
+        if not next_line or (debuge and index==10):
             break 
         all_data.append([index,next_line])
         index+=1
     seq_emb = []
     batch_size = 2
+    logger.info(f"Embbeding generation for {len(all_data)} sequences")
     for i in tqdm(np.arange(batch_size,len(all_data),batch_size)):
         #print_gpu()
         data = all_data[i-batch_size:i]
@@ -55,6 +74,11 @@ def main():
         torch.device.empty_cache()
         gc.collect()
     torch.save(seq_emb,"esm2_t30_150M_UR50D_emb.pt")
+
+
+def main():
+    logger_setup()
+    create_emmbeding(log_file=True,debuge=True)
 
 if __name__=='__main__':
     main()

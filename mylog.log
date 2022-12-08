@@ -1,0 +1,27 @@
+2022-12-08 15:16:59,644 - root - DEBUG - started run
+2022-12-08 15:16:59,644 - root - DEBUG - started run
+2022-12-08 15:16:59,644 - root - DEBUG - started run
+2022-12-08 15:16:59,645 - root - INFO - debuge mode True
+2022-12-08 15:16:59,645 - root - INFO - debuge mode True
+2022-12-08 15:17:01,617 - root - INFO - Finished loading model - esm2_t30_150M_UR50D
+2022-12-08 15:17:01,617 - root - INFO - Finished loading model - esm2_t30_150M_UR50D
+2022-12-08 15:17:01,619 - root - INFO - Embbeding generation for 10 sequences
+2022-12-08 15:17:01,619 - root - INFO - Embbeding generation for 10 sequences
+2022-12-08 15:18:50,317 - root - DEBUG - started run
+2022-12-08 15:18:50,317 - root - DEBUG - started run
+2022-12-08 15:18:50,317 - root - DEBUG - started run
+2022-12-08 15:18:50,317 - root - INFO - debuge mode True
+2022-12-08 15:18:50,317 - root - INFO - debuge mode True
+2022-12-08 15:18:51,761 - root - INFO - Finished loading model - esm2_t30_150M_UR50D
+2022-12-08 15:18:51,761 - root - INFO - Finished loading model - esm2_t30_150M_UR50D
+2022-12-08 15:18:51,762 - root - INFO - Embbeding generation for 10 sequences
+2022-12-08 15:18:51,762 - root - INFO - Embbeding generation for 10 sequences
+2022-12-08 15:48:15,289 - root - DEBUG - started run
+2022-12-08 15:48:15,290 - root - DEBUG - started run
+2022-12-08 15:48:15,290 - root - DEBUG - started run
+2022-12-08 15:48:15,290 - root - INFO - debuge mode True
+2022-12-08 15:48:15,290 - root - INFO - debuge mode True
+2022-12-08 15:48:17,058 - root - INFO - Finished loading model - esm2_t30_150M_UR50D
+2022-12-08 15:48:17,058 - root - INFO - Finished loading model - esm2_t30_150M_UR50D
+2022-12-08 15:48:17,059 - root - INFO - Embbeding generation for 10 sequences
+2022-12-08 15:48:17,059 - root - INFO - Embbeding generation for 10 sequences

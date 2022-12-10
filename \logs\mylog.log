@@ -1,0 +1,9 @@
+2022-12-08 15:49:03,012 - root - DEBUG - started run
+2022-12-08 15:49:03,012 - root - DEBUG - started run
+2022-12-08 15:49:03,012 - root - DEBUG - started run
+2022-12-08 15:49:03,013 - root - INFO - debuge mode True
+2022-12-08 15:49:03,013 - root - INFO - debuge mode True
+2022-12-08 15:49:04,630 - root - INFO - Finished loading model - esm2_t30_150M_UR50D
+2022-12-08 15:49:04,630 - root - INFO - Finished loading model - esm2_t30_150M_UR50D
+2022-12-08 15:49:04,631 - root - INFO - Embbeding generation for 10 sequences
+2022-12-08 15:49:04,631 - root - INFO - Embbeding generation for 10 sequences

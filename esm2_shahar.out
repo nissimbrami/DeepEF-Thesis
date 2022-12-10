@@ -1,0 +1,27 @@
+Sat Dec 10 15:34:22 IST 2022
+
+SLURM_JOBID:		 518820
+SLURM_JOB_NODELIST:	 ise-1080-01 
+
+
+Using cache found in /home/shaharax/.cache/torch/hub/facebookresearch_esm_main
+Finished loading model.
+  0%|          | 0/24917 [00:00<?, ?it/s]  0%|          | 0/24917 [00:03<?, ?it/s]
+Traceback (most recent call last):
+  File "get_embeddings.py", line 87, in <module>
+    main()
+  File "get_embeddings.py", line 84, in main
+    create_emmbeding(log_file=True,debuge=False)
+  File "get_embeddings.py", line 67, in create_emmbeding
+    results = model(batch_tokens, repr_layers=[30], return_contacts=True)
+  File "/home/shaharax/.conda/envs/esm2_env/lib/python3.7/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/shaharax/.conda/envs/esm2_env/lib/python3.7/site-packages/esm/model/esm2.py", line 141, in forward
+    contacts = self.contact_head(tokens, attentions)
+  File "/home/shaharax/.conda/envs/esm2_env/lib/python3.7/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/shaharax/.conda/envs/esm2_env/lib/python3.7/site-packages/esm/modules.py", line 355, in forward
+    attentions = apc(symmetrize(attentions))
+  File "/home/shaharax/.conda/envs/esm2_env/lib/python3.7/site-packages/esm/modules.py", line 29, in symmetrize
+    return x + x.transpose(-1, -2)
+RuntimeError: CUDA out of memory. Tried to allocate 2.57 GiB (GPU 0; 10.92 GiB total capacity; 8.32 GiB already allocated; 1.98 GiB free; 8.42 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF

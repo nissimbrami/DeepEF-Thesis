@@ -3,20 +3,6 @@ import esm
 import numpy as np
 import gc
 from tqdm import tqdm
-import logging
-
-# Create logger
-logger = logging.getLogger()
-
-def logger_setup():   
-    fhandler = logging.FileHandler(filename='mylog.log', mode='a')
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    fhandler.setFormatter(formatter)
-    logger.addHandler(fhandler)
-    logger.setLevel(logging.DEBUG)
-    logger.debug("started run")
- 
-
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")  # Use GPU is avaliable
 
@@ -52,8 +38,6 @@ def create_emmbeding(log_file=False,debuge=False):
         index+=1
     seq_emb = []
     batch_size = 1
-    all_data = all_data[17462:]
-    logger.info(f"Embbeding generation for {len(all_data)} sequences")
     for i in tqdm(np.arange(batch_size,len(all_data),batch_size)):
         #print_gpu()
         torch.cuda.empty_cache()
@@ -82,6 +66,11 @@ def create_emmbeding(log_file=False,debuge=False):
 def main():
     logger_setup()
     create_emmbeding(log_file=True,debuge=False)
+
+
+def main():
+    logger_setup()
+    create_emmbeding(log_file=True,debuge=True)
 
 if __name__=='__main__':
     main()

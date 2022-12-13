@@ -7,8 +7,8 @@
 
 #SBATCH --partition main                        ### specify partition name where to run a job. main: all nodes; gtx1080: 1080 gpu card nodes; rtx2080: 2080 nodes; teslap100: p100 nodes; titanrtx: titan nodes
 #SBATCH --time 2-10:30:00                       ### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
-#SBATCH --job-name shahar_embedding_gen                       ### name of the job
-#SBATCH --output esm2_shahar.out                     ### output log for running job - %J for job number
+#SBATCH --job-name esm2_emb_shahar                       ### name of the job
+#SBATCH --output esm2_log.out                     ### output log for running job - %J for job number
 #SBATCH --gpus=1                                ### number of GPUs, allocating more than 1 requires IT team's permission
 
 # Note: the following 4 lines are commented out

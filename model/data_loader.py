@@ -14,49 +14,11 @@ class meshiRefinementDataset(Dataset):
         self.split = split              # split type - if not train no split
         self.root_dir = root_dir        # root dir
         self.cropSize = crop_size       # crop size
-        proteinPath = self.root_dir     # proteion root path
+        self.proteinPath = self.root_dir     # proteion root path
         self.debug = debug              # debuge mode
         self.deb_exmp = deb_examp       # debug examples
-        if debug:
-            self.seq = torch.load(proteinPath + '/seq.pt')[:deb_examp]
-            self.ids = torch.load(proteinPath + '/ids.pt') [:deb_examp]
-            self.coordN = torch.load(proteinPath + '/CoordN.pt')[:deb_examp]
-            self.coordAlpha = torch.load(proteinPath + '/CoordAlpha.pt') [:deb_examp]
-            self.coordC = torch.load(proteinPath + '/CoordC.pt') [:deb_examp]
-            self.coordBeta = torch.load(proteinPath + '/CoordBeta.pt')  [:deb_examp]
-
-            self.nativemask = torch.load(proteinPath + '/nativemask.pt') [:deb_examp]
-            self.msk = torch.load(proteinPath + '/mask.pt') [:deb_examp]
-
-            self.gdtts = torch.load(proteinPath + '/GDTTS.pt') [:deb_examp]
-            self.iddts = torch.load(proteinPath + '/IDDTS.pt')[:deb_examp]
-
-            self.coordNNative = torch.load(proteinPath + '/CoordNNative.pt') [:deb_examp]
-            self.coordAlphaNative = torch.load(proteinPath + '/CoordCaNative.pt') [:deb_examp]
-            self.coordCNative = torch.load(proteinPath + '/CoordCNative.pt') [:deb_examp]
-            self.coordBetaNative = torch.load(proteinPath + '/CoordCbNative.pt')[:deb_examp]
-
-            self.embeddings = torch.load(proteinPath + '/embeddings.pt') [:deb_examp]
-        else:
-            self.seq = torch.load(proteinPath + '/seq.pt') 
-            self.ids = torch.load(proteinPath + '/ids.pt')
-            self.coordN = torch.load(proteinPath + '/CoordN.pt')  # [:200]
-            self.coordAlpha = torch.load(proteinPath + '/CoordAlpha.pt')  # [:200]
-            self.coordC = torch.load(proteinPath + '/CoordC.pt')  # [:200]
-            self.coordBeta = torch.load(proteinPath + '/CoordBeta.pt')  # [:200]
-
-            self.nativemask = torch.load(proteinPath + '/nativemask.pt')  # [:200]
-            self.msk = torch.load(proteinPath + '/mask.pt')  # [:200]
-
-            self.gdtts = torch.load(proteinPath + '/GDTTS.pt')  # [:200]
-            self.iddts = torch.load(proteinPath + '/IDDTS.pt')  # [:200]
-
-            self.coordNNative = torch.load(proteinPath + '/CoordNNative.pt')  # [:200]
-            self.coordAlphaNative = torch.load(proteinPath + '/CoordCaNative.pt')  # [:200]
-            self.coordCNative = torch.load(proteinPath + '/CoordCNative.pt')  # [:200]
-            self.coordBetaNative = torch.load(proteinPath + '/CoordCbNative.pt')  # [:200]
-
-            self.embeddings = torch.load(proteinPath + '/embeddings.pt')  # [:200] 
+        self.load_data()
+        
 
         self.typeindices = range(len(self.ids))
         if type is not None:
@@ -66,7 +28,47 @@ class meshiRefinementDataset(Dataset):
                     self.typeindices.append(ii)
 
         
-        
+    def load_data(self):
+        if self.debug:
+            self.seq = torch.load(self.proteinPath + '/seq.pt')[:self.deb_examp]
+            self.ids = torch.load(self.proteinPath + '/ids.pt') [:self.deb_examp]
+            self.coordN = torch.load(self.proteinPath + '/CoordN.pt')[:self.deb_examp]
+            self.coordAlpha = torch.load(self.proteinPath + '/CoordAlpha.pt') [:self.deb_examp]
+            self.coordC = torch.load(self.proteinPath + '/CoordC.pt') [:self.deb_examp]
+            self.coordBeta = torch.load(self.proteinPath + '/CoordBeta.pt')  [:self.deb_examp]
+
+            self.nativemask = torch.load(self.proteinPath + '/nativemask.pt') [:self.deb_examp]
+            self.msk = torch.load(self.proteinPath + '/mask.pt') [:self.deb_examp]
+
+            self.gdtts = torch.load(self.proteinPath + '/GDTTS.pt') [:self.deb_examp]
+            self.iddts = torch.load(self.proteinPath + '/IDDTS.pt')[:self.deb_examp]
+
+            self.coordNNative = torch.load(self.proteinPath + '/CoordNNative.pt') [:self.deb_examp]
+            self.coordAlphaNative = torch.load(self.proteinPath + '/CoordCaNative.pt') [:self.deb_examp]
+            self.coordCNative = torch.load(self.proteinPath + '/CoordCNative.pt') [:self.deb_examp]
+            self.coordBetaNative = torch.load(self.proteinPath + '/CoordCbNative.pt')[:self.deb_examp]
+
+            self.embeddings = torch.load(self.proteinPath + '/embeddings.pt') [:self.deb_examp]
+        else:
+            self.seq = torch.load(self.proteinPath + '/seq.pt') 
+            self.ids = torch.load(self.proteinPath + '/ids.pt')
+            self.coordN = torch.load(self.proteinPath + '/CoordN.pt')  # [:200]
+            self.coordAlpha = torch.load(self.proteinPath + '/CoordAlpha.pt')  # [:200]
+            self.coordC = torch.load(self.proteinPath + '/CoordC.pt')  # [:200]
+            self.coordBeta = torch.load(self.proteinPath + '/CoordBeta.pt')  # [:200]
+
+            self.nativemask = torch.load(self.proteinPath + '/nativemask.pt')  # [:200]
+            self.msk = torch.load(self.proteinPath + '/mask.pt')  # [:200]
+
+            self.gdtts = torch.load(self.proteinPath + '/GDTTS.pt')  # [:200]
+            self.iddts = torch.load(self.proteinPath + '/IDDTS.pt')  # [:200]
+
+            self.coordNNative = torch.load(self.proteinPath + '/CoordNNative.pt')  # [:200]
+            self.coordAlphaNative = torch.load(self.proteinPath + '/CoordCaNative.pt')  # [:200]
+            self.coordCNative = torch.load(self.proteinPath + '/CoordCNative.pt')  # [:200]
+            self.coordBetaNative = torch.load(self.proteinPath + '/CoordCbNative.pt')  # [:200]
+
+            self.embeddings = torch.load(self.proteinPath + '/embeddings.pt')  # [:200] 
 
     def __len__(self):
         if self.type is None:
@@ -81,8 +83,8 @@ class meshiRefinementDataset(Dataset):
         self.split = 'train'
 
     def read_protein_data(self, i):
-        # proteinPath is the path to the folder with all the .pt files of the proteins
-        proteinPath = self.root_dir
+        # self.proteinPath is the path to the folder with all the .pt files of the proteins
+        self.proteinPath = self.root_dir
         i = self.typeindices[i]
         seq = self.seq[i]
         ids = self.ids[i]

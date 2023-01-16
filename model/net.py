@@ -26,12 +26,11 @@ class ProteinEnergyNet(nn.Module):
         self.KcoordsIn = nn.Parameter(nn.init.xavier_uniform_(torch.empty(3,self.cord_size))) # 3 for x,y,z
         self.KcoordsOut = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.cord_size))) # 3 for x,y,z
         
-        # GNN layers
+        # GNN layers  - each layes contains the params for matrix multiplication(TODO: what is the benefit in convolution)
         self.Kbond_layers = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.num_layers,self.cord_size))) # 3 for x,y,z
-        self.Kbond_layers = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.num_layers,self.cord_size))) # 3 for x,y,z
+        self.Kunbond_layers = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.num_layers,self.cord_size))) # 3 for x,y,z
         
-        for i in range(self.num_layers):
-            self.GNN_layers[i] = nn.MultiheadAttention(params.embedding_size, params.num_heads)
+       
         
 
     def forward(self, X_decoy, X_native,emmbeidng):
@@ -49,8 +48,13 @@ class ProteinEnergyNet(nn.Module):
         B,N_residu,N_atoms,N_cords = X_decoy.shape
         Xd = self.embed_cords(X_decoy,self.cord_size)                       # [batch_size, n_nodes ,num_atoms=4,new_cords_size]
         D = self.getDistMatrices(Xd.reshape(B,N_atoms,N_cords,N_residu))    # [batch_size, n_nodes, atom_dist=16, new_cords_size]    
-        Fd = self.layer_operation(D,emmbeidng)                              # [batch_size,n_nodes, embedding_size]
-        FS =  emmbeidng                                                     # [batch_size,n_nodes, embedding_size]
+        FD = self.layer_operation(D,emmbeidng)                              # [batch_size,n_nodes, embedding_size]
+        FS =  emmbeidng   
+        Fh = torch.cat(Fd,FS)                                                  # [batch_size,n_nodes, embedding_size]
+
+        # Start GNN layers loop:
+        for layer in self.num_layers:
+            E_h = get_current_energy()
 
 
     def embed_cords(self, X_decoy):
@@ -71,7 +75,7 @@ class ProteinEnergyNet(nn.Module):
     
     def getDistMatrices(Coords):
         # Coords is assumed to be of shape [B, 4, 3, N]
-        # Compute distance maps
+        # Compute distance maps and returns [batch_size, n_nodes, atom_dist=16, new_cords_size] tensor
         batchSize = Coords.shape[0]
         nnodes = Coords.shape[-1]
         I = torch.tensor([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3])

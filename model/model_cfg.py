@@ -8,3 +8,4 @@ class CFG:
     homothresh = 0.9
     split_train = 0.8
     # Model parameters
+    h = 0.001

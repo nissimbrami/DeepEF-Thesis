@@ -54,7 +54,7 @@ class ProteinEnergyNet(nn.Module):
             emmbeidng: a [batch_size,n_nodes, embedding_size] tensor
         Since every node is connected to all other nodes there are no need for ajacency matrix.
         Returns:
-            Energy [batch_size] tensor
+            Energy [batch_size] tensor.
         """
         # Calculate energy for decoy and native
         E_xd = self.forward_x(X_decoy,emmbeidng)

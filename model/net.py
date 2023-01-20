@@ -19,7 +19,7 @@ class ProteinEnergyNet(nn.Module):
             name: name of the network
         """
         super(ProteinEnergyNet, self).__init__()
-        self.name = name
+        self.name = name 
         # GNN parameters
         self.num_layers = params.layers
         self.n_filters = params.filters

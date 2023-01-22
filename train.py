@@ -1,6 +1,8 @@
 from model.data_loader import PEFDataset,fetch_dataloader
+from model.data_loader import params as data_params
 from model.model_cfg import CFG
 from model.net import ProteinEnergyNet
+from model.net import params as model_params
 import torch
 from torch import optim
 from torch.optim import lr_scheduler
@@ -46,13 +48,25 @@ def train_one_epoch(model, optimizer, scheduler, dataloader, device, epoch):
     return 0
 
 def main():
-    train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path,num_workers =CFG.num_workers,
-                                                  batch_size=CFG.batch_size,cuda=CFG.cuda)
+    print('***Start main function***')
+    print('***load the data with dataloader***')
+    # d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda)
+    # train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
     
     # Build the model
-    model = ProteinEnergyNet(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
-                             cord_size = CFG.coords_emb,h = CFG.h) 
+    print('***Build the model***')
+    m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
+                             cord_size = CFG.coords_emb,h = CFG.h)
+    model = ProteinEnergyNet(m_params).to(CFG.device)
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
-    
+    print('***Start training***')
+    x_test = torch.randn(2,10,4,3).to(CFG.device)
+    x_test_native = torch.randn(2,10,4,3).to(CFG.device)
+    x_test_embed = torch.randn(2,10,480).to(CFG.device)
+    y_pred = model(x_test,x_test_native,x_test_embed)
+    print(y_pred.shape)
     return 1
+
+if __name__ == '__main__':
+    main()

@@ -5,6 +5,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class params():
+    def __init__(self,embedding_size,layers,filters,cord_size,h):
+        self.embedding_size = embedding_size
+        self.layers = layers
+        self.filters = filters
+        self.cord_size = cord_size
+        self.h = h
 
 class ProteinEnergyNet(nn.Module):
     """
@@ -33,7 +40,7 @@ class ProteinEnergyNet(nn.Module):
         
         # corrdinate embedding paraameters
         self.KcoordsIn = nn.Parameter(nn.init.xavier_uniform_(torch.empty(3,self.cord_size))) # 3 for x,y,z
-        self.KcoordsOut = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.cord_size))) 
+        self.KcoordsOut = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.cord_size,1))) 
         
         # GNN layers  - each layes contains the params for matrix multiplication(TODO: what is the benefit in convolution)
         self.Kbond_layers = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.num_layers,self.n_filters,
@@ -73,18 +80,18 @@ class ProteinEnergyNet(nn.Module):
             E torch.tensor : Batch of proteins energy [batch_size]
         """
         B,N_residu,N_atoms,N_cords = X.shape
-        Xembed = self.embed_cords(X,self.cord_size)                       # [batch_size, n_nodes ,num_atoms=4,new_cords_size]
+        Xembed = self.embed_cords(X)                                      # [batch_size, n_nodes ,num_atoms=4,new_cords_size]
         Fh,A_G = self.get_Fh0(Xembed,emmbeidng,self.h)                    # [batch_size, n_nodes ,atom_dist+embedding_size]
         # Start GNN layers loop:
-        for layer in self.num_layers:
+        for layer in range(self.num_layers):
             # calculate avrege and gradient of each neigbor
             Ki = self.Knonbond_layers[layer]
             Ki_hat = self.Kbond_layers[layer]
             # Generate Fhb for bonded atoms
             Fhb = torch.zeros(B,N_residu,N_atoms,self.emmbeding_size+N_atoms**2)
             for i in range(self.bonded,Fh.shape[1],self.bonded):
-                Fhb[:,(i-self.bonded):i,:,:]= self.layer_operation(Ki_hat,A_G[:,(i-self.bonded):i,:,:],
-                                                                   Fh[:,(i-self.bonded):i,:,:])
+                Fhb[:,(i-self.bonded):i,:]= self.layer_operation(Ki_hat,A_G[:,(i-self.bonded):i,:],
+                                                                 Fh[:,(i-self.bonded):i,:])
             # Generate Fhub for noneboned atoms
             Fhub = self.layer_operation(Ki,A_G,Fh)
             # Update Feature vector for each node
@@ -118,11 +125,11 @@ class ProteinEnergyNet(nn.Module):
         """
         X_centered = X_decoy-X_decoy.mean(dim=-1, keepdim=True)
         X = torch.matmul(X_centered**2, self.KcoordsIn) #[batch_size, n_nodes ,num_atoms=4,new_cords_size]
-        X = torch.nn.ReLU(X)
+        X = F.relu(X)
         X = torch.matmul(X, self.KcoordsOut)            #[batch_size, n_nodes ,num_atoms=4,new_cords_size]  
         return X * X_centered
    
-    def layer_operation(Ki,A_G,Fh):
+    def layer_operation(self,Ki,A_G,Fh):
         """
         Return the node features
         Args:

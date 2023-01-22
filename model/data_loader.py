@@ -4,6 +4,7 @@ import os
 from model.model_cfg import CFG
 import gc
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 class PEFDataset(Dataset):
     '''
@@ -51,35 +52,63 @@ class PEFDataset(Dataset):
         index_path = os.path.join(self.datapath, self.filenames[index])
        # Sequence of the protein
         seq = torch.load(os.path.join(index_path, 'seq.pt')).to(CFG.device)
-        id = torch.load(os.path.join(index_path, 'ids.pt')).to(CFG.device)
+        id = torch.load(os.path.join(index_path, 'ids.pt')) # string id
        # 3D coordinates of the protein
-        coordsAlpha = torch.load(os.path.join(index_path, 'coordsAlpha.pt')).to(CFG.device)
-        coordsBeta = torch.load(s.path.join(index_path, 'coordsBeta.pt')).to(CFG.device)
-        coordsC = torch.load(os.path.join(index_path, 'coordsC.pt')).to(CFG.device)
-        coordsN = torch.load(os.path.join(index_path, 'coordsN.pt')).to(CFG.device)
+        coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt')).to(CFG.device)
+        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt')).to(CFG.device)
+        coordsC = torch.load(os.path.join(index_path, 'CoordC.pt')).to(CFG.device)
+        coordsN = torch.load(os.path.join(index_path, 'CoordN.pt')).to(CFG.device)
         # 3D coordinates of the protein native
-        coordsAlpha_native = torch.load(os.path.join(index_path, 'coordsAlpha_native.pt')).to(CFG.device)
-        coordsBeta_native = torch.load(os.path.join(index_path, 'coordsBeta_native.pt')).to(CFG.device)
-        coordsC_native = torch.load(os.path.join(index_path, 'coordsC_native.pt')).to(CFG.device)
-        coordsCa_native = torch.load(os.path.join(index_path, 'coordsCa_native.pt')).to(CFG.device)
-        coordsN_native = torch.load(os.path.join(index_path, 'coordsN_native.pt')).to(CFG.device)
+        coordsAlpha_native = torch.load(os.path.join(index_path, 'CoordCaNative.pt')).to(CFG.device)
+        coordsBeta_native = torch.load(os.path.join(index_path, 'CoordCbNative.pt')).to(CFG.device)
+        coordsC_native = torch.load(os.path.join(index_path, 'CoordCNative.pt')).to(CFG.device)
+        coordsN_native = torch.load(os.path.join(index_path, 'CoordNNative.pt')).to(CFG.device)
         # Masks
         mask = torch.load(os.path.join(index_path, 'mask.pt')).to(CFG.device)
         nativemask = torch.load(os.path.join(index_path, 'nativemask.pt')).to(CFG.device)
         # Embeddings
-        esm_embed = torch.load(os.path.join(index_path, 'emb_esm.pt')).to(CFG.device)
+        esm_embed = torch.load(os.path.join(index_path, 'emb_esm.pt'))[0].to(CFG.device)
         # Concatenate the coordinates
         Xd = self.concat_cords(coordsAlpha,coordsBeta, coordsC, coordsN)
-        Xn = self.concat_cords(coordsAlpha_native,coordsBeta_native, coordsC_native, coordsCa_native, coordsN_native)
+        Xn = self.concat_cords(coordsAlpha_native,coordsBeta_native, coordsC_native, coordsN_native)
             
         return seq, id, Xd,Xn, mask, nativemask, esm_embed 
         
+    def read_protein(self,index):
+        """
+        Read the protein data from the index path
+
+        Args:
+            index (int): index of protein in the dataset
+        """
+        index_path = os.path.join(self.datapath, self.filenames[index])
+        # Sequence of the protein
+        seq = torch.load(os.path.join(index_path, 'seq.pt')).to(CFG.device)
+        id = torch.load(os.path.join(index_path, 'ids.pt')) # string id
+        # 3D coordinates of the protein
+        coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt')).to(CFG.device)
+        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt')).to(CFG.device)
+        coordsC = torch.load(os.path.join(index_path, 'CoordC.pt')).to(CFG.device)
+        coordsN = torch.load(os.path.join(index_path, 'CoordN.pt')).to(CFG.device)
+        # 3D coordinates of the protein native
+        coordsAlpha_native = torch.load(os.path.join(index_path, 'CoordCaNative.pt')).to(CFG.device)
+        coordsBeta_native = torch.load(os.path.join(index_path, 'CoordCbNative.pt')).to(CFG.device)
+        coordsC_native = torch.load(os.path.join(index_path, 'CoordCNative.pt')).to(CFG.device)
+        coordsN_native = torch.load(os.path.join(index_path, 'CoordNNative.pt')).to(CFG.device)
+        # Masks
+        mask = torch.load(os.path.join(index_path, 'mask.pt')).to(CFG.device)
+        nativemask = torch.load(os.path.join(index_path, 'nativemask.pt')).to(CFG.device)
+        # Embeddings
+        esm_embed = torch.load(os.path.join(index_path, 'emb_esm.pt'))[0].to(CFG.device)
+        
+        return seq, id, coordsAlpha,coordsBeta, coordsC, coordsN, coordsAlpha_native,coordsBeta_native, coordsC_native, coordsN_native, mask, nativemask, esm_embed
+    
     def concat_cords(self,coordsAlpha,coordsBeta, coordsC, coordsN):
         """
         Concatenate the coordinates
         output: X (torch.tensor): concatenated coordinates [N,4,3]
         """
-        coordsAlpha,coordsBeta, coordsC, coordsCa, coordsN = coordsAlpha.unsqueeze(1), coordsBeta.unsqueeze(1), coordsC.unsqueeze(1), coordsN.unsqueeze(1)
+        coordsAlpha,coordsBeta, coordsC, coordsN = coordsAlpha.unsqueeze(1), coordsBeta.unsqueeze(1), coordsC.unsqueeze(1), coordsN.unsqueeze(1)
         X = torch.cat((coordsAlpha,coordsBeta, coordsC, coordsN), dim=1)
         return X
     
@@ -89,11 +118,11 @@ class PEFDataset(Dataset):
         Check mask and native mask.
         Update file names list.
         """
+        print('Checking data constrain...')
         new_filenames = []
-        for i in range(len(self.filenames)):
-            (seq, id, coordsAlpha,coordsBeta, coordsC, coordsCa, coordsN, 
-             coordsAlpha_native, coordsBeta_native, coordsC_native, 
-             coordsCa_native, coordsN_native, mask, nativemask, esm_embed)  = self.__getitem__(i)
+        for i in tqdm(range(len(self.filenames))):
+            (seq, id, coordAlpha,coordBeta, coordC, coordN, coordAlphaNative,
+             coordBetaNative, coordCNative, coordNNative, mask, nativemask, embedding)  = self.read_protein(i)
             dt = torch.get_default_dtype()
             coordN = coordN.to(dt)
             coordAlpha = coordAlpha.to(dt)
@@ -170,3 +199,10 @@ def fetch_dataloader(data_dir, params):
     return dataloaders
 
 #TODO: clean dataset from  homology threshold
+
+class params:
+    def __init__(self,batch_size,num_workers,cuda):
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.cuda = cuda
+        

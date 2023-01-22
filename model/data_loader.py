@@ -41,7 +41,7 @@ class PEFDataset(Dataset):
         self.train_type = train_type
         # remove the files with homology greater than homothresh
         if type == 'train':
-            self.check_data_constrain(self.homothresh)
+            self.check_data_constrain()
         
 
     def __len__(self):
@@ -112,7 +112,7 @@ class PEFDataset(Dataset):
         X = torch.cat((coordsAlpha,coordsBeta, coordsC, coordsN), dim=1)
         return X
     
-    def check_data_constrain(self, homothresh):
+    def check_data_constrain(self):
         """
         Check the data constrain and remove the files with homology greater than homothresh.
         Check mask and native mask.
@@ -179,6 +179,8 @@ def fetch_dataloader(data_dir, params):
     dataloaders = {}
     # Get the filenames from the train folder
     file_names = os.listdir(data_dir)
+    if params.debug:
+        file_names = file_names[:100]
     # Split the data into train, validation and test set
     X_train, X_rem, y_train, y_rem = train_test_split(file_names,file_names, train_size=CFG.split_train,
                                                       random_state=CFG.seed)
@@ -201,8 +203,9 @@ def fetch_dataloader(data_dir, params):
 #TODO: clean dataset from  homology threshold
 
 class params:
-    def __init__(self,batch_size,num_workers,cuda):
+    def __init__(self,batch_size,num_workers,cuda,debug=False):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cuda = cuda
+        self.debug = debug
         

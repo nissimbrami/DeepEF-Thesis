@@ -56,7 +56,7 @@ def main():
     # Build the model
     print('***Build the model***')
     m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
-                             cord_size = CFG.coords_emb,h = CFG.h)
+                             cord_size = CFG.coords_emb,h = CFG.h,device=CFG.device)
     model = ProteinEnergyNet(m_params).to(CFG.device)
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training

@@ -6,12 +6,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class params():
-    def __init__(self,embedding_size,layers,filters,cord_size,h):
+    def __init__(self,embedding_size,layers,filters,cord_size,h,device):
         self.embedding_size = embedding_size
         self.layers = layers
         self.filters = filters
         self.cord_size = cord_size
         self.h = h
+        self.device = device
 
 class ProteinEnergyNet(nn.Module):
     """
@@ -26,7 +27,8 @@ class ProteinEnergyNet(nn.Module):
             name: name of the network
         """
         super(ProteinEnergyNet, self).__init__()
-        self.name = name 
+        self.name = name
+        self.device = params.device 
         # GNN parameters
         self.num_layers = params.layers
         self.n_filters = params.filters
@@ -66,8 +68,10 @@ class ProteinEnergyNet(nn.Module):
         # Calculate energy for decoy and native
         E_xd = self.forward_x(X_decoy,emmbeidng)
         E_xn = self.forward_x(X_native,emmbeidng)
-        
-        return E_xd,E_xn
+        # Concatenate the energy of the decoy and native
+        E_xd = E_xd.unsqueeze(1)
+        E_xn = E_xn.unsqueeze(1)
+        return torch.cat((E_xd,E_xn),dim=1)
 
     def forward_x(self,X,emmbeidng):
         """
@@ -88,7 +92,7 @@ class ProteinEnergyNet(nn.Module):
             Ki = self.Knonbond_layers[layer]
             Ki_hat = self.Kbond_layers[layer]
             # Generate Fhb for bonded atoms
-            Fhb = torch.zeros(B,N_residu,N_atoms,self.emmbeding_size+N_atoms**2)
+            Fhb = torch.zeros(B,N_residu,self.emmbeding_size+N_atoms**2,device=self.device)
             for i in range(self.bonded,Fh.shape[1],self.bonded):
                 Fhb[:,(i-self.bonded):i,:]= self.layer_operation(Ki_hat,A_G[:,(i-self.bonded):i,:],
                                                                  Fh[:,(i-self.bonded):i,:])
@@ -101,11 +105,11 @@ class ProteinEnergyNet(nn.Module):
         
         return E
     
-    def get_energy(Fh):
+    def get_energy(self,Fh):
         """
         Calculates the energy of the protein
         Inputs:
-            Fh: a [batch_size, n_nodes ,num_atoms=4, embedding_size+N_residu] tensor
+            Fh: a [batch_size, n_nodes , embedding_size+N_residu] tensor
         Returns:
             Energy [batch_size] tensor
         """
@@ -134,21 +138,21 @@ class ProteinEnergyNet(nn.Module):
         Return the node features
         Args:
             K (tensor): weight matrix [n_filters,param1, param2]
-            A_G (tensor): [batch_size, n_nodes, atoms_dist=16]
+            A_G (tensor): [batch_size, n_nodes, n_nodes, atoms_dist=16]
             Fh (tensor): [batch_size,n_nodes, embedding_size+n_nodes]
 
         Returns:
             tensor : [batch_size,n_nodes, embedding_size+n_nodes]
         """
-        B,N_residu,atom_dist = A_G.shape
+        B,N_residu, _,atom_dist = A_G.shape
+        A_G_AVG = torch.mean(A_G,dim=2)                         #[batch_size, n_nodes, atoms_dist=16]
         nodeE = Fh
-        Q = torch.matmul(A_G.reshape(B,atom_dist,N_residu),nodeE.reshape(B,N_residu,-1)) #[batch_size,atom_dist,embedding_size+n_nodes]
+        Q = torch.matmul(A_G_AVG.reshape(B,atom_dist,N_residu),nodeE.reshape(B,N_residu,-1)) #[batch_size,atom_dist,embedding_size+n_nodes]
         Q = F.conv1d(Q, Ki)
         Q = F.instance_norm(Q)
         Q = F.leaky_relu(Q, negative_slope=0.2)
         Q = F.conv_transpose1d(Q, Ki)
-        Q = torch.matmul(A_G.reshape(B,N_residu,atom_dist),Q)
-        
+        Q = torch.matmul(A_G_AVG.reshape(B,N_residu,atom_dist),Q)   #[batch_size,n_nodes,embedding_size+n_nodes]
         return Q
         
     

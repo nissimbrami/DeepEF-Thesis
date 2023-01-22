@@ -50,8 +50,8 @@ def train_one_epoch(model, optimizer, scheduler, dataloader, device, epoch):
 def main():
     print('***Start main function***')
     print('***load the data with dataloader***')
-    # d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda)
-    # train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
+    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,debug=CFG.debug)
+    train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
     
     # Build the model
     print('***Build the model***')

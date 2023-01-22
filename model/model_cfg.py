@@ -10,6 +10,7 @@ class CFG:
         
     data_path = './data/data2'
     seed = 42
+    debug = True
     # Train data parameters
     homothresh = 0.9
     split_train = 0.8

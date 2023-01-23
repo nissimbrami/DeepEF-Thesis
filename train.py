@@ -3,12 +3,14 @@ from model.data_loader import params as data_params
 from model.model_cfg import CFG
 from model.net import ProteinEnergyNet
 from model.net import params as model_params
+from train_utils import save_checkpoint
 import torch
 from torch import optim
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 import gc
 import time
+
 
 # define one epoch train
 def training (model, optimizer, dataloader, device,N):
@@ -23,34 +25,42 @@ def training (model, optimizer, dataloader, device,N):
     """
     model.train()
     
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(CFG.num_epochs):  # loop over the dataset multiple times
 
         running_loss = 0.0
-        for i, data in enumerate(tqdm(dataloader, 0)):
-            # get the inputs; data is a list of [inputs, labels]   
-            seq, id, Xd,Xn, mask, nativemask, esm_embed = data
-            Xd = Xd.to(device)
-            Xn = Xn.to(device)
-            esm_embed = esm_embed.to(device)
-            Xd.requires_grad = True
-            Xn.requires_grad = True
-            # zero the parameter gradients
-            optimizer.zero_grad()
+        with tqdm(dataloader, unit="batch") as tepoch:
+            for i, data in enumerate(tepoch):
+                # set progress bar description
+                tepoch.set_description(f"Epoch {epoch}")
+                
+                # get the inputs; data is a list of [inputs, labels]   
+                seq, id, Xd,Xn, mask, nativemask, esm_embed = data
+                Xd = Xd.to(device)
+                Xn = Xn.to(device)
+                esm_embed = esm_embed.to(device)
+                Xd.requires_grad = True
+                Xn.requires_grad = True
+                # zero the parameter gradients
+                optimizer.zero_grad()
 
-            # forward + backward + optimize
-            outputs = model(Xd,Xn,esm_embed)
-            loss = criterion(outputs,Xd,Xn,N)
-            loss.backward()
-            optimizer.step()
+                # forward + backward + optimize
+                outputs = model(Xd,Xn,esm_embed)
+                loss = criterion(outputs,Xd,Xn,N)
+                loss.backward()
+                optimizer.step()
 
-            # print statistics
-            running_loss += loss.item()
-            if i % 2000 == 1999:    # print every 2000 mini-batches
-                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
-                running_loss = 0.0
-            torch.cuda.empty_cache()
-            gc.collect()
-
+                # print statistics
+                running_loss += loss.item()
+                if i % 2000 == 1999:    # print every 2000 mini-batches
+                    print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
+                    running_loss = 0.0
+                
+                torch.cuda.empty_cache()
+                gc.collect()
+                # update the progress bar
+                tepoch.set_postfix(loss=loss.item())
+            # save the model
+            save_checkpoint(epoch, model, optimizer,loss,CFG.model_path)
     print('Finished Training')
 
 def preform_energy_optimization(X_decoy,partial_dx_decoy):
@@ -88,9 +98,7 @@ def criterion(E,X_native,X_decoy,N):
     lossd = (E[:,] / E[:,0]).mean()
     
     lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
-    print("lossg: ",lossg)
-    print("lossd: ",lossd)
-    print("lossc: ",lossc)
+    
     return (lossg+lossd+lossc)/3
 
 def main():
@@ -110,6 +118,7 @@ def main():
     training(model, optimizer, train_loader, CFG.device,CFG.N)
     
     return 1
+
 def test(optimizer,model):
     x_test = torch.randn((2,10,4,3),requires_grad=True).to(CFG.device)
     x_test_native = torch.randn((2,10,4,3),requires_grad=True).to(CFG.device)

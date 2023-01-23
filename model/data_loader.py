@@ -181,7 +181,7 @@ def fetch_dataloader(data_dir, params):
     # Get the filenames from the train folder
     file_names = os.listdir(data_dir)
     if params.debug:
-        file_names = file_names[:100]
+        file_names = file_names[:CFG.debuge_size]
     # Split the data into train, validation and test set
     X_train, X_rem, y_train, y_rem = train_test_split(file_names,file_names, train_size=CFG.split_train,
                                                       random_state=CFG.seed)

@@ -45,33 +45,35 @@ class PEFDataset(Dataset):
         
 
     def __len__(self):
-        return len(os.listdir(self.datapath))
+        return len(self.filenames)
 
     def __getitem__(self, index):
         
         index_path = os.path.join(self.datapath, self.filenames[index])
        # Sequence of the protein
-        seq = torch.load(os.path.join(index_path, 'seq.pt')).to(CFG.device)
+        seq = torch.load(os.path.join(index_path, 'seq.pt'))
         id = torch.load(os.path.join(index_path, 'ids.pt')) # string id
        # 3D coordinates of the protein
-        coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt')).to(CFG.device)
-        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt')).to(CFG.device)
-        coordsC = torch.load(os.path.join(index_path, 'CoordC.pt')).to(CFG.device)
-        coordsN = torch.load(os.path.join(index_path, 'CoordN.pt')).to(CFG.device)
+        coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt'))
+        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt'))
+        coordsC = torch.load(os.path.join(index_path, 'CoordC.pt'))
+        coordsN = torch.load(os.path.join(index_path, 'CoordN.pt'))
         # 3D coordinates of the protein native
-        coordsAlpha_native = torch.load(os.path.join(index_path, 'CoordCaNative.pt')).to(CFG.device)
-        coordsBeta_native = torch.load(os.path.join(index_path, 'CoordCbNative.pt')).to(CFG.device)
-        coordsC_native = torch.load(os.path.join(index_path, 'CoordCNative.pt')).to(CFG.device)
-        coordsN_native = torch.load(os.path.join(index_path, 'CoordNNative.pt')).to(CFG.device)
+        coordsAlpha_native = torch.load(os.path.join(index_path, 'CoordCaNative.pt'))
+        coordsBeta_native = torch.load(os.path.join(index_path, 'CoordCbNative.pt'))
+        coordsC_native = torch.load(os.path.join(index_path, 'CoordCNative.pt'))
+        coordsN_native = torch.load(os.path.join(index_path, 'CoordNNative.pt'))
         # Masks
-        mask = torch.load(os.path.join(index_path, 'mask.pt')).to(CFG.device)
-        nativemask = torch.load(os.path.join(index_path, 'nativemask.pt')).to(CFG.device)
+        mask = torch.load(os.path.join(index_path, 'mask.pt'))
+        nativemask = torch.load(os.path.join(index_path, 'nativemask.pt'))
         # Embeddings
-        esm_embed = torch.load(os.path.join(index_path, 'emb_esm.pt'))[0].to(CFG.device)
+        n_nodes= coordsAlpha.shape[0]
+        esm_embed = torch.stack(torch.load(os.path.join(index_path, 'emb_esm.pt')))
+        esm_embed = esm_embed.repeat(n_nodes,1)
         # Concatenate the coordinates
         Xd = self.concat_cords(coordsAlpha,coordsBeta, coordsC, coordsN)
         Xn = self.concat_cords(coordsAlpha_native,coordsBeta_native, coordsC_native, coordsN_native)
-            
+           
         return seq, id, Xd,Xn, mask, nativemask, esm_embed 
         
     def read_protein(self,index):

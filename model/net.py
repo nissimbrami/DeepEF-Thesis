@@ -177,7 +177,7 @@ class ProteinEnergyNet(nn.Module):
         A_G = torch.cat((A,G),dim=3)                                        # [batch_size, n_nodes, n_nodes, atom_dist=16, 1]
         FD =  torch.matmul(A_G.reshape(B,N_residu,N_atoms**2,N_residu),D)   # [batch_size,n_nodes,atom_dist, atom_dist=16]
         FD = FD.sum(dim=3)                                                  # [batch_size,n_nodes, atoms_dist=16]
-        FD = F.normalize(FD, p=2, dim=2)                                    # [batch_size,n_nodes, atoms_dist=16]
+        FD = F.normalize(FD, p=2, dim=2)                                    # [batch_size,n_nodes, atoms_dist=16]   
         Fh = torch.cat((FD,FS),dim=2)                                       # [batch_size,n_nodes, embedding_size+atoms_dist=16]
         return Fh,A_G
         

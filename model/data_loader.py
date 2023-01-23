@@ -35,7 +35,7 @@ class PEFDataset(Dataset):
             type (str, optional): _description_. Defaults to 'train'.
         """
         self.datapath = datapath
-        self.filenames = file_df
+        self.filenames = file_df.copy()
         self.homothresh = homothresh
         self.type = type
         self.train_type = train_type
@@ -176,7 +176,6 @@ def fetch_dataloader(data_dir, params):
     Returns:
         data: (dict) contains the DataLoader object for each type in types
     """
-    dataloaders = {}
     # Get the filenames from the train folder
     file_names = os.listdir(data_dir)
     if params.debug:
@@ -188,17 +187,17 @@ def fetch_dataloader(data_dir, params):
     # we have to define valid_size=0.5 (that is 50% of remaining data)
     X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5)
     # Now we have the data split in training, validation and test set
-    dataloaders['train']= DataLoader(PEFDataset(X_train,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
+    train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
                                         num_workers=params.num_workers,
                                         pin_memory=params.cuda)
-    dataloaders['val']= DataLoader(PEFDataset(X_valid,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
+    valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
                                         num_workers=params.num_workers,
                                         pin_memory=params.cuda)
 
-    dataloaders['test']= DataLoader(PEFDataset(X_test,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
+    test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
                                         num_workers=params.num_workers,
                                         pin_memory=params.cuda)
-    return dataloaders
+    return train_loader, valid_loader, test_loader
 
 #TODO: clean dataset from  homology threshold
 

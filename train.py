@@ -11,41 +11,80 @@ import gc
 import time
 
 # define one epoch train
-def train_one_epoch(model, optimizer, scheduler, dataloader, device, epoch):
+def training (model, optimizer, dataloader, device,N):
+    """
+    Training function for the model.
+    Args:
+        model (torch.model): model to train
+        optimizer (torch.optim): optimizer to use
+        dataloader (torch.utils.data.DataLoader): dataloader for the training set
+        device (torch.device): device to use ('cpu' or 'cuda' or 'mps')
+        N (int): The number of iterations for the iterative optimization
+    """
     model.train()
     
-    dataset_size = 0
-    running_loss = 0.0
-    
-    pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc='Train ')
-    for step, (seq, id, coordsAlpha,coordsBeta, coordsC, coordsCa, coordsN, 
-             coordsAlpha_native, coordsBeta_native, coordsC_native, 
-             coordsCa_native, coordsN_native, mask, nativemask, esm_embed) in pbar:         
-    
-        if (step + 1) % 1 == 0:
-            start_time = time.time()
+    for epoch in range(2):  # loop over the dataset multiple times
 
+        running_loss = 0.0
+        for i, data in tqdm(enumerate(dataloader, 0)):
+            # get the inputs; data is a list of [inputs, labels]   
+            seq, id, Xd,Xn, mask, nativemask, esm_embed = data
+            Xd = Xd.to(device)
+            Xn = Xn.to(device)
+            esm_embed.to(device)
             # zero the parameter gradients
             optimizer.zero_grad()
 
-            if scheduler is not None:
-                scheduler.step()
-        E_d,E_n = model() 
-        # running_loss += (loss.item() * batch_size)
-        # dataset_size += batch_size
-        
-    #     epoch_loss = running_loss / dataset_size
-        
-    #     mem = torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0
-    #     current_lr = optimizer.param_groups[0]['lr']
-    #     pbar.set_postfix(train_loss=f'{epoch_loss:0.4f}',
-    #                     lr=f'{current_lr:0.5f}',
-    #                     gpu_mem=f'{mem:0.2f} GB')
-    # torch.cuda.empty_cache()
-    # gc.collect()
-    
-    # return epoch_loss
+            # forward + backward + optimize
+            outputs = model(Xd,Xn,esm_embed)
+            loss = criterion(outputs,Xd,Xn,N)
+            loss.backward()
+            optimizer.step()
+
+            # print statistics
+            running_loss += loss.item()
+            if i % 2000 == 1999:    # print every 2000 mini-batches
+                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
+                running_loss = 0.0
+            torch.cuda.empty_cache()
+            gc.collect()
+
+    print('Finished Training')
+
+def preform_energy_optimization(X_decoy,partial_dx_decoy):
+    """
+    Preform an iterative optimization on the decoy structure, by using the energy partial derivative on the decoy structure,
+    Args:
+        X_decoy (tensor): A tensor containing the decoy structure [batch_size,seq_len,4,3]
+        partial_dx_decoy (tensor): A tensor containing the partial derivative of the energy with respect to the decoy structure [batch_size,seq_len,4,3]
+    """
     return 0
+
+def criterion(E,X_native,X_decoy,N):
+    """
+    The loss function for the model coressponds to 3 main losses:
+    1. lossg: the partial derivateve of the energy with respect to the native structure
+    2. lossd: the energy of the native structure divided by the decoy energy
+    3. lossc: After preforming an iterative optimization on the decoy structure, by using the energy partial derivative on the decoy structure, 
+              we calculate the dRMSD of the end and the start of the optimization.
+
+    Args:
+        E (tensor): A tensor containing the energy of the native and the decoy structure Exd,Exn [batch_size,2]
+        X_native (tensor): A tensor containing the native structure [batch_size,seq_len,4,3]
+        X_decoy (tensor): A tensor containing the decoy structure [batch_size,seq_len,4,3]
+        N (int): The number of iterations for the iterative optimization
+    output:
+        loss (tensor): The loss of the model
+    """
+    partial_dx_decoy = torch.autograd.grad(E[:,1].sum(),X_decoy,create_graph=True)[0]
+    partial_dx_native = torch.autograd.grad(E[:,0].sum(),X_native,create_graph=True)[0]
+    
+    lossg = 0.5*torch.norm(partial_dx_native,p=2)
+    
+    lossd = (E[:,] / E[:,0]).mean()
+    
+    lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
+    return lossg+lossd+lossc
 
 def main():
     print('***Start main function***')
@@ -61,12 +100,22 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
     print('***Start training***')
-    x_test = torch.randn(2,10,4,3).to(CFG.device)
-    x_test_native = torch.randn(2,10,4,3).to(CFG.device)
-    x_test_embed = torch.randn(2,10,480).to(CFG.device)
-    y_pred = model(x_test,x_test_native,x_test_embed)
-    print(y_pred.shape)
+    training(model, optimizer, train_loader, CFG.device,CFG.N)
+    
     return 1
-
+def test(optimizer,model):
+    x_test = torch.randn((2,10,4,3),requires_grad=True).to(CFG.device)
+    x_test_native = torch.randn((2,10,4,3),requires_grad=True).to(CFG.device)
+    x_test_embed = torch.randn(2,10,480).to(CFG.device)
+    
+    # zero the parameter gradients
+    optimizer.zero_grad()
+    # forward + backward + optimize
+    y_pred = model(x_test,x_test_native,x_test_embed)
+    y_pred.sum().backward(retain_graph=True)
+    loss = criterion(y_pred,x_test_native,x_test)
+    loss.backward()
+    
+    optimizer.step()
 if __name__ == '__main__':
     main()

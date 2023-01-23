@@ -31,7 +31,9 @@ def training (model, optimizer, dataloader, device,N):
             seq, id, Xd,Xn, mask, nativemask, esm_embed = data
             Xd = Xd.to(device)
             Xn = Xn.to(device)
-            esm_embed.to(device)
+            esm_embed = esm_embed.to(device)
+            Xd.requires_grad = True
+            Xn.requires_grad = True
             # zero the parameter gradients
             optimizer.zero_grad()
 
@@ -84,7 +86,7 @@ def criterion(E,X_native,X_decoy,N):
     lossd = (E[:,] / E[:,0]).mean()
     
     lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
-    return lossg+lossd+lossc
+    return (lossg+lossd+lossc)/3
 
 def main():
     print('***Start main function***')
@@ -117,5 +119,6 @@ def test(optimizer,model):
     loss.backward()
     
     optimizer.step()
+    
 if __name__ == '__main__':
     main()

@@ -26,7 +26,7 @@ def training (model, optimizer, dataloader, device,N):
     for epoch in range(2):  # loop over the dataset multiple times
 
         running_loss = 0.0
-        for i, data in tqdm(enumerate(dataloader, 0)):
+        for i, data in enumerate(tqdm(dataloader, 0)):
             # get the inputs; data is a list of [inputs, labels]   
             seq, id, Xd,Xn, mask, nativemask, esm_embed = data
             Xd = Xd.to(device)
@@ -59,6 +59,8 @@ def preform_energy_optimization(X_decoy,partial_dx_decoy):
     Args:
         X_decoy (tensor): A tensor containing the decoy structure [batch_size,seq_len,4,3]
         partial_dx_decoy (tensor): A tensor containing the partial derivative of the energy with respect to the decoy structure [batch_size,seq_len,4,3]
+    output:
+        lossc (tensor): The dRMSD of the end and the start of the optimization.
     """
     return 0
 
@@ -86,6 +88,9 @@ def criterion(E,X_native,X_decoy,N):
     lossd = (E[:,] / E[:,0]).mean()
     
     lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
+    print("lossg: ",lossg)
+    print("lossd: ",lossd)
+    print("lossc: ",lossc)
     return (lossg+lossd+lossc)/3
 
 def main():

@@ -91,11 +91,13 @@ class ProteinEnergyNet(nn.Module):
             # calculate avrege and gradient of each neigbor
             Ki = self.Knonbond_layers[layer]
             Ki_hat = self.Kbond_layers[layer]
+            # Normalize the feature vector
+            Fh = F.normalize(Fh)
             # Generate Fhb for bonded atoms
             Fhb = torch.zeros(B,N_residu,self.emmbeding_size+N_atoms**2,device=self.device)
             for i in range(self.bonded,Fh.shape[1],self.bonded):
                 Fhb[:,(i-self.bonded):i,:]= self.layer_operation(Ki_hat,A_G[:,(i-self.bonded):i,:],
-                                                                 Fh[:,(i-self.bonded):i,:])
+                                                     Fh[:,(i-self.bonded):i,:])
             # Generate Fhub for noneboned atoms
             Fhub = self.layer_operation(Ki,A_G,Fh)
             # Update Feature vector for each node

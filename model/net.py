@@ -172,8 +172,8 @@ class ProteinEnergyNet(nn.Module):
             G (tensor): [batch_size, n_nodes, n_nodes]
         """
         B,N_residu,N_atoms,coords_size = Xd.shape
-        D = self.get_dist_matrix(Xd)                                             # [batch_size, n_nodes,n_nodes, atom_dist=16]
-        D = D.reshape(B,N_residu,N_residu*N_atoms**2)                            # [batch_size, n_nodes,n_nodes*atom_dist=256]
+        D = self.get_dist_matrix(Xd)                                        # [batch_size, n_nodes,n_nodes, atom_dist=16]
+        D = D.reshape(B,N_residu,N_residu*N_atoms**2)                       # [batch_size, n_nodes,n_nodes*atom_dist=256]
         # Get the derivative of the distance matrix
         G = self.get_gradient_mat(D)                                        # [batch_size, n_nodes,n_nodes]
         # Get the average of the distance matrix

@@ -18,7 +18,7 @@ class CFG:
     # Model parameters
     h = 0.001
     coords_emb = 64
-    embedding_size = 480
+    embedding_size = 10
     filters = 128
     num_layers = 16
     model_path = "model.pt"

@@ -68,7 +68,7 @@ class PEFDataset(Dataset):
         nativemask = torch.load(os.path.join(index_path, 'nativemask.pt'))
         # Embeddings
         n_nodes= coordsAlpha.shape[0]
-        esm_embed = torch.stack(torch.load(os.path.join(index_path, 'emb_esm.pt')))
+        esm_embed = torch.stack(torch.load(os.path.join(index_path, 'emb_esm.pt')))[0][:10]
         esm_embed = esm_embed.repeat(n_nodes,1)
         # Concatenate the coordinates
         Xd = self.concat_cords(coordsAlpha,coordsBeta, coordsC, coordsN)

@@ -14,7 +14,7 @@ class CFG:
     # Train data parameters
     homothresh = 0.9
     split_train = 0.8
-    debuge_size  = 2000
+    debuge_size  = 100
     # Model parameters
     h = 0.001
     coords_emb = 64

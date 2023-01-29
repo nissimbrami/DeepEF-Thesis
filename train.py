@@ -28,6 +28,8 @@ def training (model, optimizer, dataloader, device,N):
     for epoch in range(CFG.num_epochs):  # loop over the dataset multiple times
 
         running_loss = 0.0
+        torch.cuda.empty_cache()
+        gc.collect()
         with tqdm(dataloader, unit="batch") as tepoch:
             for i, data in enumerate(tepoch):
                 # set progress bar description
@@ -46,6 +48,7 @@ def training (model, optimizer, dataloader, device,N):
                 # forward + backward + optimize
                 outputs = model(Xd,Xn,esm_embed)
                 loss = criterion(outputs,Xd,Xn,N)
+                print(loss)
                 loss.backward()
                 optimizer.step()
 

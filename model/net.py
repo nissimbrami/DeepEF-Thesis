@@ -35,7 +35,7 @@ class ProteinEnergyNet(nn.Module):
         self.cord_size = params.cord_size
         self.n_atom_dist = 16
         self.emmbeding_size = params.embedding_size
-        self.alpha = 0.2
+        self.alpha = 0.0001
         self.bonded = 1 
         # dirivative error
         self.h = params.h
@@ -44,11 +44,19 @@ class ProteinEnergyNet(nn.Module):
         self.KcoordsIn = nn.Parameter(nn.init.xavier_uniform_(torch.empty(3,self.cord_size))) # 3 for x,y,z
         self.KcoordsOut = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.cord_size,1))) 
         
+        # batch normalization
+        self.epsilon = 1e-5
+        self.momentum = 0.1
+        self.gamma = nn.Parameter(torch.ones(self.emmbeding_size+self.n_atom_dist))
+        self.beta = nn.Parameter(torch.zeros(self.emmbeding_size+self.n_atom_dist))
+        self.register_buffer('running_mean', torch.zeros(self.emmbeding_size+self.n_atom_dist))
+        self.register_buffer('running_var', torch.ones(self.emmbeding_size+self.n_atom_dist))
+        
         # GNN layers  - each layes contains the params for matrix multiplication(TODO: what is the benefit in convolution)
         self.Kbond_layers = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.num_layers,self.n_filters,
-                                                                             self.bonded,self.emmbeding_size))) 
+                                                                             self.n_atom_dist+ self.emmbeding_size,self.bonded))) 
         self.Knonbond_layers = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.num_layers,self.n_filters,
-                                                                             1000,self.emmbeding_size)))
+                                                                             self.n_atom_dist+ self.emmbeding_size,5)))
         
        
         
@@ -84,22 +92,24 @@ class ProteinEnergyNet(nn.Module):
             E torch.tensor : Batch of proteins energy [batch_size]
         """
         B,N_residu,N_atoms,N_cords = X.shape
-        Xembed = self.embed_cords(X)                                      # [batch_size, n_nodes ,num_atoms=4,new_cords_size]
+        #Xembed = self.embed_cords(X)                                      # [batch_size, n_nodes ,num_atoms=4,new_cords_size]
+        Xembed = X
         Fh,A,G = self.get_Fh0(Xembed,emmbeidng,self.h)                    # [batch_size, n_nodes ,atom_dist+embedding_size]
-        # Start GNN layers loop:
+        #Start GNN layers loop:
         for layer in range(self.num_layers):
+            Fh = self.normelize_graph(Fh)            # [batch_size, n_nodes ,atom_dist+embedding_size]
             # calculate avrege and gradient of each neigbor
             Ki = self.Knonbond_layers[layer]
             Ki_hat = self.Kbond_layers[layer]
-            # Normalize the feature vector
-            Fh = F.normalize(Fh)
+            # Get new Avrege and gradient of each node
+            A , G = self.get_AVG_mat(Fh), self.get_Grad_mat(Fh)
             # Generate Fhb for bonded atoms
-            Fhb = torch.zeros(B,N_residu,self.emmbeding_size+N_residu*N_atoms**2,device=self.device)
+            Fhb = torch.zeros(B,N_residu,self.emmbeding_size+N_atoms**2,device=self.device)
             for i in range(self.bonded,Fh.shape[1],self.bonded):
                 Fhb[:,(i-self.bonded):i,:]= self.layer_operation(Ki_hat,A[:,(i-self.bonded):i,(i-self.bonded):i],G[:,(i-self.bonded):i,(i-self.bonded):i],
                                                      Fh[:,(i-self.bonded):i,:])
             # Generate Fhub for noneboned atoms
-            Fhub = self.layer_operation(Ki[:,:N_residu,:],A,G,Fh)
+            Fhub = self.layer_operation(Ki,A,G,Fh)
             # Update Feature vector for each node
             Fh = Fh-self.alpha*Fhub - self.alpha*Fhb
         # Calculate energy
@@ -115,7 +125,7 @@ class ProteinEnergyNet(nn.Module):
         Returns:
             Energy [batch_size] tensor
         """
-        E = torch.sqrt(torch.sum(Fh**2,dim=(1,2)))
+        E = torch.sum(Fh**2,dim=(1,2))
         return E
     
     
@@ -149,11 +159,14 @@ class ProteinEnergyNet(nn.Module):
         """
         B,N_residu,_ = A.shape
         nodeE = Fh
-        Q = torch.matmul(A,nodeE) + torch.matmul(G,nodeE)  #[batch_size,n_nodes,embedding_size+n_nodes*atom_dist]
+        Q = torch.matmul(A,nodeE) + torch.matmul(G,nodeE)  #[batch_size,n_nodes,embedding_size+atom_dist]
+        # Change shape to fit the conv1d
+        Q = Q.reshape(B,-1,N_residu)                       #[batch_size,embedding_size+atom_dist,n_nodes]
         Q = F.conv1d(Q, Ki)
-        Q = F.instance_norm(Q)
+        # Q = F.instance_norm(Q)
         Q = F.leaky_relu(Q, negative_slope=0.2)
         Q = F.conv_transpose1d(Q, Ki)
+        Q = Q.reshape(B,N_residu,-1)                       #[batch_size, n_nodes, filters]
         Q = torch.matmul(A,Q) + torch.matmul(G,Q)   #[batch_size,n_nodes,embedding_size+n_nodes]
         return Q
         
@@ -167,20 +180,22 @@ class ProteinEnergyNet(nn.Module):
             h (_type_): derovative step
 
         Returns:
-            Fh (tensor): [batch_size,n_nodes, embedding_size+n_nodes*atom_dist
+            Fh (tensor): [batch_size,n_nodes, embedding_size+atom_dist]
             A (tensor): [batch_size, n_nodes, n_nodes]
             G (tensor): [batch_size, n_nodes, n_nodes]
         """
         B,N_residu,N_atoms,coords_size = Xd.shape
         D = self.get_dist_matrix(Xd)                                        # [batch_size, n_nodes,n_nodes, atom_dist=16]
-        D = D.reshape(B,N_residu,N_residu*N_atoms**2)                       # [batch_size, n_nodes,n_nodes*atom_dist=256]
+        #D = D.reshape(B,N_residu,N_residu*N_atoms**2)                       # [batch_size, n_nodes,n_nodes*atom_dist=256]
+        # Sum for each atom 16 distances
+        D = D.sum(dim=2)                                                   # [batch_size, n_nodes,atom_dist=16]
         # Get the derivative of the distance matrix
-        G = self.get_gradient_mat(D)                                        # [batch_size, n_nodes,n_nodes]
+        G = self.get_Grad_mat(D)                                        # [batch_size, n_nodes,n_nodes]
         # Get the average of the distance matrix
         A = self.get_AVG_mat(D)                                             # [batch_size, n_nodes, n_nodes]
         # First node features
-        FD =  torch.matmul(A,D) +torch.matmul(G,D)                          # [batch_size,n_nodes, n_nodes*atom_dist=16]
-        FD = F.normalize(FD, p=2, dim=2)                                    # [batch_size,n_nodes, atoms_dist=16]   
+        FD =  torch.matmul(A,D) +torch.matmul(G,D)                          # [batch_size,n_nodes, atom_dist=16]
+        # FD = F.normalize(FD, p=2, dim=2)                                    # [batch_size,n_nodes, atoms_dist=16]   
         Fh = torch.cat((FD,FS),dim=2)                                       # [batch_size,n_nodes, embedding_size+atoms_dist=16]
         return Fh,A,G
         
@@ -212,7 +227,7 @@ class ProteinEnergyNet(nn.Module):
         B = Fh.sum(axis=2).repeat(1,N_residu,1)
         return (A+B)/2
     
-    def get_gradient_mat(self,Fh):
+    def get_Grad_mat(self,Fh):
         """
         Return the node distence matrix between all nodes
 
@@ -226,3 +241,26 @@ class ProteinEnergyNet(nn.Module):
         A = Fh.sum(axis=2, keepdim=True).repeat(1,1,N_residu)
         B = Fh.sum(axis=2).repeat(1,N_residu,1)
         return (A-B)
+    
+    def normelize_graph(self,x):
+        """
+        Preform batch normalization on the graph
+
+        Args:
+            x (tensor): B,N_residu,embedding_size+atom_dist tensor
+        """
+        # Compute the mean and variance of the node features for each graph
+        x_mean = torch.mean(x, dim=1, keepdim=True)
+        x_var = torch.var(x, dim=1, keepdim=True)
+        
+        # Normalize the node features
+        x_norm = (x - x_mean) / torch.sqrt(x_var + self.epsilon)
+        
+        # Weight and bias the normalized features
+        x_out = self.gamma * x_norm + self.beta
+        
+        # Update the running mean and variance
+        self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * x_mean.squeeze()
+        self.running_var = (1 - self.momentum) * self.running_var + self.momentum * x_var.squeeze()
+        
+        return x_out

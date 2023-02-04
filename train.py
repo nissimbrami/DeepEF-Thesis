@@ -48,7 +48,7 @@ def training (model, optimizer, dataloader, device,N):
                 # forward + backward + optimize
                 outputs = model(Xd,Xn,esm_embed)
                 loss = criterion(outputs,Xd,Xn,N)
-                print(loss)
+                print(loss.item())
                 loss.backward()
                 optimizer.step()
 
@@ -97,13 +97,13 @@ def criterion(E,X_native,X_decoy,N):
     partial_dx_decoy = torch.autograd.grad(E[:,0].sum(),X_decoy,create_graph=True)[0]
     partial_dx_native = torch.autograd.grad(E[:,1].sum(),X_native,create_graph=True)[0]
     print('***End derivative calc function***')
-    lossg = 0.5*torch.norm(partial_dx_native,p=2)
+    lossg = torch.norm(partial_dx_native,p=2)
     
     lossd = (E[:,1] / E[:,0]).mean()
     
     lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
     
-    return (lossg+lossd+lossc)/3
+    return (lossg+lossd+lossc)
 
 def main():
     print('***Start main function***')

@@ -53,9 +53,9 @@ class ProteinEnergyNet(nn.Module):
         self.register_buffer('running_var', torch.ones(self.emmbeding_size+self.n_atom_dist))
         
         # GNN layers  - each layes contains the params for matrix multiplication(TODO: what is the benefit in convolution)
-        self.Kbond_layers = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.num_layers,self.n_filters,
+        self.Kbond_layers = nn.Parameter(nn.init.xavier_normal_(torch.empty(self.num_layers,self.n_filters,
                                                                              self.n_atom_dist+ self.emmbeding_size,self.bonded))) 
-        self.Knonbond_layers = nn.Parameter(nn.init.xavier_uniform_(torch.empty(self.num_layers,self.n_filters,
+        self.Knonbond_layers = nn.Parameter(nn.init.xavier_normal_(torch.empty(self.num_layers,self.n_filters,
                                                                              self.n_atom_dist+ self.emmbeding_size,5)))
         
        
@@ -73,6 +73,15 @@ class ProteinEnergyNet(nn.Module):
         Returns:
             Energy [batch_size] tensor.
         """
+        # Add f(x+h),f(x-h) to the input
+        X_decoyh = X_decoy + self.h
+        X_decoyl = X_decoy - self.h
+        X_decoy = torch.cat((X_decoy,X_decoyh,X_decoyl),dim=0)
+        X_nativeh = X_native + self.h
+        X_natively = X_native - self.h
+        X_native = torch.cat((X_native,X_nativeh,X_natively),dim=0)
+        emmbeidng = emmbeidng.repeat(3,1,1)
+        
         # Calculate energy for decoy and native
         E_xd = self.forward_x(X_decoy,emmbeidng)
         E_xn = self.forward_x(X_native,emmbeidng)
@@ -223,9 +232,9 @@ class ProteinEnergyNet(nn.Module):
             AVG_MAT (tensor) : [batch_size,n_nodes, n_nodes] tensor
         """
         B,N_residu, _ = Fh.shape
-        A = Fh.sum(axis=2,keepdim=True).repeat(1,1,N_residu)
-        B = Fh.sum(axis=2).repeat(1,N_residu,1)
-        return (A+B)/2
+        # Calculate the pairwise avrege between each node in the tensor
+        pairwise_avg = (Fh.unsqueeze(axis=2) + Fh.unsqueeze(axis=1))/2   
+        return torch.sum(pairwise_avg,axis=-1)
     
     def get_Grad_mat(self,Fh):
         """
@@ -237,10 +246,15 @@ class ProteinEnergyNet(nn.Module):
         output:
             Grad_MAT (tensor) : [batch_size,n_nodes, n_nodes] tensor
         """
-        B,N_residu, _ = Fh.shape
-        A = Fh.sum(axis=2, keepdim=True).repeat(1,1,N_residu)
-        B = Fh.sum(axis=2).repeat(1,N_residu,1)
-        return (A-B)
+        # Get the number of nodes in each batch and the dimensionality of each node
+        batch_size, n_nodes, d_dims = Fh.shape
+        # Calculate the pairwise differences between each node in the tensor
+        pairwise_differences = Fh.unsqueeze(axis=2) - Fh.unsqueeze(axis=1)
+        # Calculate the pairwise squared distances between each node in the tensor
+        # pairwise_squared_distances = torch.sum(pairwise_differences**2, axis=-1)
+        # # Calculate the pairwise distances between each node in the tensor
+        # distances = torch.sqrt(pairwise_squared_distances)
+        return torch.sum(pairwise_differences,axis=-1)
     
     def normelize_graph(self,x):
         """

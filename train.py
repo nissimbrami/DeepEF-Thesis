@@ -47,9 +47,10 @@ def training (model, optimizer, dataloader, device,N):
 
                 # forward + backward + optimize
                 outputs = model(Xd,Xn,esm_embed)
-                loss = criterion(outputs,Xd,Xn,N)
+                loss = criterion(outputs,Xd,Xn,N,CFG.h)
                 print(loss.item())
                 loss.backward()
+                # print_par(model) # print the parameters of the model
                 optimizer.step()
 
                 # print statistics
@@ -61,9 +62,9 @@ def training (model, optimizer, dataloader, device,N):
                 torch.cuda.empty_cache()
                 gc.collect()
                 # update the progress bar
-                tepoch.set_postfix(loss=loss.item())
-            # save the model
-            save_checkpoint(epoch, model, optimizer,loss,CFG.model_path)
+                tepoch.set_postfix(loss=round(loss.item(),3))
+                # save the model
+                save_checkpoint(epoch, model, optimizer,loss,CFG.model_path)
     print('Finished Training')
 
 def preform_energy_optimization(X_decoy,partial_dx_decoy):
@@ -77,7 +78,7 @@ def preform_energy_optimization(X_decoy,partial_dx_decoy):
     """
     return 0
 
-def criterion(E,X_native,X_decoy,N):
+def criterion(E,X_native,X_decoy,N,h):
     """
     The loss function for the model coressponds to 3 main losses:
     1. lossg: the partial derivateve of the energy with respect to the native structure
@@ -86,24 +87,28 @@ def criterion(E,X_native,X_decoy,N):
               we calculate the dRMSD of the end and the start of the optimization.
 
     Args:
-        E (tensor): A tensor containing the energy of the native and the decoy structure Exd,Exn [batch_size,2]
+        E (tensor): A tensor containing the energy of the native and the decoy structure Exd,Exn [batch_size*3,2]
         X_native (tensor): A tensor containing the native structure [batch_size,seq_len,4,3]
         X_decoy (tensor): A tensor containing the decoy structure [batch_size,seq_len,4,3]
         N (int): The number of iterations for the iterative optimization
+        h (float): The step size for the numerical derivative
     output:
         loss (tensor): The loss of the model
     """
-    print('***Start criterion function***')
-    partial_dx_decoy = torch.autograd.grad(E[:,0].sum(),X_decoy,create_graph=True)[0]
-    partial_dx_native = torch.autograd.grad(E[:,1].sum(),X_native,create_graph=True)[0]
-    print('***End derivative calc function***')
+    # print('***Start criterion function***')
+    # partial_dx_decoy = torch.autograd.grad(E[:,0].sum(),X_decoy,create_graph=True)[0]
+    # partial_dx_native = torch.autograd.grad(E[:,1].sum(),X_native,create_graph=True)[0]
+    # print('***End derivative calc function***')
+    batch_size3,_ = E.shape
+    batch_size = int(batch_size3/3)
+    partial_dx_native = (E[batch_size:2*batch_size,0] - E[2*batch_size:3*batch_size,0])/(2*h)
     lossg = torch.norm(partial_dx_native,p=2)
     
     lossd = (E[:,1] / E[:,0]).mean()
     
-    lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
+    # lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
     
-    return (lossg+lossd+lossc)
+    return (lossd+lossg)
 
 def main():
     print('***Start main function***')
@@ -138,5 +143,10 @@ def test(optimizer,model):
     
     optimizer.step()
     
+def print_par(model):
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print (name, param.data)
+   
 if __name__ == '__main__':
     main()

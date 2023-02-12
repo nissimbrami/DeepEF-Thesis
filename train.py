@@ -1,7 +1,8 @@
 from model.data_loader import PEFDataset,fetch_dataloader
 from model.data_loader import params as data_params
 from model.model_cfg import CFG
-from model.net import ProteinEnergyNet
+# from model.net import ProteinEnergyNet
+from model.hydro_net import ProteinEnergyNet
 from model.net import params as model_params
 from train_utils import save_checkpoint
 import torch
@@ -34,19 +35,23 @@ def training (model, optimizer, dataloader, device,N):
             for i, data in enumerate(tepoch):
                 # set progress bar description
                 tepoch.set_description(f"Epoch {epoch}")
-                
+                # Clean the GPU cache
+                torch.cuda.empty_cache()
+                gc.collect()
                 # get the inputs; data is a list of [inputs, labels]   
                 seq, id, Xd,Xn, mask, nativemask, esm_embed = data
                 Xd = Xd.to(device)
                 Xn = Xn.to(device)
                 esm_embed = esm_embed.to(device)
-                Xd.requires_grad = True
-                Xn.requires_grad = True
+                seq = seq.to(device)
+                seq = seq.reshape(seq.shape[0],seq.shape[2],seq.shape[1]) # reshape the seq tensor to [batch_size,seq_len,20]
+                #emb = torch.cat((esm_embed,seq),dim=2)
+                emb = seq
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
                 # forward + backward + optimize
-                outputs = model(Xd,Xn,esm_embed)
+                outputs = model(Xd,Xn,emb)
                 loss = criterion(outputs,Xd,Xn,N,CFG.h)
                 print(loss.item())
                 loss.backward()
@@ -101,7 +106,8 @@ def criterion(E,X_native,X_decoy,N,h):
     # print('***End derivative calc function***')
     batch_size3,_ = E.shape
     batch_size = int(batch_size3/3)
-    partial_dx_native = (E[batch_size:2*batch_size,0] - E[2*batch_size:3*batch_size,0])/(2*h)
+    # f(x+h) - f(x-h) / 2h is the numerical derivative for central space O(h^2) error
+    partial_dx_native = (E[batch_size:2*batch_size,1] - E[2*batch_size:3*batch_size,1])/(2*h)
     lossg = torch.norm(partial_dx_native,p=2)
     
     lossd = (E[:,1] / E[:,0]).mean()
@@ -121,6 +127,7 @@ def main():
     m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
                              cord_size = CFG.coords_emb,h = CFG.h,device=CFG.device)
     model = ProteinEnergyNet(m_params).to(CFG.device)
+    
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
     print('***Start training***')

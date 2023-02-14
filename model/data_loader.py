@@ -52,6 +52,7 @@ class PEFDataset(Dataset):
         index_path = os.path.join(self.datapath, self.filenames[index])
        # Sequence of the protein
         seq = torch.load(os.path.join(index_path, 'seq.pt'))
+        seq_decoy = seq[:,torch.randperm(seq.shape[1])]
         id = torch.load(os.path.join(index_path, 'ids.pt')) # string id
        # 3D coordinates of the protein
         coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt'))
@@ -74,7 +75,7 @@ class PEFDataset(Dataset):
         Xd = self.concat_cords(coordsAlpha,coordsBeta, coordsC, coordsN)
         Xn = self.concat_cords(coordsAlpha_native,coordsBeta_native, coordsC_native, coordsN_native)
            
-        return seq, id, Xd,Xn, mask, nativemask, esm_embed 
+        return seq,seq_decoy, id, Xd,Xn, mask, nativemask, esm_embed 
         
     def read_protein(self,index):
         """
@@ -145,6 +146,7 @@ class PEFDataset(Dataset):
             if (self.train_type is not None) and (not self.train_type in id):
                 continue
 
+            # TODO: add mask check and inference
             # scale = 1e-2
             # Mnat = nativemask
             # M = msk & Mnat

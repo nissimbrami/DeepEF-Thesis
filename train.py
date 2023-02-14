@@ -39,21 +39,24 @@ def training (model, optimizer, dataloader, device,N):
                 torch.cuda.empty_cache()
                 gc.collect()
                 # get the inputs; data is a list of [inputs, labels]   
-                seq, id, Xd,Xn, mask, nativemask, esm_embed = data
+                seq,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
                 Xd = Xd.to(device)
                 Xn = Xn.to(device)
                 esm_embed = esm_embed.to(device)
                 seq = seq.to(device)
                 seq = seq.reshape(seq.shape[0],seq.shape[2],seq.shape[1]) # reshape the seq tensor to [batch_size,seq_len,20]
+                seq_decoy = seq_decoy.reshape(seq_decoy.shape[0],seq_decoy.shape[2],seq_decoy.shape[1]) # reshape the seq tensor to [batch_size,seq_len,20]
                 #emb = torch.cat((esm_embed,seq),dim=2)
                 emb = seq
+                emb_decoy = seq_decoy.to(device)
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
                 # forward + backward + optimize
-                outputs = model(Xd,Xn,emb)
-                loss = criterion(outputs,Xd,Xn,N,CFG.h)
+                outputs = model(Xd,Xn,emb,emb_decoy)
+                loss = criterion(outputs,Xd,Xn,model,N,CFG.h)
                 print(loss.item())
+                model.zero_grad()
                 loss.backward()
                 # print_par(model) # print the parameters of the model
                 optimizer.step()
@@ -83,7 +86,7 @@ def preform_energy_optimization(X_decoy,partial_dx_decoy):
     """
     return 0
 
-def criterion(E,X_native,X_decoy,N,h):
+def criterion(E,X_native,X_decoy,model,N,h):
     """
     The loss function for the model coressponds to 3 main losses:
     1. lossg: the partial derivateve of the energy with respect to the native structure
@@ -95,20 +98,18 @@ def criterion(E,X_native,X_decoy,N,h):
         E (tensor): A tensor containing the energy of the native and the decoy structure Exd,Exn [batch_size*3,2]
         X_native (tensor): A tensor containing the native structure [batch_size,seq_len,4,3]
         X_decoy (tensor): A tensor containing the decoy structure [batch_size,seq_len,4,3]
+        model (torch.model): model that was trained
         N (int): The number of iterations for the iterative optimization
         h (float): The step size for the numerical derivative
     output:
         loss (tensor): The loss of the model
     """
     # print('***Start criterion function***')
-    # partial_dx_decoy = torch.autograd.grad(E[:,0].sum(),X_decoy,create_graph=True)[0]
-    # partial_dx_native = torch.autograd.grad(E[:,1].sum(),X_native,create_graph=True)[0]
+    # partial_dx_decoy = torch.autograd.grad(E[:,0].sum(),model.parameters(),create_graph=True,allow_unused=True)
+    partial_dx_native = torch.autograd.grad(E[:,1].sum(),model.parameters(),create_graph=True,allow_unused=True)
     # print('***End derivative calc function***')
-    batch_size3,_ = E.shape
-    batch_size = int(batch_size3/3)
-    # f(x+h) - f(x-h) / 2h is the numerical derivative for central space O(h^2) error
-    partial_dx_native = (E[batch_size:2*batch_size,1] - E[2*batch_size:3*batch_size,1])/(2*h)
-    lossg = torch.norm(partial_dx_native,p=2)
+    
+    lossg = sum([ 0 if part_dx is None else torch.norm(part_dx,p=2) for part_dx in partial_dx_native])
     
     lossd = (E[:,1] / E[:,0]).mean()
     

@@ -58,7 +58,7 @@ class ProteinEnergyNet(nn.Module):
        
         
 
-    def forward(self, X_decoy, X_native,emmbeidng):
+    def forward(self, X_decoy, X_native,emmbeidng,emb_decoy):
         """
         This is where we define the network's forward pass, i.e. how the network maps inputs to outputs.
         The forward pass wiill recive the input data as a tensor.
@@ -66,15 +66,14 @@ class ProteinEnergyNet(nn.Module):
             X_decoy: a [batch_size,n_nodes ,num_atoms=4,coordination=3] tensor
             X_native: a a [batch_size,n_nodes ,num_atoms=4,coordination=3] tensor
             emmbeidng: a [batch_size,n_nodes, embedding_size] tensor
+            emb_decoy: a [batch_size,n_nodes, embedding_size] tensor
         Since every node is connected to all other nodes there are no need for ajacency matrix.
         Returns:
             Energy [batch_size] tensor.
         """
-        # Repeat the embedding for each f(x+h),f(x-h) 
-        emmbeidng = emmbeidng.repeat(3,1,1)
         
         # Calculate energy for decoy and native
-        E_xd = self.forward_x(X_decoy,emmbeidng)
+        E_xd = self.forward_x(X_decoy,emb_decoy)
         E_xn = self.forward_x(X_native,emmbeidng)
         # Concatenate the energy of the decoy and native
         E_xd = E_xd.unsqueeze(1)
@@ -97,7 +96,7 @@ class ProteinEnergyNet(nn.Module):
         Xembed = X_centered
         
         Fh,A,G = self.get_Fh0(Xembed,emmbeidng,self.h)                    # [batch_size, n_nodes ,atom_dist+embedding_size]
-        B = Fh.shape[0]
+        B,N,d = Fh.shape
         #Start GNN layers loop:
         for layer in range(self.num_layers):
             # calculate avrege and gradient of each neigbor
@@ -193,21 +192,19 @@ class ProteinEnergyNet(nn.Module):
         D = D.reshape(B,N_atoms**2,N_residu,N_residu)              # [batch_size, n_nodes*atom_dist,n_nodes]
         Z = F.conv2d(D, self.sigma.abs(), padding=self.sigma.shape[-1]//2)
         Z = F.normalize(Z, dim=[2,3])
-        D = torch.relu(torch.exp(-1e2*Z) - self.biasDistance)
+        D = torch.relu(torch.exp(-1e1*Z) - self.biasDistance)
         # Sum for each atom 16 distances
         D = D.sum(dim=2)                                                   # [batch_size, n_nodes,atom_dist=16]
-        # Get the h+1 and h-1 distance matrix
-        Dr = D + D.mean()*h
-        Dl = D - D.mean()*h
-        D = torch.cat((D,Dr,Dl),dim=0)                                   # [batch_size*3, n_nodes,atom_dist=16*3]
-        D = D.reshape(B*3,N_residu,-1)           # [batch_size, 3*atom_dist,n_nodes]
+        D = F.normalize(D, p=2, dim=1)                                    # [batch_size,n_nodes, atoms_dist=16]
+        D = D.reshape(B,N_residu,-1)
         # Get the derivative of the distance matrix
         G = self.get_Grad_mat(D)                                        # [batch_size, n_nodes,n_nodes]
         # Get the average of the distance matrix
         A = self.get_AVG_mat(D)                                             # [batch_size, n_nodes, n_nodes]
         # First node features
         FD =  torch.matmul(A,D) +torch.matmul(G,D)                          # [batch_size,n_nodes, atom_dist=16]
-        FD = F.normalize(FD, p=2, dim=2)                                    # [batch_size,n_nodes, atoms_dist=16]   
+        #TODO: diffrences between atomes of the same node are small
+        FD = F.normalize(FD, p=2, dim=1)                                    # [batch_size,n_nodes, atoms_dist=16]   
         Fh = torch.cat((FD,FS),dim=2)                                       # [batch_size,n_nodes, embedding_size+atoms_dist=16]
         return Fh,A,G
         

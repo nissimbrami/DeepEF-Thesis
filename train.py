@@ -56,7 +56,7 @@ def training (model, optimizer, dataloader, device,N):
                 outputs = model(Xd,Xn,emb,emb_decoy)
                 loss = criterion(outputs,Xd,Xn,model,N,CFG.h)
                 print(loss.item())
-                model.zero_grad()
+
                 loss.backward()
                 # print_par(model) # print the parameters of the model
                 optimizer.step()

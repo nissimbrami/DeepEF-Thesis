@@ -61,7 +61,7 @@ class ProteinEnergyNet(nn.Module):
        
         
 
-    def forward(self, X_decoy, X_native,emmbeidng):
+    def forward(self, X_decoy, X_native,embedding):
         """
         This is where we define the network's forward pass, i.e. how the network maps inputs to outputs.
         The forward pass wiill recive the input data as a tensor.
@@ -80,22 +80,22 @@ class ProteinEnergyNet(nn.Module):
         # X_nativeh = X_native + self.h
         # X_natively = X_native - self.h
         # X_native = torch.cat((X_native,X_nativeh,X_natively),dim=0)
-        emmbeidng = emmbeidng.repeat(3,1,1)
+        embedding = embedding.repeat(3,1,1)
         
         # Calculate energy for decoy and native
-        E_xd = self.forward_x(X_decoy,emmbeidng)
-        E_xn = self.forward_x(X_native,emmbeidng)
+        E_xd = self.forward_x(X_decoy,embedding)
+        E_xn = self.forward_x(X_native,embedding)
         # Concatenate the energy of the decoy and native
         E_xd = E_xd.unsqueeze(1)
         E_xn = E_xn.unsqueeze(1)
         return torch.cat((E_xd,E_xn),dim=1)
 
-    def forward_x(self,X,emmbeidng):
+    def forward_x(self,X,embedding):
         """
         Recives a single protein and calculate the energy
         Args:
             X (torch.tensor): Batch of proteins [batch_size,n_nodes ,num_atoms=4,coordination=3]
-            emmbeidng (_type_): Batch of proteins [batch_size,n_nodes, embedding_size]
+            embedding (_type_): Batch of proteins [batch_size,n_nodes, embedding_size]
 
         Returns:
             E torch.tensor : Batch of proteins energy [batch_size]
@@ -103,11 +103,11 @@ class ProteinEnergyNet(nn.Module):
         B,N_residu,N_atoms,N_cords = X.shape
         #Xembed = self.embed_cords(X)                                      # [batch_size, n_nodes ,num_atoms=4,new_cords_size]
         Xembed = X
-        Fh,A,G = self.get_Fh0(Xembed,emmbeidng,self.h)                    # [batch_size, n_nodes ,atom_dist+embedding_size]
+        Fh,A,G = self.get_Fh0(Xembed,embedding,self.h)                    # [batch_size, n_nodes ,atom_dist+embedding_size]
         B = Fh.shape[0]
         #Start GNN layers loop:
         for layer in range(self.num_layers):
-            Fh = self.normelize_graph(Fh)            # [batch_size, n_nodes ,atom_dist+embedding_size]
+            Fh = self.normalize_graph(Fh)            # [batch_size, n_nodes ,atom_dist+embedding_size]
             # calculate avrege and gradient of each neigbor
             Ki = self.Knonbond_layers[layer]
             Ki_hat = self.Kbond_layers[layer]
@@ -261,7 +261,7 @@ class ProteinEnergyNet(nn.Module):
         # distances = torch.sqrt(pairwise_squared_distances)
         return torch.sum(pairwise_differences,axis=-1)
     
-    def normelize_graph(self,x):
+    def normalize_graph(self,x):
         """
         Preform batch normalization on the graph
 

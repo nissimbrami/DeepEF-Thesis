@@ -53,7 +53,7 @@ class ProteinEnergyNet(nn.Module):
         self.Kbond_layers = nn.Parameter(nn.init.xavier_normal_(torch.empty(self.num_layers,self.n_filters,
                                                                              3*self.n_atom_dist+ self.emmbeding_size,self.bonded))) 
         self.Knonbond_layers = nn.Parameter(nn.init.xavier_normal_(torch.empty(self.num_layers,self.n_filters,
-                                                                             3*self.n_atom_dist+ self.emmbeding_size,5)))
+                                                                             3*self.n_atom_dist+ self.emmbeding_size,11)))
         
        
         
@@ -135,13 +135,13 @@ class ProteinEnergyNet(nn.Module):
         """
         Embeds the item into a vector representation.
         Inputs:
-            item: a [batch_size, n_nodes ,num_atoms=4,coordination=3] tensor
+            X_decoy: a [batch_size, n_nodes ,num_atoms=4,coordination=3] tensor
         Returns:
             X: a [batch_size, n_nodes ,num_atoms=4,new_cords_size, embedding_size] tensor
         
         3.1 equation from the research paper
         """
-        X_centered = X_decoy-X_decoy.mean(dim=-1, keepdim=True)
+        X_centered = X_decoy-X_decoy.mean(dim=1, keepdim=True)
         X = torch.matmul(X_centered**2, self.KcoordsIn) #[batch_size, n_nodes ,num_atoms=4,new_cords_size]
         X = F.relu(X)
         X = torch.matmul(X, self.KcoordsOut)            #[batch_size, n_nodes ,num_atoms=4,new_cords_size]  

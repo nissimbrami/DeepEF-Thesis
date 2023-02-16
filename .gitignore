@@ -1,3 +1,4 @@
 /data/*
 /experiments/.ipyn*
 /model.pt
+\model\__pycache__\*

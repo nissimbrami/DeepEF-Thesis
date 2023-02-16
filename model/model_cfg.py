@@ -20,7 +20,7 @@ class CFG:
     coords_emb = 64
     embedding_size = 20
     filters = 64
-    num_layers = 16
+    num_layers = 1
     model_path = "model.pt"
     #training parameters
     lr = 0.0001

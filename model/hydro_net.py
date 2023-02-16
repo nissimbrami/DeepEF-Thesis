@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 class params():
     def __init__(self,embedding_size,layers,filters,cord_size,h,device):
@@ -43,7 +44,7 @@ class ProteinEnergyNet(nn.Module):
         self.stdv = 1e-3
         self.Kembeddings = nn.Parameter(self.stdv * torch.randn(20, self.emmbeding_size, 9))
         # corrdinate embedding paraameters
-        sigma = 1+torch.rand(3*self.n_atom_dist, self.n_atom_dist, 5 , 5)
+        sigma = 1+torch.zeros(3*self.n_atom_dist, self.n_atom_dist, 5 , 5)
         self.sigma = nn.Parameter(sigma)
         self.biasDistance = nn.Parameter(0.6*torch.ones(1, 3*self.n_atom_dist, 1, 1))
         self.KcoordsIn = nn.Parameter(nn.init.xavier_uniform_(torch.empty(3,self.cord_size))) # 3 for x,y,z
@@ -152,18 +153,18 @@ class ProteinEnergyNet(nn.Module):
         Return the node features
         Args:
             K (tensor): weight matrix [n_filters,param1, param2]
-            A (tensor): [batch_size, n_nodes, n_nodes]
-            G (tensor): [batch_size, n_nodes, n_nodes]
-            Fh (tensor): [batch_size,n_nodes, embedding_size+n_nodes]
+            A (tensor): [batch_size, n_nodes, n_nodes] - avrege of each node
+            G (tensor): [batch_size, n_nodes, n_nodes] - gradient of each node
+            Fh (tensor): [batch_size,n_nodes, d] - node features
 
         Returns:
             tensor : [batch_size,n_nodes, embedding_size+n_nodes]
         """
         B,N_residu,_ = A.shape
         nodeE = Fh
-        Q = torch.matmul(A,nodeE) + torch.matmul(G,nodeE)  #[batch_size,n_nodes,embedding_size+atom_dist]
+        Q = torch.matmul(A,nodeE) + torch.matmul(G,nodeE)  #[batch_size,n_nodes,d]
         # Change shape to fit the conv1d
-        Q = Q.reshape(B,-1,N_residu)                       #[batch_size,embedding_size+atom_dist,n_nodes]
+        Q = Q.reshape(B,-1,N_residu)                       #[batch_size,d,n_nodes]
         Q = F.conv1d(Q, Ki)
         # Q = F.instance_norm(Q)
         Q = F.leaky_relu(Q, negative_slope=0.2)
@@ -217,8 +218,14 @@ class ProteinEnergyNet(nn.Module):
             tensor : [batch_size, n_nodes,n_nodes ,atom_dist=16] tensor
         """
         B,N_residu,N_atoms,coords_size = Xd.shape
-        Xd = Xd.reshape(B,N_residu*N_atoms,coords_size)
-        D = torch.cdist(Xd,Xd,p=2).reshape(B,N_residu,N_residu,N_atoms**2)      # [batch_size, n_nodes,n_nodes, atom_dist=16]
+        Xd = Xd.reshape(B,N_residu,N_atoms*coords_size)
+        # D = torch.cdist(Xd,Xd,p=2).reshape(B,N_residu,N_residu,N_atoms**2)      # [batch_size, n_nodes,n_nodes, atom_dist=16]
+        # Calculate the pairwise differences between each node in the tensor
+        pairwise_differences = (Xd.unsqueeze(axis=2) - Xd.unsqueeze(axis=1))
+        # Calculate the pairwise squared distances between each node in the tensor
+        pairwise_squared_distances = torch.sum(pairwise_differences**2, axis=-1)
+        # Calculate the pairwise distances between each node in the tensor
+        D = torch.sqrt(pairwise_squared_distances)
         return D
     
     def get_AVG_mat(self,Fh):

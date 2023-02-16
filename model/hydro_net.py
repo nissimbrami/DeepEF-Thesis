@@ -58,7 +58,7 @@ class ProteinEnergyNet(nn.Module):
        
         
 
-    def forward(self, X_decoy, X_native,emmbeidng,emb_decoy):
+    def forward(self, X_decoy, X_native,embeiddng,emb_decoy):
         """
         This is where we define the network's forward pass, i.e. how the network maps inputs to outputs.
         The forward pass wiill recive the input data as a tensor.
@@ -74,13 +74,13 @@ class ProteinEnergyNet(nn.Module):
         
         # Calculate energy for decoy and native
         E_xd = self.forward_x(X_decoy,emb_decoy)
-        E_xn = self.forward_x(X_native,emmbeidng)
+        E_xn = self.forward_x(X_native,embeiddng)
         # Concatenate the energy of the decoy and native
         E_xd = E_xd.unsqueeze(1)
         E_xn = E_xn.unsqueeze(1)
         return torch.cat((E_xd,E_xn),dim=1)
 
-    def forward_x(self,X,emmbeidng):
+    def forward_x(self,X,embeiddng):
         """
         Recives a single protein and calculate the energy
         Args:
@@ -95,7 +95,7 @@ class ProteinEnergyNet(nn.Module):
         X_centered = X-X.mean(dim=1, keepdim=True)
         Xembed = X_centered
         
-        Fh,A,G = self.get_Fh0(Xembed,emmbeidng,self.h)                    # [batch_size, n_nodes ,atom_dist+embedding_size]
+        Fh,A,G = self.get_Fh0(Xembed,embeiddng,self.h)                    # [batch_size, n_nodes ,atom_dist+embedding_size]
         B,N,d = Fh.shape
         #Start GNN layers loop:
         for layer in range(self.num_layers):

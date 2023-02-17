@@ -218,14 +218,8 @@ class ProteinEnergyNet(nn.Module):
             tensor : [batch_size, n_nodes,n_nodes ,atom_dist=16] tensor
         """
         B,N_residu,N_atoms,coords_size = Xd.shape
-        Xd = Xd.reshape(B,N_residu,N_atoms*coords_size)
-        # D = torch.cdist(Xd,Xd,p=2).reshape(B,N_residu,N_residu,N_atoms**2)      # [batch_size, n_nodes,n_nodes, atom_dist=16]
-        # Calculate the pairwise differences between each node in the tensor
-        pairwise_differences = (Xd.unsqueeze(axis=2) - Xd.unsqueeze(axis=1))
-        # Calculate the pairwise squared distances between each node in the tensor
-        pairwise_squared_distances = torch.sum(pairwise_differences**2, axis=-1)
-        # Calculate the pairwise distances between each node in the tensor
-        D = torch.sqrt(pairwise_squared_distances)
+        Xd = Xd.reshape(B,N_residu*N_atoms,coords_size)
+        D = torch.cdist(Xd,Xd,p=2).reshape(B,N_residu,N_residu,N_atoms**2)      # [batch_size, n_nodes,n_nodes, atom_dist=16]
         return D
     
     def get_AVG_mat(self,Fh):

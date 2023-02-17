@@ -219,7 +219,10 @@ class ProteinEnergyNet(nn.Module):
         """
         B,N_residu,N_atoms,coords_size = Xd.shape
         Xd = Xd.reshape(B,N_residu*N_atoms,coords_size)
-        D = torch.cdist(Xd,Xd,p=2).reshape(B,N_residu,N_residu,N_atoms**2)      # [batch_size, n_nodes,n_nodes, atom_dist=16]
+        D = torch.cdist(Xd,Xd,p=2)
+        D = D.reshape(B,N_residu,N_atoms,N_residu,N_atoms)
+        D = torch.swapaxes(D,2,3)
+        D = D.reshape(B,N_residu,N_residu,N_atoms*N_atoms)
         return D
     
     def get_AVG_mat(self,Fh):

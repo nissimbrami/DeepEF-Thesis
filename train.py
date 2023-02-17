@@ -39,15 +39,15 @@ def training (model, optimizer, dataloader, device,N):
                 torch.cuda.empty_cache()
                 gc.collect()
                 # get the inputs; data is a list of [inputs, labels]   
-                seq,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
+                seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
                 Xd = Xd.to(device)
                 Xn = Xn.to(device)
                 esm_embed = esm_embed.to(device)
-                seq = seq.to(device)
-                seq = seq.reshape(seq.shape[0],seq.shape[2],seq.shape[1]) # reshape the seq tensor to [batch_size,seq_len,20]
-                seq_decoy = seq_decoy.reshape(seq_decoy.shape[0],seq_decoy.shape[2],seq_decoy.shape[1]) # reshape the seq tensor to [batch_size,seq_len,20]
+                seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
+                seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
+                seq_decoy = torch.swapaxes(seq_decoy,1,2)
                 #emb = torch.cat((esm_embed,seq),dim=2)
-                emb = seq
+                emb = seq_one_hot
                 emb_decoy = seq_decoy.to(device)
                 # zero the parameter gradients
                 optimizer.zero_grad()

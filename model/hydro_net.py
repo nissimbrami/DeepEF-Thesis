@@ -36,7 +36,7 @@ class ProteinEnergyNet(nn.Module):
         self.cord_size = params.cord_size
         self.n_atom_dist = 16
         self.emmbeding_size = params.embedding_size
-        self.alpha = 0.0001
+        self.alpha = 0.1
         self.bonded = 1 
         # dirivative error
         self.h = params.h

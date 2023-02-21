@@ -109,7 +109,8 @@ def criterion(E,X_native,X_decoy,model,N,h):
     partial_dx_native = torch.autograd.grad(E[:,1].sum(),model.parameters(),create_graph=True,allow_unused=True)
     # print('***End derivative calc function***')
     
-    lossg = sum([ 0 if part_dx is None else torch.norm(part_dx,p=2) for part_dx in partial_dx_native])
+    part_dx_native = [ 0 if part_dx is None else torch.norm(part_dx,p=2) for part_dx in partial_dx_native]
+    lossg = sum(part_dx_native)
     
     lossd = (E[:,1] / E[:,0]).mean()
     

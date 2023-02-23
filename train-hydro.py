@@ -2,7 +2,7 @@ from model.data_loader import PEFDataset,fetch_dataloader
 from model.data_loader import params as data_params
 from model.model_cfg import CFG
 # from model.net import ProteinEnergyNet
-from model.hydro_net import ProteinEnergyNet
+from model.hydro_net import PEM
 from model.net import params as model_params
 from train_utils import save_checkpoint
 import torch
@@ -51,12 +51,28 @@ def training (model, optimizer, dataloader, device,N):
                 emb_decoy = seq_decoy.to(device)
                 # zero the parameter gradients
                 optimizer.zero_grad()
-
+                Xd = Xd.squeeze()
+                Xn = Xn.squeeze()
+                # Xd = Xd.reshape(Xd.shape[0],-1)
+                emb_decoy = emb_decoy.squeeze()
+                emb = emb.squeeze()
+                
+                # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
+                # create edge_index
+                edge_index = torch.tensor([],dtype=torch.long)
                 # forward + backward + optimize
-                outputs = model(Xd,Xn,emb,emb_decoy)
+                for i in range(Xd.shape[0]):
+                    for j in range(i,Xd.shape[0]):
+                        if i == j:
+                            continue
+                        else:
+                            edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
+                edge_index = edge_index.to(device)
+                
+                outputs = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous())
+                
                 loss = criterion(outputs,Xd,Xn,model,N,CFG.h)
-                print(loss.item())
-
+               
                 loss.backward()
                 # print_par(model) # print the parameters of the model
                 optimizer.step()
@@ -72,7 +88,8 @@ def training (model, optimizer, dataloader, device,N):
                 # update the progress bar
                 tepoch.set_postfix(loss=round(loss.item(),3))
                 # save the model
-                save_checkpoint(epoch, model, optimizer,loss,CFG.model_path)
+                # 
+                # save_checkpoint(epoch, model, optimizer,loss,CFG.model_path)
     print('Finished Training')
 
 def preform_energy_optimization(X_decoy,partial_dx_decoy):
@@ -128,7 +145,7 @@ def main():
     print('***Build the model***')
     m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
                              cord_size = CFG.coords_emb,h = CFG.h,device=CFG.device)
-    model = ProteinEnergyNet(m_params).to(CFG.device)
+    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=3,model_type='GAT').to(CFG.device)
     
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
@@ -137,20 +154,6 @@ def main():
     
     return 1
 
-def test(optimizer,model):
-    x_test = torch.randn((2,10,4,3),requires_grad=True).to(CFG.device)
-    x_test_native = torch.randn((2,10,4,3),requires_grad=True).to(CFG.device)
-    x_test_embed = torch.randn(2,10,480).to(CFG.device)
-    
-    # zero the parameter gradients
-    optimizer.zero_grad()
-    # forward + backward + optimize
-    y_pred = model(x_test,x_test_native,x_test_embed)
-    y_pred.sum().backward(retain_graph=True)
-    loss = criterion(y_pred,x_test_native,x_test)
-    loss.backward()
-    
-    optimizer.step()
     
 def print_par(model):
     for name, param in model.named_parameters():

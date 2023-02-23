@@ -4,6 +4,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import Linear, Dropout
+from torch_geometric.nn import GCNConv, GATv2Conv
 import matplotlib.pyplot as plt
 
 class params():
@@ -36,7 +38,7 @@ class ProteinEnergyNet(nn.Module):
         self.cord_size = params.cord_size
         self.n_atom_dist = 16
         self.emmbeding_size = params.embedding_size
-        self.alpha = 0.0001
+        self.alpha = 0.1
         self.bonded = 1 
         # dirivative error
         self.h = params.h
@@ -260,4 +262,113 @@ class ProteinEnergyNet(nn.Module):
         # distances = torch.sqrt(pairwise_squared_distances)
         return torch.sum(pairwise_differences,axis=-1)
     
+class PEM(torch.nn.Module):
+  """Protein energy model"""
+  
+  def __init__(self, dim_in, dim_h, dim_out, layers, model_type, heads = 8):
+    super().__init__()
     
+    if model_type == 'GCN':
+      self.model = [GCN(dim_in, dim_h, dim_out) for i in range(layers)]
+    elif model_type == 'GAT':
+      # self.model = [GAT(dim_in, dim_h, dim_out) for i in range(layers)]
+      self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
+      self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
+      self.optimizer = torch.optim.Adam(self.parameters(),
+                                        lr=0.005,
+                                        weight_decay=5e-4)
+    else:
+      raise ValueError('Model type not supported')
+    self.layers = layers
+    # First fully connected layer
+    self.fcs1 = nn.Linear(36, 128)
+    self.fcs2 = nn.Linear(128, 36)
+    self.bn1  = nn.BatchNorm1d(36)
+    # First fully connected layer
+    self.fc1 = nn.Linear(36, 128)
+    # Second fully connected layer that outputs our 10 labels
+    self.fc2 = nn.Linear(128, 1)
+  
+  def forward(self,x_decoy, emb_decoy,x_native,emb_native ,edge_index):
+      x_decoy  = self.get_graph(x_decoy, emb_decoy)
+      identity = x_decoy
+      x = x_decoy
+      x = self.fcs1(x)
+      x = F.relu(x)
+      x = self.fcs2(x)
+      x = self.bn1(x)
+      for layer in range(self.layers):
+        h = F.dropout(x, p=0.6, training=self.training)
+        h = self.gat1(x, edge_index)
+        h = F.elu(h)
+        h = F.dropout(h, p=0.6, training=self.training)
+        h = self.gat2(h, edge_index)
+        
+        h = F.log_softmax(h, dim=1)+identity
+      
+      x  = self.fc1(x)
+      x = F.relu(x)
+      x_decoy = self.fc2(x)
+
+      
+      x_native  = self.get_graph(x_native, emb_native)
+      identity = x_native
+      x = x_native
+      x = self.fcs1(x)
+      x = F.relu(x)
+      x = self.fcs2(x)
+      x = self.bn1(x)
+      for layer in range(self.layers):
+        h = F.dropout(x, p=0.6, training=self.training)
+        h = self.gat1(x, edge_index)
+        h = F.elu(h)
+        h = F.dropout(h, p=0.6, training=self.training)
+        h = self.gat2(h, edge_index)
+        
+        h = F.log_softmax(h, dim=1)+identity
+      
+      x  = self.fc1(x)
+      x = F.relu(x)
+      x_native = self.fc2(x)
+    
+      
+     
+      return torch.cat((self.get_energy(x_decoy).unsqueeze(0), self.get_energy(x_native).unsqueeze(0)),dim=0)
+    
+  def get_graph(self,x, emb):
+    """Get graph representation of protein"""
+    D = self.get_dist_matrix(x) # N,N,16
+    D = torch.relu(torch.exp(-1e1*D))
+    
+    D = D.sum(dim=1) #N,16
+    
+    Fh = torch.cat([emb,D],dim=1) #N,16+emb_size
+    
+    return Fh
+  
+  def get_dist_matrix(self,Xd):
+      """
+      Return the node distence matrix
+      Args:
+          Xd (tensor):X embeded [n_nodes ,num_atoms=4,new_cords_size]
+      Returns:
+          tensor : [n_nodes,n_nodes ,atom_dist=16] tensor
+      """
+      N_residu,N_atoms,coords_size = Xd.shape
+      Xd = Xd.reshape(N_residu*N_atoms,coords_size)
+      D = torch.cdist(Xd,Xd,p=2)
+      D = D.reshape(N_residu,N_atoms,N_residu,N_atoms)
+      D = torch.swapaxes(D,2,3)
+      D = D.reshape(N_residu,N_residu,N_atoms*N_atoms)
+      return D
+  
+  def get_energy(self,Fh):
+        """
+        Calculates the energy of the protein
+        Inputs:
+            Fh: a [n_nodes , embedding_size+N_residu] tensor
+        Returns:
+            Energy [batch_size] tensor
+        """
+        E = torch.sum(Fh**2,dim=(0,1))
+        return E

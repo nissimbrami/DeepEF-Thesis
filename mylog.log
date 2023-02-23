@@ -77,3 +77,6 @@
 2022-12-13 15:27:34,580 - root - DEBUG - started run
 2022-12-13 15:27:34,581 - root - INFO - debuge mode False
 2022-12-13 15:27:36,390 - root - INFO - Finished loading model - esm2_t12_35M_UR50D
+2023-01-23 23:14:06,097 - root - DEBUG - started run
+2023-01-23 23:14:06,097 - root - INFO - debuge mode False
+2023-01-23 23:14:07,992 - root - INFO - Finished loading model - esm2_t12_35M_UR50D

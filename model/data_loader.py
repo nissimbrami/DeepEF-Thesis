@@ -1,124 +1,131 @@
 import torch
-from torch.utils.data import Dataset, IterableDataset
+from torch.utils.data import Dataset, DataLoader
+import os 
+from model.model_cfg import CFG
+import gc
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
-class meshiRefinementDataset(Dataset):
-    """Dataset of refinements from AlphaFold and RosettaFold."""
-
-    def __init__(self, root_dir, crop_size=None, split='train', type='AlphaFold', homothresh=0.9, debug = False,deb_examp = 200):
-        """
+class PEFDataset(Dataset):
+    '''
+    Deep energy function dataset.
+    Data item structure:
+        # 3D coordinates of the protein
+            * coordsAlpha
+            * coordsBeta 
+            * coordsC
+            * coordsCa
+            * coordsN
+            * coordsAlpha native
+            * coordsBeta native
+            * coordsC native
+            * coordsCa native
+            * coordsN native
+        # Embeddings
+           * Large languege model embeddings
+           * hand selected features
+    '''
+    def __init__(self,file_df ,datapath=CFG.data_path,homothresh=CFG.homothresh,type='train',train_type = 'AlphaFold'):
+        """_summary_
+        Data set for the Deep energy function dataset.
         Args:
-            root_dir (string): Directory with all the images.
+            file_df (list): _description_.files dataframe from the data path
+            datapath (string,): _description_. Defaults to CFG.data_path.
+            homothresh (float, optional): _description_. Defaults to CFG.homothresh.
+            type (str, optional): _description_. Defaults to 'train'.
         """
-        self.homothresh = homothresh    # homologic threshold
-        self.type = type                # Dataset type of no native(AlphaFold\RosettaFold)
-        self.split = split              # split type - if not train no split
-        self.root_dir = root_dir        # root dir
-        self.cropSize = crop_size       # crop size
-        self.proteinPath = self.root_dir     # proteion root path
-        self.debug = debug              # debuge mode
-        self.deb_exmp = deb_examp       # debug examples
-        self.load_data()
+        self.datapath = datapath
+        self.filenames = file_df.copy()
+        self.homothresh = homothresh
+        self.type = type
+        self.train_type = train_type
+        # remove the files with homology greater than homothresh
+        if type == 'train':
+            self.check_data_constrain()
         
-
-        self.typeindices = range(len(self.ids))
-        if type is not None:
-            self.typeindices = []
-            for ii, id in enumerate(self.ids):
-                if (self.type is not None) and (self.type in id):
-                    self.typeindices.append(ii)
-
-        
-    def load_data(self):
-        if self.debug:
-            self.seq = torch.load(self.proteinPath + '/seq.pt')[:self.deb_examp]
-            self.ids = torch.load(self.proteinPath + '/ids.pt') [:self.deb_examp]
-            self.coordN = torch.load(self.proteinPath + '/CoordN.pt')[:self.deb_examp]
-            self.coordAlpha = torch.load(self.proteinPath + '/CoordAlpha.pt') [:self.deb_examp]
-            self.coordC = torch.load(self.proteinPath + '/CoordC.pt') [:self.deb_examp]
-            self.coordBeta = torch.load(self.proteinPath + '/CoordBeta.pt')  [:self.deb_examp]
-
-            self.nativemask = torch.load(self.proteinPath + '/nativemask.pt') [:self.deb_examp]
-            self.msk = torch.load(self.proteinPath + '/mask.pt') [:self.deb_examp]
-
-            self.gdtts = torch.load(self.proteinPath + '/GDTTS.pt') [:self.deb_examp]
-            self.iddts = torch.load(self.proteinPath + '/IDDTS.pt')[:self.deb_examp]
-
-            self.coordNNative = torch.load(self.proteinPath + '/CoordNNative.pt') [:self.deb_examp]
-            self.coordAlphaNative = torch.load(self.proteinPath + '/CoordCaNative.pt') [:self.deb_examp]
-            self.coordCNative = torch.load(self.proteinPath + '/CoordCNative.pt') [:self.deb_examp]
-            self.coordBetaNative = torch.load(self.proteinPath + '/CoordCbNative.pt')[:self.deb_examp]
-
-            self.embeddings = torch.load(self.proteinPath + '/embeddings.pt') [:self.deb_examp]
-        else:
-            self.seq = torch.load(self.proteinPath + '/seq.pt') 
-            self.ids = torch.load(self.proteinPath + '/ids.pt')
-            self.coordN = torch.load(self.proteinPath + '/CoordN.pt')  # [:200]
-            self.coordAlpha = torch.load(self.proteinPath + '/CoordAlpha.pt')  # [:200]
-            self.coordC = torch.load(self.proteinPath + '/CoordC.pt')  # [:200]
-            self.coordBeta = torch.load(self.proteinPath + '/CoordBeta.pt')  # [:200]
-
-            self.nativemask = torch.load(self.proteinPath + '/nativemask.pt')  # [:200]
-            self.msk = torch.load(self.proteinPath + '/mask.pt')  # [:200]
-
-            self.gdtts = torch.load(self.proteinPath + '/GDTTS.pt')  # [:200]
-            self.iddts = torch.load(self.proteinPath + '/IDDTS.pt')  # [:200]
-
-            self.coordNNative = torch.load(self.proteinPath + '/CoordNNative.pt')  # [:200]
-            self.coordAlphaNative = torch.load(self.proteinPath + '/CoordCaNative.pt')  # [:200]
-            self.coordCNative = torch.load(self.proteinPath + '/CoordCNative.pt')  # [:200]
-            self.coordBetaNative = torch.load(self.proteinPath + '/CoordCbNative.pt')  # [:200]
-
-            self.embeddings = torch.load(self.proteinPath + '/embeddings.pt')  # [:200] 
 
     def __len__(self):
-        if self.type is None:
-            return len(self.seq)
-        else:
-            return len(self.typeindices)
+        return len(self.filenames)
 
-    def toTestSplit(self):
-        self.split = 'test'
+    def __getitem__(self, index):
+        
+        index_path = os.path.join(self.datapath, self.filenames[index])
+       # Sequence of the protein
+        seq = torch.load(os.path.join(index_path, 'seq.pt'))
+        seq_decoy = seq[:,torch.randperm(seq.shape[1])]
+        id = torch.load(os.path.join(index_path, 'ids.pt')) # string id
+       # 3D coordinates of the protein
+        coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt'))
+        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt'))
+        coordsC = torch.load(os.path.join(index_path, 'CoordC.pt'))
+        coordsN = torch.load(os.path.join(index_path, 'CoordN.pt'))
+        # 3D coordinates of the protein native
+        coordsAlpha_native = torch.load(os.path.join(index_path, 'CoordCaNative.pt'))
+        coordsBeta_native = torch.load(os.path.join(index_path, 'CoordCbNative.pt'))
+        coordsC_native = torch.load(os.path.join(index_path, 'CoordCNative.pt'))
+        coordsN_native = torch.load(os.path.join(index_path, 'CoordNNative.pt'))
+        # Masks
+        mask = torch.load(os.path.join(index_path, 'mask.pt'))
+        nativemask = torch.load(os.path.join(index_path, 'nativemask.pt'))
+        # Embeddings
+        n_nodes= coordsAlpha.shape[0]
+        esm_embed = torch.stack(torch.load(os.path.join(index_path, 'emb_esm.pt')))[0][:10]
+        esm_embed = esm_embed.repeat(n_nodes,1)
+        # Concatenate the coordinates
+        Xd = self.concat_cords(coordsAlpha,coordsBeta, coordsC, coordsN)
+        Xn = self.concat_cords(coordsAlpha_native,coordsBeta_native, coordsC_native, coordsN_native)
+           
+        return seq,seq_decoy, id, Xd,Xn, mask, nativemask, esm_embed 
+        
+    def read_protein(self,index):
+        """
+        Read the protein data from the index path
 
-    def toTrainSplit(self):
-        self.split = 'train'
-
-    def read_protein_data(self, i):
-        # self.proteinPath is the path to the folder with all the .pt files of the proteins
-        self.proteinPath = self.root_dir
-        i = self.typeindices[i]
-        seq = self.seq[i]
-        ids = self.ids[i]
-
-        coordN = self.coordN[i]
-        coordAlpha = self.coordAlpha[i]
-        # if coordAlpha.max()>5e4:
-        #    print('problems in Calpha')
-        #    print('in data loader 1')
-        coordC = self.coordC[i]
-        coordBeta = self.coordBeta[i]
-
-        nativemask = self.nativemask[i]
-        msk = self.msk[i]
-
-        gdtts = self.gdtts[i]
-        iddts = self.iddts[i]
-
-        coordNNative = self.coordNNative[i]
-        coordAlphaNative = self.coordAlphaNative[i]
-        coordCNative = self.coordCNative[i]
-        coordBetaNative = self.coordBetaNative[i]
-
-        embeddings = self.embeddings[i]
-
-        return coordN, coordAlpha, coordC, coordBeta, seq, ids, msk, gdtts, iddts, embeddings, coordNNative, coordAlphaNative, coordCNative, coordBetaNative, nativemask
-
-    def __getitem__(self, idx):
-        ok = False
-        while not ok:
-            coordN, coordAlpha, coordC, coordBeta, seq, id, msk, gdtt, \
-            iddt, embedding, coordNNative, coordAlphaNative, \
-            coordCNative, coordBetaNative, nativemask = self.read_protein_data(idx)
-
+        Args:
+            index (int): index of protein in the dataset
+        """
+        index_path = os.path.join(self.datapath, self.filenames[index])
+        # Sequence of the protein
+        seq = torch.load(os.path.join(index_path, 'seq.pt')).to(CFG.device)
+        id = torch.load(os.path.join(index_path, 'ids.pt')) # string id
+        # 3D coordinates of the protein
+        coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt')).to(CFG.device)
+        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt')).to(CFG.device)
+        coordsC = torch.load(os.path.join(index_path, 'CoordC.pt')).to(CFG.device)
+        coordsN = torch.load(os.path.join(index_path, 'CoordN.pt')).to(CFG.device)
+        # 3D coordinates of the protein native
+        coordsAlpha_native = torch.load(os.path.join(index_path, 'CoordCaNative.pt')).to(CFG.device)
+        coordsBeta_native = torch.load(os.path.join(index_path, 'CoordCbNative.pt')).to(CFG.device)
+        coordsC_native = torch.load(os.path.join(index_path, 'CoordCNative.pt')).to(CFG.device)
+        coordsN_native = torch.load(os.path.join(index_path, 'CoordNNative.pt')).to(CFG.device)
+        # Masks
+        mask = torch.load(os.path.join(index_path, 'mask.pt')).to(CFG.device)
+        nativemask = torch.load(os.path.join(index_path, 'nativemask.pt')).to(CFG.device)
+        # Embeddings
+        esm_embed = torch.load(os.path.join(index_path, 'emb_esm.pt'))[0].to(CFG.device)
+        
+        return seq, id, coordsAlpha,coordsBeta, coordsC, coordsN, coordsAlpha_native,coordsBeta_native, coordsC_native, coordsN_native, mask, nativemask, esm_embed
+    
+    def concat_cords(self,coordsAlpha,coordsBeta, coordsC, coordsN):
+        """
+        Concatenate the coordinates
+        output: X (torch.tensor): concatenated coordinates [N,4,3]
+        """
+        coordsAlpha,coordsBeta, coordsC, coordsN = coordsAlpha.unsqueeze(1), coordsBeta.unsqueeze(1), coordsC.unsqueeze(1), coordsN.unsqueeze(1)
+        X = torch.cat((coordsAlpha,coordsBeta, coordsC, coordsN), dim=1)
+        return X
+    
+    def check_data_constrain(self):
+        """
+        Check the data constrain and remove the files with homology greater than homothresh.
+        Check mask and native mask.
+        Update file names list.
+        """
+        print('Checking data constrain...')
+        new_filenames = []
+        for i in tqdm(range(len(self.filenames))):
+            (seq, id, coordAlpha,coordBeta, coordC, coordN, coordAlphaNative,
+             coordBetaNative, coordCNative, coordNNative, mask, nativemask, embedding)  = self.read_protein(i)
             dt = torch.get_default_dtype()
             coordN = coordN.to(dt)
             coordAlpha = coordAlpha.to(dt)
@@ -134,124 +141,74 @@ class meshiRefinementDataset(Dataset):
             s = seq.mean(-1)
             if (self.homothresh is not None) and (s.max() > self.homothresh):
                 # print("protein is too homogenuous", id)
-                idx = (idx + 1) % self.__len__()
                 continue
 
-            if (self.type is not None) and (not self.type in id):
-                # print("id not from ", self.type, " ,", id)
-                # idx = torch.randint(self.__len__(), (1, 1))[0]
-                idx = (idx + 1) % self.__len__()
+            if (self.train_type is not None) and (not self.train_type in id):
                 continue
 
-            scale = 1e-2
-            Mnat = nativemask
-            M = msk & Mnat
+            # TODO: add mask check and inference
+            # scale = 1e-2
+            # Mnat = nativemask
+            # M = msk & Mnat
 
-            ind = torch.where(M)[0]
-            istart = ind[0]
-            ilast = ind[-1]
-            M = M[istart:ilast + 1]
-            msk = msk[istart:ilast + 1]
-            msk = msk.type('torch.FloatTensor')
-            if torch.any(msk == 0):
-                # print("id problem", id)
-                idx = (idx + 1) % self.__len__()
-                continue
-            else:
-                ok = True
+            # ind = torch.where(M)[0]
+            # istart = ind[0]
+            # ilast = ind[-1]
+            # M = M[istart:ilast + 1]
+            # msk = msk[istart:ilast + 1]
+            # msk = msk.type('torch.FloatTensor')
+            # if torch.any(msk == 0):
+            #     # print("id problem", id)
+            #     idx = (idx + 1) % self.__len__()
+            #     continue
+ 
+            new_filenames.append(self.filenames[i])
+            
+            torch.cuda.empty_cache()
+            gc.collect()
+        
+        self.filenames = new_filenames
+  
+        
+def fetch_dataloader(data_dir, params):
+    """
+    Fetches the DataLoader object for each type in types from data_dir.
+    Args:
+        types: (list) has one or more of 'train', 'val', 'test' depending on which data is required
+        data_dir: (string) directory containing the dataset
+        params: (Params) hyperparameters
+    Returns:
+        data: (dict) contains the DataLoader object for each type in types
+    """
+    # Get the filenames from the train folder
+    file_names = os.listdir(data_dir)
+    if params.debug:
+        file_names = file_names[:CFG.debuge_size]
+    # Split the data into train, validation and test set
+    X_train, X_rem, y_train, y_rem = train_test_split(file_names,file_names, train_size=CFG.split_train,
+                                                      random_state=CFG.seed)
+    # Now since we want the valid and test size to be equal (10% each of overall data). 
+    # we have to define valid_size=0.5 (that is 50% of remaining data)
+    X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5)
+    # Now we have the data split in training, validation and test set
+    train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
+                                        num_workers=params.num_workers,
+                                        pin_memory=params.cuda)
+    valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
+                                        num_workers=params.num_workers,
+                                        pin_memory=params.cuda)
 
-        Mnat = Mnat[istart:ilast + 1]
-        Mnat = Mnat.type('torch.FloatTensor')
+    test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
+                                        num_workers=params.num_workers,
+                                        pin_memory=params.cuda)
+    return train_loader, valid_loader, test_loader
 
-        X1 = coordAlpha.t()
-        X2 = coordC.t()
-        X3 = coordN.t()
-        X4 = coordBeta.t()
+#TODO: clean dataset from  homology threshold
 
-        glyIndices = torch.where(X4[0, :] > 5e4)[0]
-        X4[:, glyIndices] = getCB(X3[:, glyIndices], X1[:, glyIndices], X2[:, glyIndices])
-
-        X1native = coordAlphaNative.t()
-        X2native = coordCNative.t()
-        X3native = coordNNative.t()
-        X4native = coordBetaNative.t()
-
-        X4native[:, glyIndices] = getCB(X3native[:, glyIndices], X1native[:, glyIndices], X2native[:, glyIndices])
-
-        CoordsNative = scale * torch.stack((X1native, X2native, X3native, X4native), dim=1)
-        CoordsNative = CoordsNative.type('torch.FloatTensor')
-        CoordsNative = CoordsNative[:, :, istart:ilast + 1]
-
-        Coords = scale * torch.stack((X1, X2, X3, X4), dim=1)
-        Coords = Coords.type('torch.FloatTensor')
-        Coords = Coords[:, :, istart:ilast + 1]
-        A0 = seq.t()
-        A = A0[istart:ilast + 1, :]
-
-        embedding0 = embedding.clone()
-        embedding0 = embedding0[istart:ilast + 1, :]
-
-        Coords = Coords.unsqueeze(0)
-        CoordsNative = CoordsNative.unsqueeze(0)
-
-        # Coords = Coords[:, :, :, M == 1]
-        # CoordsNative = CoordsNative[:, :, :, M == 1]
-        # A = A[M == 1, :]
-        # embedding0 = embedding0[M == 1, :]
-        if (self.cropSize is not None) and (self.split == 'train'):
-            nnodes = Coords.shape[-1]
-            CoordsBatch = torch.zeros(1, 3, 4, 2 * self.cropSize, device=Coords.device)
-            CoordsDecoy = torch.zeros(1, 3, 4, 2 * self.cropSize, device=Coords.device)
-            ABatch = torch.zeros(1, 2 * self.cropSize, 20, device=Coords.device)
-            if nnodes > (2 * self.cropSize + 2):
-                mid = nnodes // 2
-                istart1 = torch.randint(0, mid - self.cropSize, (1,))
-                istart2 = torch.randint(mid, nnodes - self.cropSize, (1,))
-                Patch1 = torch.arange(istart1[0], (istart1[0] + self.cropSize))
-                Patch2 = torch.arange(istart2[0], (istart2[0] + self.cropSize))
-            else:
-                istart1 = torch.randint(0, nnodes, (1,))
-                istart2 = torch.randint(0, nnodes, (1,))
-                Patch1 = torch.arange(istart1[0], (istart1[0] + self.cropSize))
-                Patch2 = torch.arange(istart2[0], (istart2[0] + self.cropSize))
-                # Cyclical:
-                Patch1 = Patch1 % nnodes
-                Patch2 = Patch2 % nnodes
-
-            # Take patch:
-            p = torch.cat((Patch1, Patch2), dim=0)
-            CoordsBatch[0, :, :, :] = CoordsNative[0, :, :, p]
-            CoordsDecoy[0, :, :, :] = Coords[0, :, :, p]
-            ABatch[0, :, :] = A[p, :]
-            embeddingBatch = embedding0[p, :].unsqueeze(0)
-
-            Mnat = Mnat[p]
-            # M = torch.ones(2 * self.cropSize, device=Coords.device)
-
-        else:
-            CoordsDecoy = Coords
-            CoordsBatch = CoordsNative
-            ABatch = A.unsqueeze(0)
-            embeddingBatch = embedding0.unsqueeze(0)
-
-        nodalFeat = ABatch
-        nodalFeat = nodalFeat.transpose(1, 2)
-        nodalFeat = nodalFeat.to(torch.float32)
-
-        z1, z2 = lengthConstraints(CoordsBatch)
-        MTet = (z1.abs() < 1.0)
-        MTetTet = (z2.abs() < 1.0)
-
-        g = MTet.sum(dim=[2, 3])
-        g = (g == 16).unsqueeze(2).unsqueeze(3)
-        MTet = g * MTet
-
-        g = MTetTet.sum(dim=[3])
-        g = (g == 4).unsqueeze(3)
-        MTetTet = g * MTetTet
-
-        CoordsDecoy = CoordsDecoy.transpose(1, 2)
-        CoordsBatch = CoordsBatch.transpose(1, 2)
-
-        return id, nodalFeat, CoordsBatch, Mnat.unsqueeze(
-            0), ABatch, CoordsDecoy, MTet, MTetTet, gdtt, iddt, embeddingBatch
+class params:
+    def __init__(self,batch_size,num_workers,cuda,debug=False):
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.cuda = cuda
+        self.debug = debug
+        

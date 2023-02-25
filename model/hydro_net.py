@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout
 from torch_geometric.nn import GCNConv, GATv2Conv
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 class params():
     def __init__(self,embedding_size,layers,filters,cord_size,h,device):

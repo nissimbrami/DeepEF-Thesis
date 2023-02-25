@@ -10,7 +10,7 @@ class CFG:
         
     data_path = './data/data2'
     seed = 42
-    debug = True
+    debug = False
     # Train data parameters
     homothresh = 0.9
     split_train = 0.8
@@ -28,4 +28,4 @@ class CFG:
     batch_size = 1
     num_workers = 2
     N = 10
-    num_epochs = 5
+    num_epochs = 10

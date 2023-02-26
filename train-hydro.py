@@ -69,8 +69,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
     """
     epoch_train_loss = []
     ephoch_val_loss = []
-    best_loss = 100000
-    valid_loss = 100000
+    best_loss = 10000000
+    valid_loss = 10000000
     running_loss = 0.0
     with tqdm(dataloader, unit="batch") as tepoch:
         for i, data in enumerate(tepoch):
@@ -120,17 +120,17 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
 
             # print statistics
             running_loss += loss.item()
-            if i % 1000 == 999 or CFG.debug:    # print every 1000 mini-batches
+            if i % 1000 == 99 or CFG.debug:    # print every 1000 mini-batches
                 print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 1000:.3f}')
                 # Check the validation loss
                 model.eval()# evaluate the model
                 current_valid_loss = validation(model, dataloader, device,epoch,N)
                 ephoch_val_loss.append(current_valid_loss)
-                
+                tepoch.set_postfix({"loss":round(loss.item(),3),"current_valid_loss":round(current_valid_loss,3)})
                 if current_valid_loss<valid_loss:
                     valid_loss = current_valid_loss
                     print('saving model with loss: ',valid_loss)
-                    save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_path)
+                    save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_path+str(epoch)+"_model.pt")
                    
                 running_loss = 0.0
                 model.train()
@@ -138,11 +138,21 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             torch.cuda.empty_cache()
             gc.collect()
             # update the progress bar
-            tepoch.set_postfix(loss=round(loss.item(),3))
+            tepoch.set_postfix({"loss":round(loss.item(),3),"valid_loss":round(valid_loss,3)})
             epoch_train_loss.append(loss.item())
-            tepoch.set_postfix(val_loss=round(valid_loss,3))
+        
+        # evaluate the model
+        current_valid_loss = validation(model, dataloader, device,epoch,N)
+        ephoch_val_loss.append(current_valid_loss)
+        print(f"loss: {round(loss.item(),3)} current_valid_loss:{round(current_valid_loss,3)}")
+        if current_valid_loss<valid_loss:
+            valid_loss = current_valid_loss
+            print('saving model with loss: ',valid_loss)
+            save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_path+str(epoch)+"_model.pt")
+        
+        save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_pathstr(epoch)+"_final_model.pt") 
                 
-    return epoch_train_loss,ephoch_val_loss
+    return model, epoch_train_loss,ephoch_val_loss
 
 # define one epoch train
 def training (model, optimizer, dataloader,valid_loader, device,N):
@@ -163,7 +173,7 @@ def training (model, optimizer, dataloader,valid_loader, device,N):
         
         torch.cuda.empty_cache()
         gc.collect()
-        epoch_train_loss,ephoch_val_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader)
+        model,epoch_train_loss,ephoch_val_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader)
        
         
     print('Finished Training')

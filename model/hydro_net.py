@@ -284,6 +284,7 @@ class PEM(torch.nn.Module):
     self.fcs1 = nn.Linear(36, 128)
     self.fcs2 = nn.Linear(128, 36)
     self.bn1  = nn.BatchNorm1d(36)
+    self.bn2  = nn.BatchNorm1d(36)
     # First fully connected layer
     self.fc1 = nn.Linear(36, 128)
     # Second fully connected layer that outputs our 10 labels
@@ -305,7 +306,7 @@ class PEM(torch.nn.Module):
         h = self.gat2(h, edge_index)
         
         h = F.log_softmax(h, dim=1)+identity
-      
+      x = self.bn1(x)
       x  = self.fc1(x)
       x = F.relu(x)
       x_decoy = self.fc2(x)
@@ -326,7 +327,7 @@ class PEM(torch.nn.Module):
         h = self.gat2(h, edge_index)
         
         h = F.log_softmax(h, dim=1)+identity
-      
+      x = self.bn2(x)
       x  = self.fc1(x)
       x = F.relu(x)
       x_native = self.fc2(x)

@@ -25,7 +25,7 @@ class PEFDataset(Dataset):
            * Large languege model embeddings
            * hand selected features
     '''
-    def __init__(self,file_df ,datapath=CFG.data_path,homothresh=CFG.homothresh,type='train',train_type = 'AlphaFold'):
+    def __init__(self,file_df ,datapath=CFG.data_path,constrain = True,homothresh=CFG.homothresh,type='train',train_type = 'AlphaFold'):
         """_summary_
         Data set for the Deep energy function dataset.
         Args:
@@ -40,8 +40,8 @@ class PEFDataset(Dataset):
         self.type = type
         self.train_type = train_type
         # remove the files with homology greater than homothresh
-        # if type == 'train':
-        #     self.check_data_constrain()
+        if type == 'train' and constrain:
+            self.check_data_constrain()
         
 
     def __len__(self):
@@ -191,14 +191,14 @@ def fetch_dataloader(data_dir, params):
     # we have to define valid_size=0.5 (that is 50% of remaining data)
     X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5)
     # Now we have the data split in training, validation and test set
-    train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
+    train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir,constrain = params.constrain), batch_size=params.batch_size, shuffle=True,
                                         num_workers=params.num_workers,
                                         pin_memory=params.cuda)
-    valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
+    valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir,constrain = params.constrain), batch_size=params.batch_size, shuffle=True,
                                         num_workers=params.num_workers,
                                         pin_memory=params.cuda)
 
-    test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir), batch_size=params.batch_size, shuffle=True,
+    test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir,constrain = params.constrain), batch_size=params.batch_size, shuffle=True,
                                         num_workers=params.num_workers,
                                         pin_memory=params.cuda)
     return train_loader, valid_loader, test_loader
@@ -206,9 +206,10 @@ def fetch_dataloader(data_dir, params):
 #TODO: clean dataset from  homology threshold
 
 class params:
-    def __init__(self,batch_size,num_workers,cuda,debug=False):
+    def __init__(self,batch_size,num_workers,cuda,constrain,debug=False):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cuda = cuda
         self.debug = debug
+        self.constrain = constrain
         

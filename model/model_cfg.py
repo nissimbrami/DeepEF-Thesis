@@ -13,6 +13,7 @@ class CFG:
     debug = False
     # Train data parameters
     homothresh = 0.9
+    constrain = True
     split_train = 0.8
     debuge_size  = 100
     # Model parameters
@@ -21,7 +22,7 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 1
-    model_path = "./trianed_models_no_const/"
+    model_path = "./trianed_models/"
     #training parameters
     lr = 0.0001
     wd = 0.0001

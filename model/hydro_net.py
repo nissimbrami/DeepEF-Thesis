@@ -306,7 +306,7 @@ class PEM(torch.nn.Module):
         h = self.gat2(h, edge_index)
         
         h = F.log_softmax(h, dim=1)+identity
-      x = self.bn1(x)
+      x = self.bn2(x)
       x  = self.fc1(x)
       x = F.relu(x)
       x_decoy = self.fc2(x)

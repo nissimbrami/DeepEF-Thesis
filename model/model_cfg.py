@@ -21,11 +21,11 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 1
-    model_path = "/trianed_models/"
+    model_path = "./trianed_models_no_const/"
     #training parameters
     lr = 0.0001
     wd = 0.0001
     batch_size = 1
     num_workers = 2
     N = 10
-    num_epochs = 10
+    num_epochs = 5

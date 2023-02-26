@@ -24,7 +24,7 @@ class CFG:
     num_layers = 1
     model_path = "./trianed_models/"
     #training parameters
-    lr = 0.0001
+    lr = 0.001
     wd = 0.0001
     batch_size = 1
     num_workers = 2

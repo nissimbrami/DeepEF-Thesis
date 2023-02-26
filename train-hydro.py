@@ -139,12 +139,13 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             
         
         # evaluate the model
-        current_valid_loss = validation(model, valid_loader, device,epoch,N)
-        ephoch_val_loss.append(current_valid_loss)
-        print(f"loss: {round(loss.item(),3)} current_valid_loss:{round(current_valid_loss,3)}")
-        valid_loss = current_valid_loss
-        print('saving model with valid loss: ',valid_loss)
-        save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_path+str(epoch)+"_model.pt")
+        with torch.no_grad():
+            current_valid_loss = validation(model, valid_loader, device,epoch,N)
+            ephoch_val_loss.append(current_valid_loss)
+            print(f"loss: {round(loss.item(),3)} current_valid_loss:{round(current_valid_loss,3)}")
+            valid_loss = current_valid_loss
+            print('saving model with valid loss: ',valid_loss)
+            save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_path+str(epoch)+"_model.pt")
         
         save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_pathstr(epoch)+"_final_model.pt") 
                 
@@ -243,6 +244,7 @@ def print_par(model):
             print (name, param.data)
    
 if __name__ == '__main__':
-    if len(sys.argv>1):
+    if len(sys.argv)>1:
         CFG.model_path = sys.argv[1]
+        CFG.constrain = sys.argv[2]
     main()

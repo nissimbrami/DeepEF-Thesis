@@ -40,8 +40,8 @@ class PEFDataset(Dataset):
         self.type = type
         self.train_type = train_type
         # remove the files with homology greater than homothresh
-        if type == 'train':
-            self.check_data_constrain()
+        # if type == 'train':
+        #     self.check_data_constrain()
         
 
     def __len__(self):

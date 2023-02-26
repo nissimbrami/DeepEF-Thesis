@@ -1,0 +1,11 @@
+Sun Feb 26 11:23:11 IST 2023
+
+SLURM_JOBID:		 659694
+SLURM_JOB_NODELIST:	 cs-3090-02 
+
+
+***Start main function***
+***load the data with dataloader***
+***Build the model***
+***Start training***
+  0%|          | 0/33904 [00:00<?, ?batch/s]Epoch 0:   0%|          | 0/33904 [00:00<?, ?batch/s]Epoch 0:   0%|          | 0/33904 [00:02<?, ?batch/s, loss=1.09, valid_loss=1e+7]Epoch 0:   0%|          | 1/33904 [00:02<19:56:35,  2.12s/batch, loss=1.09, valid_loss=1e+7]Epoch 0:   0%|          | 1/33904 [00:02<19:56:35,  2.12s/batch, loss=1.09, valid_loss=1e+7]Epoch 0:   0%|          | 1/33904 [00:03<19:56:35,  2.12s/batch, loss=0.013, valid_loss=1e+7]Epoch 0:   0%|          | 2/33904 [00:03<15:30:39,  1.65s/batch, loss=0.013, valid_loss=1e+7]Epoch 0:   0%|          | 2/33904 [00:03<15:30:39,  1.65s/batch, loss=0.013, valid_loss=1e+7]Epoch 0:   0%|          | 2/33904 [00:03<15:30:39,  1.65s/batch, loss=1.29, valid_loss=1e+7] Epoch 0:   0%|          | 3/33904 [00:03<10:31:25,  1.12s/batch, loss=1.29, valid_loss=1e+7]Epoch 0:   0%|          | 3/33904 [00:03<10:31:25,  1.12s/batch, loss=1.29, valid_loss=1e+7]Epoch 0:   0%|          | 3/33904 [00:05<10:31:25,  1.12s/batch, loss=0.967, valid_loss=1e+7]Epoch 0:   0%|          | 4/33904 [00:05<10:35:54,  1.13s/batch, loss=0.967, valid_loss=1e+7]Epoch 0:   0%|          | 4/33904 [00:05<10:35:54,  1.13s/batch, loss=0.967, valid_loss=1e+7]Epoch 0:   0%|          | 4/33904 [00:05<10:35:54,  1.13s/batch, loss=0.831, valid_loss=1e+7]Epoch 0:   0%|          | 5/33904 [00:05<9:03:08,  1.04batch/s, loss=0.831, valid_loss=1e+7] Epoch 0:   0%|          | 5/33904 [00:05<9:03:08,  1.04batch/s, loss=0.831, valid_loss=1e+7]Epoch 0:   0%|          | 5/33904 [00:11<9:03:08,  1.04batch/s, loss=0.084, valid_loss=1e+7]Epoch 0:   0%|          | 6/33904 [00:11<24:08:49,  2.56s/batch, loss=0.084, valid_loss=1e+7]Epoch 0:   0%|          | 6/33904 [00:11<24:08:49,  2.56s/batch, loss=0.084, valid_loss=1e+7]Epoch 0:   0%|          | 6/33904 [00:11<24:08:49,  2.56s/batch, loss=0.74, valid_loss=1e+7] Epoch 0:   0%|          | 7/33904 [00:11<16:57:40,  1.80s/batch, loss=0.74, valid_loss=1e+7]Epoch 0:   0%|          | 7/33904 [00:11<16:57:40,  1.80s/batch, loss=0.74, valid_loss=1e+7]

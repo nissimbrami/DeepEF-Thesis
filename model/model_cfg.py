@@ -21,7 +21,7 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 1
-    model_path = "model.pt"
+    model_path = "/trianed_models/"
     #training parameters
     lr = 0.0001
     wd = 0.0001

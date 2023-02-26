@@ -1,7 +1,12 @@
-Sun Feb 26 14:19:26 IST 2023
+Sun Feb 26 17:15:29 IST 2023
 
-SLURM_JOBID:		 660109
-SLURM_JOB_NODELIST:	 cs-1080-05 
+SLURM_JOBID:		 660380
+SLURM_JOB_NODELIST:	 ise-titan-01 
 
 
-python: can't open file 'train-hydro.py': [Errno 2] No such file or directory
+Traceback (most recent call last):
+  File "train-hydro.py", line 1, in <module>
+    from model.data_loader import PEFDataset,fetch_dataloader
+  File "/cs_storage/shaharax/DeepPEF/model/data_loader.py", line 1, in <module>
+    import torch
+ModuleNotFoundError: No module named 'torch'

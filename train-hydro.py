@@ -11,6 +11,7 @@ from torch.optim import lr_scheduler
 from tqdm import tqdm
 import gc
 import time
+import sys
 
 # define validation function
 def validation(model, dataloader, device,epoch,N):
@@ -19,47 +20,52 @@ def validation(model, dataloader, device,epoch,N):
     """
     valid_loss = 0
     model.eval()
-    for i, data in enumerate(dataloader):
-        # Clean the GPU cache
-        torch.cuda.empty_cache()
-        gc.collect()
-        # get the inputs; data is a list of [inputs, labels]   
-        seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
-        Xd = Xd.to(device)
-        Xn = Xn.to(device)
-        esm_embed = esm_embed.to(device)
-        seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
-        seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
-        seq_decoy = torch.swapaxes(seq_decoy,1,2)
-        #emb = torch.cat((esm_embed,seq),dim=2)
-        emb = seq_one_hot
-        emb_decoy = seq_decoy.to(device)
-        
-        Xd = Xd.squeeze()
-        Xn = Xn.squeeze()
-        # Xd = Xd.reshape(Xd.shape[0],-1)
-        emb_decoy = emb_decoy.squeeze()
-        emb = emb.squeeze()
-        
-        # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
-            # create edge_index
-        edge_index = torch.tensor([],dtype=torch.long)
-        # forward + backward + optimize
-        for i in range(Xd.shape[0]):
-            for j in range(i,Xd.shape[0]):
-                if i == j:
-                    continue
-                else:
-                    edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
-        edge_index = edge_index.to(device)
-        outputs = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous())
-        
-        loss = criterion(outputs,Xd,Xn,model,N,CFG.h)
+    with tqdm(dataloader, unit="batch") as tepoch:
+        for i, data in enumerate(dataloader):
+            # set progress bar description
+            tepoch.set_description(f"Validation epoch {epoch}")
+            # Clean the GPU cache
+            torch.cuda.empty_cache()
+            gc.collect()
+            # get the inputs; data is a list of [inputs, labels]   
+            seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
+            Xd = Xd.to(device)
+            Xn = Xn.to(device)
+            esm_embed = esm_embed.to(device)
+            seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
+            seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
+            seq_decoy = torch.swapaxes(seq_decoy,1,2)
+            #emb = torch.cat((esm_embed,seq),dim=2)
+            emb = seq_one_hot
+            emb_decoy = seq_decoy.to(device)
+            
+            Xd = Xd.squeeze()
+            Xn = Xn.squeeze()
+            # Xd = Xd.reshape(Xd.shape[0],-1)
+            emb_decoy = emb_decoy.squeeze()
+            emb = emb.squeeze()
+            
+            # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
+                # create edge_index
+            edge_index = torch.tensor([],dtype=torch.long)
+            # forward + backward + optimize
+            for i in range(Xd.shape[0]):
+                for j in range(i,Xd.shape[0]):
+                    if i == j:
+                        continue
+                    else:
+                        edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
+            edge_index = edge_index.to(device)
+            outputs = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous())
+            
+            loss = criterion(outputs,Xd,Xn,model,N,CFG.h)
 
-        valid_loss += loss.item() 
-        torch.cuda.empty_cache()
-        gc.collect()
-        
+            valid_loss += loss.item() 
+            torch.cuda.empty_cache()
+            gc.collect()
+            # update the progress bar
+            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/((i+1)),3)})
+            
     return valid_loss/len(dataloader)
 
 def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
@@ -69,7 +75,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
     """
     epoch_train_loss = []
     ephoch_val_loss = []
-    best_loss = 10000000
+    model.train()
     running_loss = 0.0
     with tqdm(dataloader, unit="batch") as tepoch:
         for i, data in enumerate(tepoch):
@@ -119,7 +125,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
 
             # print statistics
             running_loss += loss.item()
-            if i % 10 == 9 or CFG.debug:    # print every 1000 mini-batches
+            if i % 1000 == 999 or CFG.debug:    # print every 1000 mini-batches
                 print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 1000:.3f}')
                 save_checkpoint(epoch, model, optimizer, running_loss/1000,0,CFG.model_path+str(epoch)+str(i+1)+"train_model.pt")
                
@@ -133,11 +139,11 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             
         
         # evaluate the model
-        current_valid_loss = validation(model, dataloader, device,epoch,N)
+        current_valid_loss = validation(model, valid_loader, device,epoch,N)
         ephoch_val_loss.append(current_valid_loss)
         print(f"loss: {round(loss.item(),3)} current_valid_loss:{round(current_valid_loss,3)}")
         valid_loss = current_valid_loss
-        print('saving model with loss: ',valid_loss)
+        print('saving model with valid loss: ',valid_loss)
         save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_path+str(epoch)+"_model.pt")
         
         save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_pathstr(epoch)+"_final_model.pt") 
@@ -187,7 +193,6 @@ def criterion(E,X_native,X_decoy,model,N,h):
     2. lossd: the energy of the native structure divided by the decoy energy
     3. lossc: After preforming an iterative optimization on the decoy structure, by using the energy partial derivative on the decoy structure, 
               we calculate the dRMSD of the end and the start of the optimization.
-
     Args:
         E (tensor): A tensor containing the energy of the native and the decoy structure Exd,Exn [2]
         X_native (tensor): A tensor containing the native structure [batch_size,seq_len,4,3]
@@ -215,7 +220,7 @@ def criterion(E,X_native,X_decoy,model,N,h):
 def main():
     print('***Start main function***')
     print('***load the data with dataloader***')
-    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,debug=CFG.debug)
+    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constrain=CFG.constrain,debug=CFG.debug)
     train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
     
     # Build the model
@@ -238,4 +243,6 @@ def print_par(model):
             print (name, param.data)
    
 if __name__ == '__main__':
+    if len(sys.argv>1):
+        CFG.model_path = sys.argv[1]
     main()

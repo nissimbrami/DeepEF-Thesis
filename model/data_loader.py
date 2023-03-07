@@ -66,8 +66,13 @@ class PEFDataset(Dataset):
         coordsC_native = torch.load(os.path.join(index_path, 'CoordCNative.pt'))
         coordsN_native = torch.load(os.path.join(index_path, 'CoordNNative.pt'))
         # Check glycine value
-        glyIndices = torch.where(coordsBeta_native[0, :] > 5e4)[0]
-        coordsBeta_native[:, glyIndices] = self.getCB(coordsN_native[:, glyIndices], coordsAlpha_native[:, glyIndices], coordsC_native[:, glyIndices])
+        glyIndices = torch.where(coordsBeta_native[:,0] > 5e4)[0]
+        if torch.any(glyIndices):
+            coordsBeta_native[glyIndices,:] = self.getCB(coordsN_native[glyIndices,:], coordsAlpha_native[glyIndices,:], coordsC_native[glyIndices,:])
+         # Check glycine value decoy
+        glyIndices = torch.where(coordsBeta[:, 0] > 5e4)[0]
+        if torch.any(glyIndices):    
+            coordsBeta[glyIndices,:] = self.getCB(coordsN[glyIndices,:], coordsAlpha[glyIndices,:], coordsC[glyIndices,:])
         # Masks
         mask = torch.load(os.path.join(index_path, 'mask.pt'))
         nativemask = torch.load(os.path.join(index_path, 'nativemask.pt'))
@@ -188,11 +193,11 @@ class PEFDataset(Dataset):
         # CAmN = CAmN / torch.sqrt(CAmN ** 2).sum(dim=2, keepdim=True)
         CAmC = C - CA
         # CAmC = CAmC / torch.sqrt(CAmC ** 2).sum(dim=2, keepdim=True)
-        ANxAC = torch.cross(CAmN, CAmC, dim=0)
+        ANxAC = torch.cross(CAmN, CAmC, dim=1)
 
         A = torch.cat((CAmN.reshape(-1, 1), CAmC.reshape(-1, 1), ANxAC.reshape(-1, 1)), dim=1)
         c = torch.tensor([0.5507, 0.5354, -0.5691]) / 100  # torch.tensor([1.1930, 1.2106, -2.7906]) #
-        b = (A @ c).reshape(3, -1)
+        b = (A @ c).reshape(-1,3)
         CB = CA - b
 
         return CB  

@@ -357,7 +357,7 @@ class PEM(torch.nn.Module):
       Xd = Xd.reshape(N_residu*N_atoms,coords_size)
       D = torch.cdist(Xd,Xd,p=2)
       D = D.reshape(N_residu,N_atoms,N_residu,N_atoms)
-      D = torch.swapaxes(D,2,3)
+      D = torch.swapaxes(D,1,2)
       D = D.reshape(N_residu,N_residu,N_atoms*N_atoms)
       return D
   

@@ -5,6 +5,7 @@ from model.model_cfg import CFG
 import gc
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import constants as C
 
 class PEFDataset(Dataset):
     '''
@@ -56,7 +57,7 @@ class PEFDataset(Dataset):
         id = torch.load(os.path.join(index_path, 'ids.pt')) # string id
        # 3D coordinates of the protein
         coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt'))
-        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt'))
+        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt'))   
         coordsC = torch.load(os.path.join(index_path, 'CoordC.pt'))
         coordsN = torch.load(os.path.join(index_path, 'CoordN.pt'))
         # 3D coordinates of the protein native
@@ -64,6 +65,9 @@ class PEFDataset(Dataset):
         coordsBeta_native = torch.load(os.path.join(index_path, 'CoordCbNative.pt'))
         coordsC_native = torch.load(os.path.join(index_path, 'CoordCNative.pt'))
         coordsN_native = torch.load(os.path.join(index_path, 'CoordNNative.pt'))
+        # Check glycine value
+        glyIndices = torch.where(coordsBeta_native[0, :] > 5e4)[0]
+        coordsBeta_native[:, glyIndices] = self.getCB(coordsN_native[:, glyIndices], coordsAlpha_native[:, glyIndices], coordsC_native[:, glyIndices])
         # Masks
         mask = torch.load(os.path.join(index_path, 'mask.pt'))
         nativemask = torch.load(os.path.join(index_path, 'nativemask.pt'))
@@ -74,7 +78,11 @@ class PEFDataset(Dataset):
         # Concatenate the coordinates
         Xd = self.concat_cords(coordsAlpha,coordsBeta, coordsC, coordsN)
         Xn = self.concat_cords(coordsAlpha_native,coordsBeta_native, coordsC_native, coordsN_native)
-           
+        
+        # Convert nno to angstrom
+        Xd = Xd * C.NANO_TO_ANGSTROM
+        Xn = Xn * C.NANO_TO_ANGSTROM
+          
         return seq,seq_decoy, id, Xd,Xn, mask, nativemask, esm_embed 
         
     def read_protein(self,index):
@@ -168,7 +176,26 @@ class PEFDataset(Dataset):
             gc.collect()
         
         self.filenames = new_filenames
-  
+
+    def getCB(self,N, CA, C):
+        # CB = CA + c1*(N-CA) + c2*(C-CA) + c3* (N-CA)x(C-CA)
+        dt = torch.get_default_dtype()
+        N = N.to(dt)
+        CA = CA.to(dt)
+        C = C.to(dt)
+
+        CAmN = N - CA
+        # CAmN = CAmN / torch.sqrt(CAmN ** 2).sum(dim=2, keepdim=True)
+        CAmC = C - CA
+        # CAmC = CAmC / torch.sqrt(CAmC ** 2).sum(dim=2, keepdim=True)
+        ANxAC = torch.cross(CAmN, CAmC, dim=0)
+
+        A = torch.cat((CAmN.reshape(-1, 1), CAmC.reshape(-1, 1), ANxAC.reshape(-1, 1)), dim=1)
+        c = torch.tensor([0.5507, 0.5354, -0.5691]) / 100  # torch.tensor([1.1930, 1.2106, -2.7906]) #
+        b = (A @ c).reshape(3, -1)
+        CB = CA - b
+
+        return CB  
         
 def fetch_dataloader(data_dir, params):
     """

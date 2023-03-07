@@ -41,7 +41,7 @@ class PEFDataset(Dataset):
         self.train_type = train_type
         # remove the files with homology greater than homothresh
         if type == 'train' and constraint:
-            self.check_data_constrain()
+            self.check_data_constraint()
         
 
     def __len__(self):
@@ -115,13 +115,13 @@ class PEFDataset(Dataset):
         X = torch.cat((coordsAlpha,coordsBeta, coordsC, coordsN), dim=1)
         return X
     
-    def check_data_constrain(self):
+    def check_data_constraint(self):
         """
-        Check the data constrain and remove the files with homology greater than homothresh.
+        Check the data constraint and remove the files with homology greater than homothresh.
         Check mask and native mask.
         Update file names list.
         """
-        print('Checking data constrain...')
+        print('Checking data constraint...')
         new_filenames = []
         for i in tqdm(range(len(self.filenames))):
             (seq, id, coordAlpha,coordBeta, coordC, coordN, coordAlphaNative,

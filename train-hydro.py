@@ -86,7 +86,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             gc.collect()
             # get the inputs; data is a list of [inputs, labels]   
             seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
-            Xd = Xd.to(device)
+            #Xd = Xd.to(device)
+            # Take native structure
+            Xd = torch.clone(Xn).to(device)
             Xn = Xn.to(device)
             esm_embed = esm_embed.to(device)
             seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
@@ -125,7 +127,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
 
             # print statistics
             running_loss += loss.item()
-            if index % 1000 == 999 or CFG.debug:    # print every 1000 mini-batches
+            if index % 1000 == 999 :    # print every 1000 mini-batches
                 print(f'[{epoch + 1}, {index + 1:5d}] loss: {running_loss / 1000:.3f}')
                 save_checkpoint(epoch, model, optimizer, running_loss/1000,0,CFG.model_path+str(epoch)+str(index+1)+"train_model.pt")
                

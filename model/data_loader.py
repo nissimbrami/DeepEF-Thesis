@@ -191,14 +191,14 @@ def fetch_dataloader(data_dir, params):
     # we have to define valid_size=0.5 (that is 50% of remaining data)
     X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5)
     # Now we have the data split in training, validation and test set
-    train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir,constraint = params.constrain), batch_size=params.batch_size, shuffle=True,
+    train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
                                         num_workers=params.num_workers,
                                         pin_memory=params.cuda)
-    valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir,constraint = params.constrain), batch_size=params.batch_size, shuffle=True,
+    valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
                                         num_workers=params.num_workers,
                                         pin_memory=params.cuda)
 
-    test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir,constraint = params.constrain), batch_size=params.batch_size, shuffle=True,
+    test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
                                         num_workers=params.num_workers,
                                         pin_memory=params.cuda)
     return train_loader, valid_loader, test_loader
@@ -211,5 +211,5 @@ class params:
         self.num_workers = num_workers
         self.cuda = cuda
         self.debug = debug
-        self.constrain = constraint
+        self.constraint = constraint
         

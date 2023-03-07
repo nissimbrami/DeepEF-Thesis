@@ -23,6 +23,7 @@ class CFG:
     filters = 64
     num_layers = 1
     model_path = "./trianed_models/"
+    gs_coef = -0.008*1e1
     #training parameters
     lr = 0.0001
     wd = 0.0001

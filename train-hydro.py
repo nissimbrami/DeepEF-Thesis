@@ -228,7 +228,7 @@ def main():
     print('***Build the model***')
     m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
                              cord_size = CFG.coords_emb,h = CFG.h,device=CFG.device)
-    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=3,model_type='GAT').to(CFG.device)
+    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=3,model_type='GAT',gs_coef=CFG.gs_coef).to(CFG.device)
     
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training

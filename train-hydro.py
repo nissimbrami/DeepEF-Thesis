@@ -78,7 +78,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
     model.train()
     running_loss = 0.0
     with tqdm(dataloader, unit="batch") as tepoch:
-        for i, data in enumerate(tepoch):
+        for index, data in enumerate(tepoch):
             # set progress bar description
             tepoch.set_description(f"Epoch {epoch}")
             # Clean the GPU cache
@@ -117,7 +117,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             
             outputs = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous())
             
-            loss = criterion(outputs,Xd,Xn,model,N,CFG.h)
+            loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
             
             loss.backward()
             # print_par(model) # print the parameters of the model
@@ -125,9 +125,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
 
             # print statistics
             running_loss += loss.item()
-            if i % 1000 == 999 or CFG.debug:    # print every 1000 mini-batches
-                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 1000:.3f}')
-                save_checkpoint(epoch, model, optimizer, running_loss/1000,0,CFG.model_path+str(epoch)+str(i+1)+"train_model.pt")
+            if index % 1000 == 999 or CFG.debug:    # print every 1000 mini-batches
+                print(f'[{epoch + 1}, {index + 1:5d}] loss: {running_loss / 1000:.3f}')
+                save_checkpoint(epoch, model, optimizer, running_loss/1000,0,CFG.model_path+str(epoch)+str(index+1)+"train_model.pt")
                
                 epoch_train_loss.append(running_loss/1000)
                 running_loss = 0.0
@@ -135,17 +135,17 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             torch.cuda.empty_cache()
             gc.collect()
             # update the progress bar
-            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/((i+1)%1000),3)})
+            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
             
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
-        # evaluate the model
-        with torch.no_grad():
-            current_valid_loss = validation(model, valid_loader, device,epoch,N)
-            ephoch_val_loss.append(current_valid_loss)
-            print(f"loss: {round(loss.item(),3)} current_valid_loss:{round(current_valid_loss,3)}")
-            valid_loss = current_valid_loss
-            print('saving model with valid loss: ',valid_loss)
-            save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_path+str(epoch)+"_model.pt")
+        # # evaluate the model
+        # with torch.no_grad():
+        #     current_valid_loss = validation(model, valid_loader, device,epoch,N)
+        #     ephoch_val_loss.append(current_valid_loss)
+        #     print(f"loss: {round(loss.item(),3)} current_valid_loss:{round(current_valid_loss,3)}")
+        #     valid_loss = current_valid_loss
+        #     print('saving model with valid loss: ',valid_loss)
+        #     save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_path+str(epoch)+"_model.pt")
         
         
                 
@@ -210,13 +210,13 @@ def criterion(E,X_native,X_decoy,model,N,h):
     # print('***End derivative calc function***')
     
     part_dx_native = [1 if part_dx is None else torch.norm(part_dx,p=2) for part_dx in partial_dx_native]
-    lossg = torch.prod(torch.FloatTensor(part_dx_native),dim=0)
+    lossg = torch.log(torch.prod(torch.FloatTensor(part_dx_native),dim=0) +1)
     
-    lossd = (E[1] / E[0]).mean()
+    lossd = (torch.log((E[1]+1) / (E[0]+1) +1)).mean()
     
     # lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
     # print(f"loss g: {round(lossg.item(),4)} loss d: {round(lossd.item(),4)}")
-    return lossd+lossg
+    return lossd+lossg , lossd, lossg,E[1],E[0]
 
 def main():
     print('***Start main function***')

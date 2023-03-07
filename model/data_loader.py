@@ -65,6 +65,9 @@ class PEFDataset(Dataset):
         coordsBeta_native = torch.load(os.path.join(index_path, 'CoordCbNative.pt'))
         coordsC_native = torch.load(os.path.join(index_path, 'CoordCNative.pt'))
         coordsN_native = torch.load(os.path.join(index_path, 'CoordNNative.pt'))
+        # Check glycine value
+        glyIndices = torch.where(coordsBeta_native[0, :] > 5e4)[0]
+        coordsBeta_native[:, glyIndices] = self.getCB(coordsN_native[:, glyIndices], coordsAlpha_native[:, glyIndices], coordsC_native[:, glyIndices])
         # Masks
         mask = torch.load(os.path.join(index_path, 'mask.pt'))
         nativemask = torch.load(os.path.join(index_path, 'nativemask.pt'))
@@ -173,7 +176,26 @@ class PEFDataset(Dataset):
             gc.collect()
         
         self.filenames = new_filenames
-  
+
+    def getCB(self,N, CA, C):
+        # CB = CA + c1*(N-CA) + c2*(C-CA) + c3* (N-CA)x(C-CA)
+        dt = torch.get_default_dtype()
+        N = N.to(dt)
+        CA = CA.to(dt)
+        C = C.to(dt)
+
+        CAmN = N - CA
+        # CAmN = CAmN / torch.sqrt(CAmN ** 2).sum(dim=2, keepdim=True)
+        CAmC = C - CA
+        # CAmC = CAmC / torch.sqrt(CAmC ** 2).sum(dim=2, keepdim=True)
+        ANxAC = torch.cross(CAmN, CAmC, dim=0)
+
+        A = torch.cat((CAmN.reshape(-1, 1), CAmC.reshape(-1, 1), ANxAC.reshape(-1, 1)), dim=1)
+        c = torch.tensor([0.5507, 0.5354, -0.5691]) / 100  # torch.tensor([1.1930, 1.2106, -2.7906]) #
+        b = (A @ c).reshape(3, -1)
+        CB = CA - b
+
+        return CB  
         
 def fetch_dataloader(data_dir, params):
     """

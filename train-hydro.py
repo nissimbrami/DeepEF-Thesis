@@ -221,14 +221,14 @@ def criterion(E,X_native,X_decoy,model,N,h):
 def main():
     print('***Start main function***')
     print('***load the data with dataloader***')
-    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constrain,debug=CFG.debug)
+    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint,debug=CFG.debug)
     train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
     
     # Build the model
     print('***Build the model***')
     m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
                              cord_size = CFG.coords_emb,h = CFG.h,device=CFG.device)
-    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=3,model_type='GAT',gs_coef=CFG.gs_coef).to(CFG.device)
+    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=3,model_type='GAT',gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
@@ -246,5 +246,5 @@ def print_par(model):
 if __name__ == '__main__':
     if len(sys.argv)>1:
         CFG.model_path = sys.argv[1]
-        CFG.constrain = int(sys.argv[2])
+        CFG.constraint = int(sys.argv[2])
     main()

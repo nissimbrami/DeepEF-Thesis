@@ -265,7 +265,7 @@ class ProteinEnergyNet(nn.Module):
 class PEM(torch.nn.Module):
   """Protein energy model"""
   
-  def __init__(self, dim_in, dim_h, dim_out, layers, model_type, gs_coef,heads = 8):
+  def __init__(self, dim_in, dim_h, dim_out, layers, model_type, gaussian_coef,heads = 8):
     super().__init__()
     
     if model_type == 'GCN':
@@ -277,7 +277,7 @@ class PEM(torch.nn.Module):
       self.optimizer = torch.optim.Adam(self.parameters(),
                                         lr=0.005,
                                         weight_decay=5e-4)
-      self.gs_coef = gs_coef
+      self.gaussian_coef = gaussian_coef
     else:
       raise ValueError('Model type not supported')
     self.layers = layers
@@ -338,7 +338,7 @@ class PEM(torch.nn.Module):
   def get_graph(self,x, emb):
     """Get graph representation of protein"""
     D = self.get_dist_matrix(x) # N,N,16
-    D = torch.relu(torch.exp(self.gs_coef*D**2))
+    D = torch.relu(torch.exp(self.gaussian_coef*D**2))
     
     D = D.sum(dim=1) #N,16
     

@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout
 from torch_geometric.nn import GCNConv, GATv2Conv
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 class params():
     def __init__(self,embedding_size,layers,filters,cord_size,h,device):
@@ -265,7 +265,7 @@ class ProteinEnergyNet(nn.Module):
 class PEM(torch.nn.Module):
   """Protein energy model"""
   
-  def __init__(self, dim_in, dim_h, dim_out, layers, model_type, heads = 8):
+  def __init__(self, dim_in, dim_h, dim_out, layers, model_type, gaussian_coef,heads = 8):
     super().__init__()
     
     if model_type == 'GCN':
@@ -277,17 +277,19 @@ class PEM(torch.nn.Module):
       self.optimizer = torch.optim.Adam(self.parameters(),
                                         lr=0.005,
                                         weight_decay=5e-4)
+      self.gaussian_coef = gaussian_coef
     else:
       raise ValueError('Model type not supported')
     self.layers = layers
     # First fully connected layer
-    self.fcs1 = nn.Linear(36, 128)
-    self.fcs2 = nn.Linear(128, 36)
+    self.fcs1 = nn.Linear(36, 64)
+    self.fcs2 = nn.Linear(64, 36)
     self.bn1  = nn.BatchNorm1d(36)
+    self.bn2  = nn.BatchNorm1d(36)
     # First fully connected layer
-    self.fc1 = nn.Linear(36, 128)
+    self.fc1 = nn.Linear(36, 64)
     # Second fully connected layer that outputs our 10 labels
-    self.fc2 = nn.Linear(128, 1)
+    self.fc2 = nn.Linear(64, 1)
   
   def forward(self,x_decoy, emb_decoy,x_native,emb_native ,edge_index):
       x_decoy  = self.get_graph(x_decoy, emb_decoy)
@@ -305,7 +307,7 @@ class PEM(torch.nn.Module):
         h = self.gat2(h, edge_index)
         
         h = F.log_softmax(h, dim=1)+identity
-      
+      x = self.bn2(x)
       x  = self.fc1(x)
       x = F.relu(x)
       x_decoy = self.fc2(x)
@@ -326,19 +328,17 @@ class PEM(torch.nn.Module):
         h = self.gat2(h, edge_index)
         
         h = F.log_softmax(h, dim=1)+identity
-      
+      x = self.bn2(x)
       x  = self.fc1(x)
       x = F.relu(x)
       x_native = self.fc2(x)
-    
-      
      
       return torch.cat((self.get_energy(x_decoy).unsqueeze(0), self.get_energy(x_native).unsqueeze(0)),dim=0)
     
   def get_graph(self,x, emb):
     """Get graph representation of protein"""
     D = self.get_dist_matrix(x) # N,N,16
-    D = torch.relu(torch.exp(-1e1*D))
+    D = torch.relu(torch.exp(self.gaussian_coef*D**2))
     
     D = D.sum(dim=1) #N,16
     
@@ -358,7 +358,7 @@ class PEM(torch.nn.Module):
       Xd = Xd.reshape(N_residu*N_atoms,coords_size)
       D = torch.cdist(Xd,Xd,p=2)
       D = D.reshape(N_residu,N_atoms,N_residu,N_atoms)
-      D = torch.swapaxes(D,2,3)
+      D = torch.swapaxes(D,1,2)
       D = D.reshape(N_residu,N_residu,N_atoms*N_atoms)
       return D
   

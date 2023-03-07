@@ -5,6 +5,7 @@ from model.model_cfg import CFG
 import gc
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import constants as C
 
 class PEFDataset(Dataset):
     '''
@@ -56,7 +57,7 @@ class PEFDataset(Dataset):
         id = torch.load(os.path.join(index_path, 'ids.pt')) # string id
        # 3D coordinates of the protein
         coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt'))
-        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt'))
+        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt'))   
         coordsC = torch.load(os.path.join(index_path, 'CoordC.pt'))
         coordsN = torch.load(os.path.join(index_path, 'CoordN.pt'))
         # 3D coordinates of the protein native
@@ -74,7 +75,11 @@ class PEFDataset(Dataset):
         # Concatenate the coordinates
         Xd = self.concat_cords(coordsAlpha,coordsBeta, coordsC, coordsN)
         Xn = self.concat_cords(coordsAlpha_native,coordsBeta_native, coordsC_native, coordsN_native)
-           
+        
+        # Convert nno to angstrom
+        Xd = Xd * C.NANO_TO_ANGSTROM
+        Xn = Xn * C.NANO_TO_ANGSTROM
+          
         return seq,seq_decoy, id, Xd,Xn, mask, nativemask, esm_embed 
         
     def read_protein(self,index):

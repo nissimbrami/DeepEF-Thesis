@@ -281,14 +281,14 @@ class PEM(torch.nn.Module):
       raise ValueError('Model type not supported')
     self.layers = layers
     # First fully connected layer
-    self.fcs1 = nn.Linear(36, 128)
-    self.fcs2 = nn.Linear(128, 36)
+    self.fcs1 = nn.Linear(36, 64)
+    self.fcs2 = nn.Linear(64, 36)
     self.bn1  = nn.BatchNorm1d(36)
     self.bn2  = nn.BatchNorm1d(36)
     # First fully connected layer
-    self.fc1 = nn.Linear(36, 128)
+    self.fc1 = nn.Linear(36, 64)
     # Second fully connected layer that outputs our 10 labels
-    self.fc2 = nn.Linear(128, 1)
+    self.fc2 = nn.Linear(64, 1)
   
   def forward(self,x_decoy, emb_decoy,x_native,emb_native ,edge_index):
       x_decoy  = self.get_graph(x_decoy, emb_decoy)
@@ -331,8 +331,6 @@ class PEM(torch.nn.Module):
       x  = self.fc1(x)
       x = F.relu(x)
       x_native = self.fc2(x)
-    
-      
      
       return torch.cat((self.get_energy(x_decoy).unsqueeze(0), self.get_energy(x_native).unsqueeze(0)),dim=0)
     

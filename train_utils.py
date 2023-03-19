@@ -18,4 +18,19 @@ def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
             'loss': loss,
             'valid_loss': val_loss,
             }, path)
+   
+def load_checkpoint(path,model,optimizer,device):
+    """
+    Load the model check point
+    inputs:
+        path (str) : path to load the model
+        model(torch.model): model
+        optimizer(torch.optim): torch optimizer
+        device (str) : device to load the model
+    """ 
     
+    dict = torch.load(path,map_location=device)
+    print(f"Loaded model from {path}")
+    # print(f"Epoch: {dict['epoch']},loss: {dict['loss']},valid_loss: {dict['valid_loss']}")
+    model.load_state_dict(dict['model_state_dict'])
+    optimizer.load_state_dict(dict['optimizer_state_dict'])

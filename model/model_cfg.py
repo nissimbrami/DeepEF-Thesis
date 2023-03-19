@@ -22,7 +22,7 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 1
-    model_path = "./trianed_models/"
+    model_path = "./trianed_models_no_const/"
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001

@@ -4,7 +4,7 @@ from model.model_cfg import CFG
 # from model.net import ProteinEnergyNet
 from model.hydro_net import PEM
 from model.net import params as model_params
-from train_utils import save_checkpoint
+from train_utils import save_checkpoint,load_checkpoint
 import torch
 from torch import optim
 from torch.optim import lr_scheduler
@@ -14,22 +14,27 @@ import time
 import sys
 
 # define validation function
-def validation(model, dataloader, device,epoch,N):
+def validation(model, dataloader, device,epoch,N,optimizer):
     """
     Validation function for the model.
     """
     valid_loss = 0
-    model.eval()
+    # model.eval() # cant use eval because of the loss function calculation
     with tqdm(dataloader, unit="batch") as tepoch:
-        for i, data in enumerate(dataloader):
+        for index, data in enumerate(dataloader):
             # set progress bar description
             tepoch.set_description(f"Validation epoch {epoch}")
             # Clean the GPU cache
-            torch.cuda.empty_cache()
+            if(device.type == "cuda" or device.type == "mps"):    
+                torch.cuda.empty_cache()
             gc.collect()
+            # zero the parameter gradients
+            optimizer.zero_grad()
             # get the inputs; data is a list of [inputs, labels]   
             seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
-            Xd = Xd.to(device)
+            # Xd = Xd.to(device)
+            # Take native structure
+            Xd = torch.clone(Xn).to(device)
             Xn = Xn.to(device)
             esm_embed = esm_embed.to(device)
             seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
@@ -58,13 +63,13 @@ def validation(model, dataloader, device,epoch,N):
             edge_index = edge_index.to(device)
             outputs = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous())
             
-            loss = criterion(outputs,Xd,Xn,model,N,CFG.h)
+            loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
 
             valid_loss += loss.item() 
             torch.cuda.empty_cache()
             gc.collect()
             # update the progress bar
-            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/((i+1)),3)})
+            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
             
     return valid_loss/len(dataloader)
 
@@ -141,7 +146,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
         # # evaluate the model
         # with torch.no_grad():
         #     current_valid_loss = validation(model, valid_loader, device,epoch,N)
-        #     ephoch_val_loss.append(current_valid_loss)
+        #     epoch_val_loss.append(current_valid_loss)
         #     print(f"loss: {round(loss.item(),3)} current_valid_loss:{round(current_valid_loss,3)}")
         #     valid_loss = current_valid_loss
         #     print('saving model with valid loss: ',valid_loss)
@@ -232,8 +237,10 @@ def main():
     
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
-    print('***Start training***')
-    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
+    # print('***Start training***')
+    # training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
+    load_checkpoint(CFG.model_path+"3_final_model.pt", model, optimizer,CFG.device)
+    validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer )
     
     return 1
 

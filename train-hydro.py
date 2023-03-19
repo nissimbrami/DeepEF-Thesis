@@ -4,7 +4,7 @@ from model.model_cfg import CFG
 # from model.net import ProteinEnergyNet
 from model.hydro_net import PEM
 from model.net import params as model_params
-from train_utils import save_checkpoint,load_checkpoint
+from train_utils import save_checkpoint,load_checkpoint,validation_plots
 import torch
 from torch import optim
 from torch.optim import lr_scheduler
@@ -14,62 +14,75 @@ import time
 import sys
 
 # define validation function
-def validation(model, dataloader, device,epoch,N,optimizer):
+def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
     """
     Validation function for the model.
     """
     valid_loss = 0
+    Exd_list = []
+    Exn_list = []
+    seq_len = []
     # model.eval() # cant use eval because of the loss function calculation
-    with tqdm(dataloader, unit="batch") as tepoch:
-        for index, data in enumerate(dataloader):
-            # set progress bar description
-            tepoch.set_description(f"Validation epoch {epoch}")
-            # Clean the GPU cache
-            if(device.type == "cuda" or device.type == "mps"):    
-                torch.cuda.empty_cache()
-            gc.collect()
-            # zero the parameter gradients
-            optimizer.zero_grad()
-            # get the inputs; data is a list of [inputs, labels]   
-            seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
-            # Xd = Xd.to(device)
-            # Take native structure
-            Xd = torch.clone(Xn).to(device)
-            Xn = Xn.to(device)
-            esm_embed = esm_embed.to(device)
-            seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
-            seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
-            seq_decoy = torch.swapaxes(seq_decoy,1,2)
-            #emb = torch.cat((esm_embed,seq),dim=2)
-            emb = seq_one_hot
-            emb_decoy = seq_decoy.to(device)
-            
-            Xd = Xd.squeeze()
-            Xn = Xn.squeeze()
-            # Xd = Xd.reshape(Xd.shape[0],-1)
-            emb_decoy = emb_decoy.squeeze()
-            emb = emb.squeeze()
-            
-            # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
-                # create edge_index
-            edge_index = torch.tensor([],dtype=torch.long)
-            # forward + backward + optimize
-            for i in range(Xd.shape[0]):
-                for j in range(i,Xd.shape[0]):
-                    if i == j:
-                        continue
-                    else:
-                        edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
-            edge_index = edge_index.to(device)
-            outputs = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous())
-            
-            loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
-
-            valid_loss += loss.item() 
+    #with tqdm(dataloader, unit="batch") as tepoch:
+    for index, data in enumerate(dataloader):
+        # Clean the GPU cache
+        if(device.type == "cuda" or device.type == "mps"):    
             torch.cuda.empty_cache()
-            gc.collect()
-            # update the progress bar
-            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
+        gc.collect()
+        # zero the parameter gradients
+        optimizer.zero_grad()
+        # get the inputs; data is a list of [inputs, labels]   
+        seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
+        # Xd = Xd.to(device)
+        # Take native structure
+        Xd = torch.clone(Xn).to(device)
+        Xn = Xn.to(device)
+        esm_embed = esm_embed.to(device)
+        seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
+        seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
+        if type == 'robust':
+            seq_decoy = torch.swapaxes(seq_decoy,1,2)
+        else: 
+            seq_decoy = torch.clone(seq_one_hot).to(device)
+            seq_decoy[:,torch.randperm(seq_decoy.shape[1])[:1],:] = seq_decoy[:,torch.randperm(seq_decoy.shape[1])[:1],:]
+        #emb = torch.cat((esm_embed,seq),dim=2)
+        emb = seq_one_hot
+        emb_decoy = seq_decoy.to(device)
+        
+        Xd = Xd.squeeze()
+        Xn = Xn.squeeze()
+        # Xd = Xd.reshape(Xd.shape[0],-1)
+        emb_decoy = emb_decoy.squeeze()
+        emb = emb.squeeze()
+        
+        # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
+            # create edge_index
+        edge_index = torch.tensor([],dtype=torch.long)
+        # forward + backward + optimize
+        for i in range(Xd.shape[0]):
+            for j in range(i,Xd.shape[0]):
+                if i == j:
+                    continue
+                else:
+                    edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
+        edge_index = edge_index.to(device)
+        outputs = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous())
+        
+        loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
+
+        valid_loss += loss.item() 
+        torch.cuda.empty_cache()
+        gc.collect()
+        # update the progress bar
+        if index % 1000 == 999:
+            print(f"Validation loss: {valid_loss/(index + 1)}")
+        #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
+        
+        Exd_list.append(Exd.item())
+        Exn_list.append(Exn.item())
+        seq_len.append(Xd.shape[0])
+    
+    validation_plots(Exd_list,Exn_list,seq_len,type)
             
     return valid_loss/len(dataloader)
 
@@ -96,7 +109,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             esm_embed = esm_embed.to(device)
             seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
             seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
+            
             seq_decoy = torch.swapaxes(seq_decoy,1,2)
+            
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot
             emb_decoy = seq_decoy.to(device)
@@ -240,7 +255,8 @@ def main():
     # print('***Start training***')
     # training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
     load_checkpoint(CFG.model_path+"3_final_model.pt", model, optimizer,CFG.device)
-    validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer )
+    validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , type = 'robust')
+    validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'soft')
     
     return 1
 

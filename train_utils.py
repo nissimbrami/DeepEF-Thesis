@@ -1,4 +1,5 @@
 import torch
+import matplotlib.pyplot as plt
 
 def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
     """
@@ -34,3 +35,27 @@ def load_checkpoint(path,model,optimizer,device):
     # print(f"Epoch: {dict['epoch']},loss: {dict['loss']},valid_loss: {dict['valid_loss']}")
     model.load_state_dict(dict['model_state_dict'])
     optimizer.load_state_dict(dict['optimizer_state_dict'])
+    
+def validation_plots(Exd,Exn,seq_len,type):
+    """
+    Plot the validation data
+    inputs:
+        Exd (tensor) : validation data
+        Exn (tensor) : validation data
+        seq_len (int) : sequence length
+        type (str) : type of the plot
+    """
+    # Plot the validation data
+    fig, ax = plt.subplots()
+    ax.set_title(f'Validation data for {type}')
+    ax.set_xlabel('Sequence length')
+    ax.set_ylabel('Energy')
+    ax.margins(0.05) # Optional, just adds 5% padding to the autoscaling
+    ax.plot(seq_len, Exd, marker='o', linestyle='', ms=3, label='decoy')
+    ax.plot(seq_len, Exn, marker='o', linestyle='', ms=3, label='native')
+    ax.legend()
+
+    #plt.show()
+    plt.savefig(f'./plots/E_len_{type}.png')
+    
+    plt.close()

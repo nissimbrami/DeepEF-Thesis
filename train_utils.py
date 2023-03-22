@@ -1,5 +1,6 @@
 import torch
 import matplotlib.pyplot as plt
+import numpy as np
 
 def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
     """
@@ -47,7 +48,7 @@ def validation_plots(Exd,Exn,seq_len,type):
     """
     # Plot the validation data
     fig, ax = plt.subplots()
-    ax.set_title(f'Validation data for {type}')
+    ax.set_title(f'Validation data for {type},number of sequences: {len(Exd)}')
     ax.set_xlabel('Sequence length')
     ax.set_ylabel('Energy')
     ax.margins(0.05) # Optional, just adds 5% padding to the autoscaling
@@ -57,5 +58,22 @@ def validation_plots(Exd,Exn,seq_len,type):
 
     #plt.show()
     plt.savefig(f'./plots/E_len_{type}.png')
+    
+    plt.close()
+    
+    # plot validation energy delta
+    delta_E = np.array([Exd[i]-Exn[i] for i in range(len(seq_len))])
+    seq_len = np.array(seq_len)
+    fig, ax = plt.subplots()
+    ax.set_title(f'Validation data for {type},number of sequences: {len(Exd)}')
+    ax.set_xlabel('Sequence length')
+    ax.set_ylabel('Energy delta log')
+    ax.margins(0.05) # Optional, just adds 5% padding to the autoscaling
+    ax.plot(seq_len[delta_E>0], np.log(delta_E[delta_E>=0]+1), marker='o', linestyle='', ms=3, label='positive')
+    ax.plot(seq_len[delta_E<0], -1*np.log(-1*delta_E[delta_E<0] +1), marker='o', linestyle='', ms=3, label='negative')
+    ax.legend()
+
+    #plt.show()
+    plt.savefig(f'./plots/Edelta_len_{type}.png')
     
     plt.close()

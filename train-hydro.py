@@ -74,8 +74,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
         torch.cuda.empty_cache()
         gc.collect()
         # update the progress bar
-        if index % 1000 == 999:
-            print(f"Validation loss: {valid_loss/(index + 1)}")
+        if index % 100 == 99:
+            print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}")
+            validation_plots(Exd_list,Exn_list,seq_len,type)
         #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
         
         Exd_list.append(Exd.item())
@@ -83,6 +84,8 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
         seq_len.append(Xd.shape[0])
     
     validation_plots(Exd_list,Exn_list,seq_len,type)
+    
+    print(f"Finished Validation {type}")
             
     return valid_loss/len(dataloader)
 

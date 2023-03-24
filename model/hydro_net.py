@@ -269,17 +269,13 @@ class PEM(torch.nn.Module):
     super().__init__()
     
     if model_type == 'GCN':
-      self.model = [GCN(dim_in, dim_h, dim_out) for i in range(layers)]
+      self.graph_model = [GCN(dim_in, dim_h, dim_out) for i in range(layers)]
     elif model_type == 'GAT':
-      # self.model = [GAT(dim_in, dim_h, dim_out) for i in range(layers)]
-      self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
-      self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
-      self.optimizer = torch.optim.Adam(self.parameters(),
-                                        lr=0.005,
-                                        weight_decay=5e-4)
-      self.gaussian_coef = gaussian_coef
+        self.graph_model = [GAT(dim_in, dim_h, dim_out) for i in range(layers)]
+      
     else:
       raise ValueError('Model type not supported')
+    self.gaussian_coef = gaussian_coef
     self.layers = layers
     # First fully connected layer
     self.fcs1 = nn.Linear(36, 64)
@@ -300,14 +296,10 @@ class PEM(torch.nn.Module):
       x = self.fcs2(x)
       x = self.bn1(x)
       for layer in range(self.layers):
-        x = F.dropout(x, p=0.6, training=self.training)
-        x = self.gat1(x, edge_index)
-        x = F.elu(x)
-        x = F.dropout(x, p=0.6, training=self.training)
-        x = self.gat2(x, edge_index)
+        h1,x = self.graph_model[layer](x, edge_index) 
+        x = x + identity
         
-        x = F.log_softmax(x, dim=1)+identity
-      x = self.bn2(x)
+    #   x = self.bn2(x)
       x  = self.fc1(x)
       x = F.relu(x)
       x_decoy = self.fc2(x)
@@ -321,14 +313,10 @@ class PEM(torch.nn.Module):
       x = self.fcs2(x)
       x = self.bn1(x)
       for layer in range(self.layers):
-        x = F.dropout(x, p=0.6, training=self.training)
-        x = self.gat1(x, edge_index)
-        x = F.elu(x)
-        x = F.dropout(x, p=0.6, training=self.training)
-        x = self.gat2(x, edge_index)
+        h1,x = self.graph_model[layer](x, edge_index) 
+        x = x + identity
         
-        x = F.log_softmax(x, dim=1)+identity
-      x = self.bn2(x)
+    #   x = self.bn2(x)
       x  = self.fc1(x)
       x = F.relu(x)
       x_native = self.fc2(x)
@@ -372,3 +360,41 @@ class PEM(torch.nn.Module):
         """
         E = torch.sum(Fh**2,dim=(0,1))
         return E
+    
+    
+class GAT(torch.nn.Module):
+  
+  """Graph Attention Network"""
+  def __init__(self, dim_in, dim_h, dim_out, heads=8):
+    super().__init__()
+    self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
+    self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
+    self.optimizer = torch.optim.Adam(self.parameters(),
+                                      lr=0.005,
+                                      weight_decay=5e-4)
+
+  def forward(self, x, edge_index):
+    h = F.dropout(x, p=0.6, training=self.training)
+    h = self.gat1(x, edge_index)
+    h = F.elu(h)
+    h = F.dropout(h, p=0.6, training=self.training)
+    h = self.gat2(h, edge_index)
+    return h, F.log_softmax(h, dim=1)
+
+class GCN(torch.nn.Module):
+  """Graph Convolutional Network"""
+  def __init__(self, dim_in, dim_h, dim_out):
+    super().__init__()
+    self.gcn1 = GCNConv(dim_in, dim_h)
+    self.gcn2 = GCNConv(dim_h, dim_out)
+    self.optimizer = torch.optim.Adam(self.parameters(),
+                                      lr=0.01,
+                                      weight_decay=5e-4)
+
+  def forward(self, x, edge_index):
+    h = F.dropout(x, p=0.5, training=self.training)
+    h = self.gcn1(h, edge_index)
+    h = torch.relu(h)
+    h = F.dropout(h, p=0.5, training=self.training)
+    h = self.gcn2(h, edge_index)
+    return h, F.log_softmax(h, dim=1)

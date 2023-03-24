@@ -69,7 +69,7 @@ def validation_plots(Exd,Exn,seq_len,type):
     ax.set_xlabel('Sequence length')
     ax.set_ylabel('Energy delta log')
     ax.margins(0.05) # Optional, just adds 5% padding to the autoscaling
-    ax.plot(seq_len[delta_E>0], np.log(delta_E[delta_E>=0]+1), marker='o', linestyle='', ms=3, label='positive')
+    ax.plot(seq_len[delta_E>=0], np.log(delta_E[delta_E>=0]+1), marker='o', linestyle='', ms=3, label='positive')
     ax.plot(seq_len[delta_E<0], -1*np.log(-1*delta_E[delta_E<0] +1), marker='o', linestyle='', ms=3, label='negative')
     ax.legend()
 

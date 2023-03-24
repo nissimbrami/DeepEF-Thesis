@@ -300,13 +300,13 @@ class PEM(torch.nn.Module):
       x = self.fcs2(x)
       x = self.bn1(x)
       for layer in range(self.layers):
-        h = F.dropout(x, p=0.6, training=self.training)
-        h = self.gat1(x, edge_index)
-        h = F.elu(h)
-        h = F.dropout(h, p=0.6, training=self.training)
-        h = self.gat2(h, edge_index)
+        x = F.dropout(x, p=0.6, training=self.training)
+        x = self.gat1(x, edge_index)
+        x = F.elu(x)
+        x = F.dropout(x, p=0.6, training=self.training)
+        x = self.gat2(x, edge_index)
         
-        h = F.log_softmax(h, dim=1)+identity
+        x = F.log_softmax(x, dim=1)+identity
       x = self.bn2(x)
       x  = self.fc1(x)
       x = F.relu(x)
@@ -321,13 +321,13 @@ class PEM(torch.nn.Module):
       x = self.fcs2(x)
       x = self.bn1(x)
       for layer in range(self.layers):
-        h = F.dropout(x, p=0.6, training=self.training)
-        h = self.gat1(x, edge_index)
-        h = F.elu(h)
-        h = F.dropout(h, p=0.6, training=self.training)
-        h = self.gat2(h, edge_index)
+        x = F.dropout(x, p=0.6, training=self.training)
+        x = self.gat1(x, edge_index)
+        x = F.elu(x)
+        x = F.dropout(x, p=0.6, training=self.training)
+        x = self.gat2(x, edge_index)
         
-        h = F.log_softmax(h, dim=1)+identity
+        x = F.log_softmax(x, dim=1)+identity
       x = self.bn2(x)
       x  = self.fc1(x)
       x = F.relu(x)

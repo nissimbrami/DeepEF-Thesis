@@ -276,7 +276,7 @@ class PEM(torch.nn.Module):
     else:
       raise ValueError('Model type not supported')
     self.gaussian_coef = gaussian_coef
-    self.layers = layers
+    self.layers = torch.nn.ModuleList(self.graph_model)
     # First fully connected layer
     self.fcs1 = nn.Linear(36, 64)
     self.fcs2 = nn.Linear(64, 36)
@@ -296,7 +296,7 @@ class PEM(torch.nn.Module):
       x = self.fcs2(x)
       x = self.bn1(x)
       for layer in range(self.layers):
-        h1,x = self.graph_model[layer](x, edge_index) 
+        h1,x = self.layer(x, edge_index) 
         x = x + identity
         
     #   x = self.bn2(x)
@@ -313,7 +313,7 @@ class PEM(torch.nn.Module):
       x = self.fcs2(x)
       x = self.bn1(x)
       for layer in range(self.layers):
-        h1,x = self.graph_model[layer](x, edge_index) 
+        h1,x = self.layer(x, edge_index) 
         x = x + identity
         
     #   x = self.bn2(x)

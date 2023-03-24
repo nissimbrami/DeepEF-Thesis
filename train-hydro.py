@@ -255,10 +255,10 @@ def main():
     
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
-    # print('***Start training***')
-    # training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
-    load_checkpoint(CFG.model_path+"3_final_model.pt", model, optimizer,CFG.device)
-    validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , type = 'robust')
+    print('***Start training***')
+    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
+    # load_checkpoint(CFG.model_path+"3_final_model.pt", model, optimizer,CFG.device)
+    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , type = 'robust')
     # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'soft')
     
     return 1

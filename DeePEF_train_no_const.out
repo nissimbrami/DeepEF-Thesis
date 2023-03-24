@@ -1,11 +1,25 @@
-Fri Mar 24 11:38:34 IDT 2023
+Fri Mar 24 11:49:11 IDT 2023
 
-SLURM_JOBID:		 727755
-SLURM_JOB_NODELIST:	 ise-pheno-10 
+SLURM_JOBID:		 727762
+SLURM_JOB_NODELIST:	 ise-pheno-01 
 
 
 ***Start main function***
 ***load the data with dataloader***
 ***Build the model***
-Loaded model from ./trianed_models_no_const/3_final_model.pt
-slurmstepd: error: *** JOB 727755 ON ise-pheno-10 CANCELLED AT 2023-03-24T11:39:06 ***
+***Start training***
+  0%|          | 0/33904 [00:00<?, ?batch/s]Epoch 0:   0%|          | 0/33904 [00:00<?, ?batch/s]Epoch 0:   0%|          | 0/33904 [00:00<?, ?batch/s, loss=29.2, running loss=29.2, lossd=1.24, lossg=28, Exn=5.35, Exd=1.6]Epoch 0:   0%|          | 1/33904 [00:00<6:54:11,  1.36batch/s, loss=29.2, running loss=29.2, lossd=1.24, lossg=28, Exn=5.35, Exd=1.6]Epoch 0:   0%|          | 1/33904 [00:00<6:54:11,  1.36batch/s, loss=29.2, running loss=29.2, lossd=1.24, lossg=28, Exn=5.35, Exd=1.6]Epoch 0:   0%|          | 1/33904 [00:01<6:54:11,  1.36batch/s, loss=34.1, running loss=31.6, lossd=0.55, lossg=33.5, Exn=3.79, Exd=5.54]Epoch 0:   0%|          | 2/33904 [00:01<5:32:13,  1.70batch/s, loss=34.1, running loss=31.6, lossd=0.55, lossg=33.5, Exn=3.79, Exd=5.54]Epoch 0:   0%|          | 2/33904 [00:01<5:32:13,  1.70batch/s, loss=34.1, running loss=31.6, lossd=0.55, lossg=33.5, Exn=3.79, Exd=5.54]Epoch 0:   0%|          | 2/33904 [00:01<5:32:13,  1.70batch/s, loss=13.5, running loss=25.6, lossd=0.599, lossg=12.9, Exn=0.904, Exd=1.32]Epoch 0:   0%|          | 3/33904 [00:01<3:52:20,  2.43batch/s, loss=13.5, running loss=25.6, lossd=0.599, lossg=12.9, Exn=0.904, Exd=1.32]Epoch 0:   0%|          | 3/33904 [00:01<3:52:20,  2.43batch/s, loss=13.5, running loss=25.6, lossd=0.599, lossg=12.9, Exn=0.904, Exd=1.32]Epoch 0:   0%|          | 3/33904 [00:03<3:52:20,  2.43batch/s, loss=37.9, running loss=28.7, lossd=0.449, lossg=37.4, Exn=3.83, Exd=7.52] Epoch 0:   0%|          | 4/33904 [00:03<9:37:35,  1.02s/batch, loss=37.9, running loss=28.7, lossd=0.449, lossg=37.4, Exn=3.83, Exd=7.52]Epoch 0:   0%|          | 4/33904 [00:03<9:37:35,  1.02s/batch, loss=37.9, running loss=28.7, lossd=0.449, lossg=37.4, Exn=3.83, Exd=7.52]Epoch 0:   0%|          | 4/33904 [00:03<9:37:35,  1.02s/batch, loss=15.8, running loss=26.1, lossd=0.569, lossg=15.2, Exn=2.04, Exd=2.96]Epoch 0:   0%|          | 5/33904 [00:03<7:24:12,  1.27batch/s, loss=15.8, running loss=26.1, lossd=0.569, lossg=15.2, Exn=2.04, Exd=2.96]Epoch 0:   0%|          | 5/33904 [00:03<7:24:12,  1.27batch/s, loss=15.8, running loss=26.1, lossd=0.569, lossg=15.2, Exn=2.04, Exd=2.96]Epoch 0:   0%|          | 5/33904 [00:04<7:24:12,  1.27batch/s, loss=36.6, running loss=27.8, lossd=0.783, lossg=35.8, Exn=3.62, Exd=2.89]Epoch 0:   0%|          | 6/33904 [00:04<6:41:27,  1.41batch/s, loss=36.6, running loss=27.8, lossd=0.783, lossg=35.8, Exn=3.62, Exd=2.89]Epoch 0:   0%|          | 6/33904 [00:04<6:41:27,  1.41batch/s, loss=36.6, running loss=27.8, lossd=0.783, lossg=35.8, Exn=3.62, Exd=2.89]Epoch 0:   0%|          | 6/33904 [00:08<6:41:27,  1.41batch/s, loss=68.8, running loss=33.7, lossd=0.81, lossg=68, Exn=10.3, Exd=8.04]   Epoch 0:   0%|          | 7/33904 [00:08<16:46:38,  1.78s/batch, loss=68.8, running loss=33.7, lossd=0.81, lossg=68, Exn=10.3, Exd=8.04]Epoch 0:   0%|          | 7/33904 [00:08<16:46:38,  1.78s/batch, loss=68.8, running loss=33.7, lossd=0.81, lossg=68, Exn=10.3, Exd=8.04]Epoch 0:   0%|          | 7/33904 [00:09<16:46:38,  1.78s/batch, loss=50.4, running loss=35.8, lossd=0.763, lossg=49.7, Exn=6.84, Exd=5.85]Epoch 0:   0%|          | 8/33904 [00:09<15:19:23,  1.63s/batch, loss=50.4, running loss=35.8, lossd=0.763, lossg=49.7, Exn=6.84, Exd=5.85]Epoch 0:   0%|          | 8/33904 [00:09<15:19:23,  1.63s/batch, loss=50.4, running loss=35.8, lossd=0.763, lossg=49.7, Exn=6.84, Exd=5.85]Epoch 0:   0%|          | 8/33904 [00:12<15:19:23,  1.63s/batch, loss=44.6, running loss=36.8, lossd=0.615, lossg=44, Exn=6.25, Exd=7.54]  Epoch 0:   0%|          | 9/33904 [00:12<19:28:05,  2.07s/batch, loss=44.6, running loss=36.8, lossd=0.615, lossg=44, Exn=6.25, Exd=7.54]Epoch 0:   0%|          | 9/33904 [00:12<19:28:05,  2.07s/batch, loss=44.6, running loss=36.8, lossd=0.615, lossg=44, Exn=6.25, Exd=7.54]Epoch 0:   0%|          | 9/33904 [00:12<19:28:05,  2.07s/batch, loss=25.1, running loss=35.6, lossd=0.871, lossg=24.2, Exn=1.87, Exd=1.06]Epoch 0:   0%|          | 10/33904 [00:12<14:03:37,  1.49s/batch, loss=25.1, running loss=35.6, lossd=0.871, lossg=24.2, Exn=1.87, Exd=1.06]Epoch 0:   0%|          | 10/33904 [00:12<14:03:37,  1.49s/batch, loss=25.1, running loss=35.6, lossd=0.871, lossg=24.2, Exn=1.87, Exd=1.06]Epoch 0:   0%|          | 10/33904 [00:25<23:39:36,  2.51s/batch, loss=25.1, running loss=35.6, lossd=0.871, lossg=24.2, Exn=1.87, Exd=1.06]
+Traceback (most recent call last):
+  File "train-hydro.py", line 276, in <module>
+    main()
+  File "train-hydro.py", line 259, in main
+    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
+  File "train-hydro.py", line 197, in training
+    model,epoch_train_loss,ephoch_val_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader)
+  File "train-hydro.py", line 143, in train_one_epoch
+    loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
+  File "train-hydro.py", line 232, in criterion
+    partial_dx_native = torch.autograd.grad(E[1].sum(),model.parameters(),create_graph=True,allow_unused=True)
+  File "/home/shaharax/.conda/envs/esm2_env/lib/python3.7/site-packages/torch/autograd/__init__.py", line 302, in grad
+    allow_unused, accumulate_grad=False)  # Calls into the C++ engine to run the backward pass
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 364.00 MiB (GPU 0; 10.92 GiB total capacity; 9.86 GiB already allocated; 223.44 MiB free; 10.09 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF

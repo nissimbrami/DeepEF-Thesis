@@ -288,21 +288,21 @@ class PEM(torch.nn.Module):
     self.fc2 = nn.Linear(64, 1)
   
   def forward(self,x_decoy, emb_decoy,x_native,emb_native ,edge_index):
-      x_decoy  = self.get_graph(x_decoy, emb_decoy)
-      identity = x_decoy
+      x_decoy  = self.get_graph(x_decoy, emb_decoy) # gettting the graph N,16+emb_size(20)
+      identity = x_decoy # identity for the residual connection
       x = x_decoy
-      x = self.fcs1(x)
+      x = self.fcs1(x) # N,36->N,64
       x = F.relu(x)
-      x = self.fcs2(x)
+      x = self.fcs2(x) # N,64->N,36
       x = self.bn1(x)
-      for layer in range(self.layers):
-        h1,x = self.layer(x, edge_index) 
+      for layer in self.layers:
+        h1,x = layer(x, edge_index) 
         x = x + identity
         
-    #   x = self.bn2(x)
-      x  = self.fc1(x)
+      x = self.bn2(x)
+      x  = self.fc1(x) # N,36->N,64
       x = F.relu(x)
-      x_decoy = self.fc2(x)
+      x_decoy = self.fc2(x) # N,64->N,1
 
       
       x_native  = self.get_graph(x_native, emb_native)
@@ -312,11 +312,11 @@ class PEM(torch.nn.Module):
       x = F.relu(x)
       x = self.fcs2(x)
       x = self.bn1(x)
-      for layer in range(self.layers):
-        h1,x = self.layer(x, edge_index) 
+      for layer in self.layers:
+        h1,x = layer(x, edge_index) 
         x = x + identity
         
-    #   x = self.bn2(x)
+      x = self.bn2(x)
       x  = self.fc1(x)
       x = F.relu(x)
       x_native = self.fc2(x)

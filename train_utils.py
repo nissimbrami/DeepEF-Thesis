@@ -1,4 +1,6 @@
 import torch
+import os
+from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -13,6 +15,7 @@ def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
         val_loss(tensor) : validation loss function value
         path (str) : path to save the model
     """
+    os.makedirs(str(Path(path).parent), exist_ok=True)
     torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),

@@ -1,7 +1,7 @@
 import torch
 
 class CFG:
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")  # Use GPU is avaliable
+    device = torch.device("cpu") #torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")  # Use GPU is avaliable
     if(device.type == "cuda" or device.type == "mps"):
         torch.cuda.empty_cache()
         cuda = True
@@ -10,7 +10,7 @@ class CFG:
         
     data_path = './data/data2'
     seed = 42
-    debug = False
+    debug = True
     # Train data parameters
     homothresh = 0.9
     constraint = True

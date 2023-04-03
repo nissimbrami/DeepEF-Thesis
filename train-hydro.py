@@ -12,6 +12,7 @@ from tqdm import tqdm
 import gc
 import time
 import sys
+import pandas as pd
 
 # define validation function
 def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
@@ -22,6 +23,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
     Exd_list = []
     Exn_list = []
     seq_len = []
+    lossg_list = []
+    lossd_list = []
+    ids_list = []
     # model.eval() # cant use eval because of the loss function calculation
     #with tqdm(dataloader, unit="batch") as tepoch:
     for index, data in enumerate(dataloader):
@@ -40,7 +44,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
         esm_embed = esm_embed.to(device)
         seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
         seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
-        if type == 'robust':
+        if(seq_one_hot.shape[1]>1000): # skip long sequences due to GPU memory
+            continue
+        if type == 'robust' or type == 'train':
             seq_decoy = torch.swapaxes(seq_decoy,1,2)
         else: 
             seq_decoy = torch.clone(seq_one_hot).to(device)
@@ -74,7 +80,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
         torch.cuda.empty_cache()
         gc.collect()
         # update the progress bar
-        if index % 100 == 99:
+        if index % 1000 == 99:
             print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}")
             validation_plots(Exd_list,Exn_list,seq_len,type)
         #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
@@ -82,9 +88,13 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
         Exd_list.append(Exd.item())
         Exn_list.append(Exn.item())
         seq_len.append(Xd.shape[0])
+        lossg_list.append(lossg.item())
+        lossd_list.append(lossd.item())
+        ids_list.append(id)
     
     validation_plots(Exd_list,Exn_list,seq_len,type)
-    
+    df = pd.DataFrame({'id':ids_list,'Exd':Exd_list,'Exn':Exn_list,'seq_len':seq_len,'lossg':lossg_list,'lossd':lossd_list})
+    df.to_csv(f'./results/validation_{type}.csv')
     print(f"Finished Validation {type}")
             
     return valid_loss/len(dataloader)
@@ -98,6 +108,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
     ephoch_val_loss = []
     model.train()
     running_loss = 0.0
+    n_skips = 0
     with tqdm(dataloader, unit="batch") as tepoch:
         for index, data in enumerate(tepoch):
             # set progress bar description
@@ -114,7 +125,10 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
             
             seq_decoy = torch.swapaxes(seq_decoy,1,2)
-            
+            if seq_decoy.shape[1] >1000 : # if the sequence is too long, skip it(GPU limitation)
+                n_skips += 1
+                print(f"skipping {n_skips}")
+                continue
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot
             emb_decoy = seq_decoy.to(device)
@@ -233,8 +247,9 @@ def criterion(E,X_native,X_decoy,model,N,h):
     # print('***End derivative calc function***')
     
     part_dx_native = [1 if part_dx is None else torch.norm(part_dx,p=2) for part_dx in partial_dx_native]
-    lossg = torch.log(torch.prod(torch.FloatTensor(part_dx_native),dim=0) +1)
-    
+    # lossg = torch.log(torch.prod(torch.FloatTensor(part_dx_native),dim=0) +1)
+    # change the loss function to the max value of 1
+    lossg = 2/(1+torch.exp(-torch.prod(torch.FloatTensor(part_dx_native),dim=0))) -1
     lossd = (torch.log((E[1]+1) / (E[0]+1) +1)).mean()
     
     # lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
@@ -251,15 +266,16 @@ def main():
     print('***Build the model***')
     m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
                              cord_size = CFG.coords_emb,h = CFG.h,device=CFG.device)
-    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=3,model_type='GAT',gaussian_coef=CFG.gaussian_coef).to(CFG.device)
+    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=CFG.num_layers,model_type='GAT',gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
     print('***Start training***')
-    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
-    # load_checkpoint(CFG.model_path+"3_final_model.pt", model, optimizer,CFG.device)
+    # training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
+    load_checkpoint(CFG.model_path+"4_final_model.pt", model, optimizer,CFG.device)
     # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , type = 'robust')
     # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'soft')
+    validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, type = 'train')
     
     return 1
 

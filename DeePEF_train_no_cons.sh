@@ -20,8 +20,9 @@
 echo `date`
 echo -e "\nSLURM_JOBID:\t\t" $SLURM_JOBID
 echo -e "SLURM_JOB_NODELIST:\t" $SLURM_JOB_NODELIST "\n\n"
+nvidia-smi
 
 
 module load anaconda ### load anaconda module
 source activate esm2_env ### activating Conda environment, environment must be configured before running the job
-python train-hydro.py ./trianed_models_no_const/ 0 ### execute python script – replace with your own command
+python train-hydro.py ./trianed_models_no_const/ 0  ### execute python script – replace with your own command

@@ -14,13 +14,14 @@
 # Note: the following 4 lines are commented out
 #BATCH --mail-user=shaharax@post.bgu.ac.il        ### user's email for sending job status messages
 #SBATCH --mail-type=END,FAIL                   ### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
-##SBATCH --mem=24G                              ### ammount of RAM memory, allocating more than 60G requires IT team's permission
+#SBATCH --mem=24G                              ### ammount of RAM memory, allocating more than 60G requires IT team's permission
+
 
 ### Print some data to output file ###
 echo `date`
 echo -e "\nSLURM_JOBID:\t\t" $SLURM_JOBID
 echo -e "SLURM_JOB_NODELIST:\t" $SLURM_JOB_NODELIST "\n\n"
-
+nvidia-smi
 
 module load anaconda ### load anaconda module
 source activate esm2_env ### activating Conda environment, environment must be configured before running the job

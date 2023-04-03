@@ -341,7 +341,7 @@ class PEM(torch.nn.Module):
     D = torch.relu(torch.exp(self.gaussian_coef*D**2))
     
     D = D.sum(dim=1) #N,16
-    
+    D = F.normalize(D,p=2,dim=0)
     Fh = torch.cat([emb,D],dim=1) #N,16+emb_size
     
     return Fh

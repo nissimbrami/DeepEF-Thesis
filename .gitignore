@@ -1,5 +1,5 @@
 /data/*
-/experiments/.ipyn*
+/experiments/
 /*/__pycache__/*
 *.pt
 trianed_models/*

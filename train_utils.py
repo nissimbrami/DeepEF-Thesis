@@ -80,3 +80,10 @@ def validation_plots(Exd,Exn,seq_len,type):
     plt.savefig(f'./plots/Edelta_len_{type}.png')
     
     plt.close()
+
+
+def print_parameters(model):
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(name, param.data)
+

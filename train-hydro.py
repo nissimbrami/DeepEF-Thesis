@@ -1,21 +1,22 @@
-from model.data_loader import PEFDataset,fetch_dataloader
-from model.data_loader import params as data_params
-from model.model_cfg import CFG
-# from model.net import ProteinEnergyNet
-from model.hydro_net import PEM
-from model.net import params as model_params
-from train_utils import save_checkpoint,load_checkpoint,validation_plots
+import gc
+import sys
+
+import pandas as pd
 import torch
 from torch import optim
-from torch.optim import lr_scheduler
 from tqdm import tqdm
-import gc
-import time
-import sys
-import pandas as pd
+
+from model.data_loader import fetch_dataloader
+from model.data_loader import DataLoaderParams as data_params
+# from model.net import ProteinEnergyNet
+from model.hydro_net import PEM
+from model.model_cfg import CFG
+from model.net import params as model_params
+from train_utils import save_checkpoint, validation_plots
+
 
 # define validation function
-def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
+def validation(model, dataloader, device, epoch, N, optimizer, type='robust'):
     """
     Validation function for the model.
     """
@@ -27,79 +28,76 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
     lossd_list = []
     ids_list = []
     # model.eval() # cant use eval because of the loss function calculation
-    #with tqdm(dataloader, unit="batch") as tepoch:
+    # with tqdm(dataloader, unit="batch") as tepoch:
     for index, data in enumerate(dataloader):
         # Clean the GPU cache
-        if(device.type == "cuda" or device.type == "mps"):    
+        if (device.type == "cuda" or device.type == "mps"):
             torch.cuda.empty_cache()
         gc.collect()
         # zero the parameter gradients
         optimizer.zero_grad()
         # get the inputs; data is a list of [inputs, labels]   
-        seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
+        seq_one_hot, seq_decoy, id, Xd, Xn, mask, nativemask, esm_embed = data
         # Xd = Xd.to(device)
         # Take native structure
         Xd = torch.clone(Xn).to(device)
         Xn = Xn.to(device)
         esm_embed = esm_embed.to(device)
-        seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
-        seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
-        if(seq_one_hot.shape[1]>1000): # skip long sequences due to GPU memory
+        seq_one_hot = seq_one_hot.to(device)  # [batch_size,20,seq_len]
+        seq_one_hot = torch.swapaxes(seq_one_hot, 1, 2)  # swap the axes to [batch_size,seq_len,20]
+        if (seq_one_hot.shape[1] > CFG.seq_length_constraint):  # skip long sequences due to GPU memory
             continue
         if type == 'robust' or type == 'train':
-            seq_decoy = torch.swapaxes(seq_decoy,1,2)
-        else: 
+            seq_decoy = torch.swapaxes(seq_decoy, 1, 2)
+        else:
             seq_decoy = torch.clone(seq_one_hot).to(device)
-            seq_decoy[:,torch.randperm(seq_decoy.shape[1])[:1],:] = seq_decoy[:,torch.randperm(seq_decoy.shape[1])[:1],:]
-        #emb = torch.cat((esm_embed,seq),dim=2)
+            seq_decoy[:, torch.randperm(seq_decoy.shape[1])[:1], :] = seq_decoy[:,
+                                                                      torch.randperm(seq_decoy.shape[1])[:1], :]
+        # emb = torch.cat((esm_embed,seq),dim=2)
         emb = seq_one_hot
         emb_decoy = seq_decoy.to(device)
-        
+
         Xd = Xd.squeeze()
         Xn = Xn.squeeze()
         # Xd = Xd.reshape(Xd.shape[0],-1)
         emb_decoy = emb_decoy.squeeze()
         emb = emb.squeeze()
-        
-        # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
-            # create edge_index
-        edge_index = torch.tensor([],dtype=torch.long)
-        # forward + backward + optimize
-        for i in range(Xd.shape[0]):
-            for j in range(i,Xd.shape[0]):
-                if i == j:
-                    continue
-                else:
-                    edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
-        edge_index = edge_index.to(device)
-        outputs = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous())
-        
-        loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
 
-        valid_loss += loss.item() 
+        # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
+        # create edge_index
+        combinations = torch.combinations(torch.arange(Xd.shape[0]))
+        edge_index = combinations[combinations[:, 0] != combinations[:, 1]]
+        edge_index = edge_index.to(device)
+        outputs = model(Xd, emb_decoy, Xn, emb, edge_index.t().contiguous())
+
+        loss, lossd, lossg, Exn, Exd = criterion(outputs, Xd, Xn, model, N, CFG.h)
+
+        valid_loss += loss.item()
         torch.cuda.empty_cache()
         gc.collect()
         # update the progress bar
         if index % 1000 == 99:
-            print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}")
-            validation_plots(Exd_list,Exn_list,seq_len,type)
-        #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
-        
+            print(f"Validation loss: {round(valid_loss / (index + 1), 2)}, index: {index}")
+            validation_plots(Exd_list, Exn_list, seq_len, type)
+        # tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
+
         Exd_list.append(Exd.item())
         Exn_list.append(Exn.item())
         seq_len.append(Xd.shape[0])
         lossg_list.append(lossg.item())
         lossd_list.append(lossd.item())
         ids_list.append(id)
-    
-    validation_plots(Exd_list,Exn_list,seq_len,type)
-    df = pd.DataFrame({'id':ids_list,'Exd':Exd_list,'Exn':Exn_list,'seq_len':seq_len,'lossg':lossg_list,'lossd':lossd_list})
+
+    validation_plots(Exd_list, Exn_list, seq_len, type)
+    df = pd.DataFrame({'id': ids_list, 'Exd': Exd_list, 'Exn': Exn_list, 'seq_len': seq_len, 'lossg': lossg_list,
+                       'lossd': lossd_list})
     df.to_csv(f'./results/validation_{type}.csv')
     print(f"Finished Validation {type}")
-            
-    return valid_loss/len(dataloader)
 
-def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
+    return valid_loss / len(dataloader)
+
+
+def train_one_epoch(model, optimizer, dataloader, device, epoch, N, valid_loader):
     """
     Training function for the model.
     
@@ -117,21 +115,21 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             torch.cuda.empty_cache()
             gc.collect()
             # get the inputs; data is a list of [inputs, labels]   
-            seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
-            #Xd = Xd.to(device)
+            seq_one_hot, seq_decoy, id, Xd, Xn, mask, nativemask, esm_embed = data
+            # Xd = Xd.to(device)
             # Take native structure
             Xd = torch.clone(Xn).to(device)
             Xn = Xn.to(device)
             esm_embed = esm_embed.to(device)
-            seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
-            seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
-            
-            seq_decoy = torch.swapaxes(seq_decoy,1,2)
-            if seq_decoy.shape[1] >1000 : # if the sequence is too long, skip it(GPU limitation)
+            seq_one_hot = seq_one_hot.to(device)  # [batch_size,20,seq_len]
+            seq_one_hot = torch.swapaxes(seq_one_hot, 1, 2)  # swap the axes to [batch_size,seq_len,20]
+
+            seq_decoy = torch.swapaxes(seq_decoy, 1, 2)
+            if seq_decoy.shape[1] > 1000:  # if the sequence is too long, skip it(GPU limitation)
                 n_skips += 1
                 print(f"skipping {n_skips}")
                 continue
-            #emb = torch.cat((esm_embed,seq),dim=2)
+            # emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot
             emb_decoy = seq_decoy.to(device)
             # zero the parameter gradients
@@ -141,42 +139,40 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             # Xd = Xd.reshape(Xd.shape[0],-1)
             emb_decoy = emb_decoy.squeeze()
             emb = emb.squeeze()
-            
+
             # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
-                # create edge_index
-            edge_index = torch.tensor([],dtype=torch.long)
-            # forward + backward + optimize
-            for i in range(Xd.shape[0]):
-                for j in range(i,Xd.shape[0]):
-                    if i == j:
-                        continue
-                    else:
-                        edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
+            # create edge_index
+            combinations = torch.combinations(torch.arange(Xd.shape[0]))
+            edge_index = combinations[combinations[:, 0] != combinations[:, 1]]
             edge_index = edge_index.to(device)
-            
-            outputs = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous())
-            
-            loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
-            
+
+            outputs = model(Xd, emb_decoy, Xn, emb, edge_index.t().contiguous())
+
+            loss, lossd, lossg, Exn, Exd = criterion(outputs, Xd, Xn, model, N, CFG.h)
+
             loss.backward()
-            # print_par(model) # print the parameters of the model
+            # print_parameters(model) # print the parameters of the model
             optimizer.step()
 
             # print statistics
             running_loss += loss.item()
-            if index % 1000 == 999 :    # print every 1000 mini-batches
+            if index % 1000 == 999:  # print every 1000 mini-batches
                 print(f'[{epoch + 1}, {index + 1:5d}] loss: {running_loss / 1000:.3f}')
-                save_checkpoint(epoch, model, optimizer, running_loss/1000,0,CFG.model_path+str(epoch)+str(index+1)+"train_model.pt")
-               
-                epoch_train_loss.append(running_loss/1000)
+                save_checkpoint(epoch, model, optimizer, running_loss / 1000, 0,
+                                CFG.model_path + str(epoch) + str(index + 1) + "train_model.pt")
+
+                epoch_train_loss.append(running_loss / 1000)
                 running_loss = 0.0
 
             torch.cuda.empty_cache()
             gc.collect()
             # update the progress bar
-            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
-            
-        save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
+            tepoch.set_postfix(
+                {"loss": round(loss.item(), 3), "running loss": round(running_loss / (index % 1000 + 1), 3),
+                 "lossd": round(lossd.item(), 3), "lossg": round(lossg.item(), 3), "Exn": round(Exn.item(), 3),
+                 "Exd": round(Exd.item(), 3)})
+
+        save_checkpoint(epoch, model, optimizer, loss, 0, CFG.model_path + str(epoch) + "_final_model.pt")
         # # evaluate the model
         # with torch.no_grad():
         #     current_valid_loss = validation(model, valid_loader, device,epoch,N)
@@ -185,13 +181,12 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
         #     valid_loss = current_valid_loss
         #     print('saving model with valid loss: ',valid_loss)
         #     save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_path+str(epoch)+"_model.pt")
-        
-        
-                
-    return model, epoch_train_loss,ephoch_val_loss
+
+    return model, epoch_train_loss, ephoch_val_loss
+
 
 # define one epoch train
-def training (model, optimizer, dataloader,valid_loader, device,N):
+def training(model, optimizer, dataloader, valid_loader, device, N):
     """
     Training function for the model.
     Args:
@@ -203,19 +198,19 @@ def training (model, optimizer, dataloader,valid_loader, device,N):
         N (int): The number of iterations for the iterative optimization
     """
     model.train()
-    
+
     for epoch in range(CFG.num_epochs):  # loop over the dataset multiple times
 
-        
         torch.cuda.empty_cache()
         gc.collect()
         model.train()
-        model,epoch_train_loss,ephoch_val_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader)
-       
-        
+        model, epoch_train_loss, ephoch_val_loss = train_one_epoch(model, optimizer, dataloader, device, epoch, N,
+                                                                   valid_loader)
+
     print('Finished Training')
 
-def preform_energy_optimization(X_decoy,partial_dx_decoy):
+
+def preform_energy_optimization(X_decoy, partial_dx_decoy):
     """
     Preform an iterative optimization on the decoy structure, by using the energy partial derivative on the decoy structure,
     Args:
@@ -226,7 +221,8 @@ def preform_energy_optimization(X_decoy,partial_dx_decoy):
     """
     return 0
 
-def criterion(E,X_native,X_decoy,model,N,h):
+
+def criterion(E, X_native, X_decoy, model, N, h):
     """
     The loss function for the model coressponds to 3 main losses:
     1. lossg: the partial derivateve of the energy with respect to the native structure
@@ -245,50 +241,48 @@ def criterion(E,X_native,X_decoy,model,N,h):
     """
     # print('***Start criterion function***')
     # partial_dx_decoy = torch.autograd.grad(E[:,0].sum(),model.parameters(),create_graph=True,allow_unused=True)
-    partial_dx_native = torch.autograd.grad(E[1].sum(),model.parameters(),create_graph=True,allow_unused=True)
+    partial_dx_native = torch.autograd.grad(E[1].sum(), model.parameters(), create_graph=True, allow_unused=True)
     # print('***End derivative calc function***')
-    
-    part_dx_native = [1 if part_dx is None else torch.norm(part_dx,p=2) for part_dx in partial_dx_native]
+
+    part_dx_native = [1 if part_dx is None else torch.norm(part_dx, p=2) for part_dx in partial_dx_native]
     # lossg = torch.log(torch.prod(torch.FloatTensor(part_dx_native),dim=0) +1)
     # change the loss function to the max value of 1
-    lossg = 2/(1+torch.exp(-torch.prod(torch.FloatTensor(part_dx_native),dim=0))) -1
-    lossd = (torch.log((E[1]+1) / (E[0]+1) +1)).mean()
-    
+    lossg = 2 / (1 + torch.exp(-torch.prod(torch.FloatTensor(part_dx_native), dim=0))) - 1
+    lossd = (torch.log((E[1] + 1) / (E[0] + 1) + 1)).mean()
+
     # lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
     # print(f"loss g: {round(lossg.item(),4)} loss d: {round(lossd.item(),4)}")
-    return lossd+lossg , lossd, lossg,E[1],E[0]
+    return lossd + lossg, lossd, lossg, E[1], E[0]
+
 
 def main():
     print('***Start main function***')
     print('***load the data with dataloader***')
-    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint,debug=CFG.debug)
-    train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
-    
+    d_params = data_params(num_workers=CFG.num_workers, batch_size=CFG.batch_size, cuda=CFG.cuda,
+                           constraint=CFG.constraint, debug=CFG.debug)
+    train_loader, valid_loader, test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
+
     # Build the model
     print('***Build the model***')
-    m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
-                             cord_size = CFG.coords_emb,h = CFG.h,device=CFG.device)
-    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=CFG.num_layers,model_type='GAT',gaussian_coef=CFG.gaussian_coef).to(CFG.device)
-    
+    m_params = model_params(embedding_size=CFG.embedding_size, filters=CFG.filters, layers=CFG.num_layers,
+                            cord_size=CFG.coords_emb, h=CFG.h, device=CFG.device)
+    model = PEM(dim_in=36, dim_h=64, dim_out=36, layers=CFG.num_layers, model_type='GAT',
+                gaussian_coef=CFG.gaussian_coef).to(CFG.device)
+
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
     print('***Start training***')
-    # training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
-    load_checkpoint(CFG.model_path+"4_final_model.pt", model, optimizer,CFG.device)
+    training(model, optimizer, train_loader, valid_loader, CFG.device, CFG.N)
+    # load_checkpoint(CFG.model_path+"4_final_model.pt", model, optimizer,CFG.device)
     # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , type = 'robust')
     # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'soft')
-    validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, type = 'train')
-    
+    validation(model, train_loader, CFG.device, 3, CFG.N, optimizer, type='train')
+
     return 1
 
-    
-def print_par(model):
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            print (name, param.data)
-   
+
 if __name__ == '__main__':
-    if len(sys.argv)>1:
+    if len(sys.argv) > 1:
         CFG.model_path = sys.argv[1]
         CFG.constraint = int(sys.argv[2])
     main()

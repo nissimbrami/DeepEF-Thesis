@@ -235,6 +235,18 @@ def fetch_dataloader(data_dir, params):
                                         pin_memory=params.cuda)
     return train_loader, valid_loader, test_loader
 
+def fetch_inference_loader(data_dir, params):
+    """
+    Fetches the DataLoader object for each type in types from data_dir.
+    Args:
+        data_dir (str): inferece data directory
+        params (params class): hyperparameters
+    """
+    inf_file_names = os.listdir(data_dir)
+    amino_inference_loader = DataLoader(PEFDataset(inf_file_names,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
+                                        num_workers=params.num_workers,
+                                        pin_memory=params.cuda)
+    return amino_inference_loader
 #TODO: clean dataset from  homology threshold
 
 class params:

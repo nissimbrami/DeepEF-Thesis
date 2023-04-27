@@ -267,7 +267,6 @@ class PEM(torch.nn.Module):
   
   def __init__(self, dim_in, dim_h, dim_out, layers, model_type, gaussian_coef,heads = 8):
     super().__init__()
-    
     if model_type == 'GCN':
       self.graph_model = [GCN(dim_in, dim_h, dim_out) for i in range(layers)]
     elif model_type == 'GAT':
@@ -287,7 +286,20 @@ class PEM(torch.nn.Module):
     # Second fully connected layer that outputs our 10 labels
     self.fc2 = nn.Linear(64, 1)
   
-  def forward(self,x_decoy, emb_decoy,x_native,emb_native ,edge_index):
+  def forward(self,x_decoy, emb_decoy,x_native,emb_native ,edge_index,f_type = 'Default'):
+      """
+        Forward function
+      Args:
+          x_decoy (tensor): _description_
+          emb_decoy (tensor): _description_
+          x_native (_type_): _description_
+          emb_native (_type_): _description_
+          edge_index (_type_): _description_
+          f_type (str, optional): 'A_inference' or 'defualt', if 'A_inferece' return each amino acid energy . Defaults to 'Default'.
+
+      Returns:
+          _type_: _description_
+      """
       x_decoy  = self.get_graph(x_decoy, emb_decoy) # gettting the graph N,16+emb_size(20)
       identity = x_decoy # identity for the residual connection
       x = x_decoy
@@ -298,13 +310,13 @@ class PEM(torch.nn.Module):
       for layer in self.layers:
         h1,x = layer(x, edge_index) 
         x = x + identity
-        
+
       x = self.bn2(x)
       x  = self.fc1(x) # N,36->N,64
       x = F.relu(x)
       x_decoy = self.fc2(x) # N,64->N,1
 
-      
+
       x_native  = self.get_graph(x_native, emb_native)
       identity = x_native
       x = x_native
@@ -315,14 +327,17 @@ class PEM(torch.nn.Module):
       for layer in self.layers:
         h1,x = layer(x, edge_index) 
         x = x + identity
-        
+
       x = self.bn2(x)
       x  = self.fc1(x)
       x = F.relu(x)
       x_native = self.fc2(x)
-     
-      return torch.cat((self.get_energy(x_decoy).unsqueeze(0), self.get_energy(x_native).unsqueeze(0)),dim=0)
-    
+      
+      if (f_type == 'Default'):
+        return torch.cat((self.get_energy(x_decoy).unsqueeze(0), self.get_energy(x_native).unsqueeze(0)),dim=0)
+      elif(f_type == 'A_inference'): # return the energy reference to each amino acid
+        return torch.cat((x_decoy.unsqueeze(0),x_native.unsqueeze(0)),dim=0)
+        
   def get_graph(self,x, emb):
     """Get graph representation of protein"""
     D = self.get_dist_matrix(x) # N,N,16

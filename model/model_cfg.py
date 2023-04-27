@@ -1,7 +1,7 @@
 import torch
 
 class CFG:
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")  # Use GPU is avaliable
+    device =torch.device("cuda:0" if torch.cuda.is_available() else 'cpu') #torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")  # Use GPU is avaliable
     if(device.type == "cuda" or device.type == "mps"):
         torch.cuda.empty_cache()
         cuda = True
@@ -9,6 +9,7 @@ class CFG:
         cuda = False
         
     data_path = './data/data2'
+    inference_path = './data/inference_data'
     seed = 42
     debug = False
     # Train data parameters

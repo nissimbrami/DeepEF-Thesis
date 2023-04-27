@@ -1,4 +1,4 @@
-from model.data_loader import PEFDataset,fetch_dataloader
+from model.data_loader import PEFDataset,fetch_dataloader,fetch_inference_loader
 from model.data_loader import params as data_params
 from model.model_cfg import CFG
 # from model.net import ProteinEnergyNet
@@ -13,6 +13,82 @@ import gc
 import time
 import sys
 import pandas as pd
+
+# define amino acid inference
+def A_inference(model, dataloader, device,N,optimizer,type = 'robust'):
+    """
+    Validation function for the model.
+    """
+    valid_loss = 0
+    Exd_A_list = []
+    Exn_A_list = []
+    ids_list = []
+    model.eval() # cant use eval because of the loss function calculation
+    with tqdm(dataloader, unit="batch") as tepoch:
+        for index, data in enumerate(dataloader):
+            # Clean the GPU cache
+            if(device.type == "cuda" or device.type == "mps"):    
+                torch.cuda.empty_cache()
+            gc.collect()
+            # zero the parameter gradients
+            optimizer.zero_grad()
+            # get the inputs; data is a list of [inputs, labels]   
+            seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
+            # Xd = Xd.to(device)
+            # Take native structure
+            Xd = torch.clone(Xn).to(device)
+            Xn = Xn.to(device)
+            esm_embed = esm_embed.to(device)
+            seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
+            seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
+            if(seq_one_hot.shape[1]>1000): # skip long sequences due to GPU memory
+                continue
+            if type == 'robust' or type == 'train':
+                seq_decoy = torch.swapaxes(seq_decoy,1,2)
+            else: 
+                seq_decoy = torch.clone(seq_one_hot).to(device)
+                seq_decoy[:,torch.randperm(seq_decoy.shape[1])[:1],:] = seq_decoy[:,torch.randperm(seq_decoy.shape[1])[:1],:]
+            #emb = torch.cat((esm_embed,seq),dim=2)
+            emb = seq_one_hot
+            emb_decoy = seq_decoy.to(device)
+            
+            Xd = Xd.squeeze()
+            Xn = Xn.squeeze()
+            # Xd = Xd.reshape(Xd.shape[0],-1)
+            emb_decoy = emb_decoy.squeeze()
+            emb = emb.squeeze()
+            
+            # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
+                # create edge_index
+            edge_index = torch.tensor([],dtype=torch.long)
+            # forward + backward + optimize
+            for i in range(Xd.shape[0]):
+                for j in range(i,Xd.shape[0]):
+                    if i == j:
+                        continue
+                    else:
+                        edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
+            edge_index = edge_index.to(device)
+            E_amino = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous(),f_type = 'A_inference')
+            x_decoy,x_native = E_amino[0],E_amino[1]
+            Exd_A_list.append(x_decoy.detach().numpy().squeeze())
+            Exn_A_list.append(x_native.detach().numpy().squeeze())
+            ids_list.append(id)
+            ids_list.append(id)
+
+            # valid_loss += loss.item() 
+            torch.cuda.empty_cache()
+            gc.collect()
+            # update the progress bar
+            if index % 1000 == 99:
+                print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}")
+            
+    df= pd.DataFrame(Exd_A_list)
+    df = pd.concat([df,pd.DataFrame(Exn_A_list)])  
+    df['id'] = ids_list
+    df.to_csv(f'./results/A_inference_{type}.csv')
+    print(f"Finished amino acid inference {type}")
+            
 
 # define validation function
 def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
@@ -261,9 +337,9 @@ def criterion(E,X_native,X_decoy,model,N,h):
 def main():
     print('***Start main function***')
     print('***load the data with dataloader***')
-    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint,debug=CFG.debug)
-    train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
-    
+    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, debug=CFG.debug)
+    # train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
+    amino_inference_loader = fetch_inference_loader(data_dir=CFG.inference_path, params=d_params)
     # Build the model
     print('***Build the model***')
     m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
@@ -277,8 +353,10 @@ def main():
     load_checkpoint(CFG.model_path+"4_final_model.pt", model, optimizer,CFG.device)
     # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , type = 'robust')
     # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'soft')
-    validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, type = 'train')
-    
+    # validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, type = 'train')
+    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'inference')   
+    # amino acid inference
+    A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,type = 'robust') 
     return 1
 
     
@@ -290,5 +368,5 @@ def print_par(model):
 if __name__ == '__main__':
     if len(sys.argv)>1:
         CFG.model_path = sys.argv[1]
-        CFG.constraint = int(sys.argv[2])
+        CFG.constraint = False#int(sys.argv[2])
     main()

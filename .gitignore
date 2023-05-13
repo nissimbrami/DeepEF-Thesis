@@ -9,3 +9,4 @@ trianed_models_no_const/*
 *.out
 .DS_Store
 *.csv
+*.pyc

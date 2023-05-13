@@ -222,18 +222,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             mask = mask.squeeze()
             mask_decoy = mask_decoy.squeeze()
             
-            # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
-                # create edge_index
-            edge_index = torch.tensor([],dtype=torch.long)
-            # forward + backward + optimize
-            for i in range(Xd.shape[0]):
-                for j in range(i,Xd.shape[0]):
-                    if i == j:
-                        continue
-                    else:
-                        edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
+            combinations = torch.combinations(torch.arange(Xd.shape[0]))
+            edge_index = combinations[combinations[:, 0] != combinations[:, 1]]
             edge_index = edge_index.to(device)
-            
             outputs = model(Xd,emb_decoy,mask_decoy,Xn,emb,mask,edge_index.t().contiguous())
             
             loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)

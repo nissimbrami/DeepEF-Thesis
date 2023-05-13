@@ -8,10 +8,10 @@ class CFG:
     else:
         cuda = False
         
-    data_path = './data/data2'
+    data_path = './data/casp12_data_30/' #'./data/data2'
     inference_path = './data/inference_data'
     seed = 42
-    debug = False
+    debug = True
     # Train data parameters
     homothresh = 0.9
     constraint = True

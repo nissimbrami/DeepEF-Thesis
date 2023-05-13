@@ -286,21 +286,26 @@ class PEM(torch.nn.Module):
     # Second fully connected layer that outputs our 10 labels
     self.fc2 = nn.Linear(64, 1)
   
-  def forward(self,x_decoy, emb_decoy,x_native,emb_native ,edge_index,f_type = 'Default'):
+  def forward(self,x_decoy, emb_decoy,mask_decoy,x_native,emb_native ,mask_native,edge_index,f_type = 'Default'):
       """
         Forward function
       Args:
-          x_decoy (tensor): _description_
-          emb_decoy (tensor): _description_
-          x_native (_type_): _description_
-          emb_native (_type_): _description_
-          edge_index (_type_): _description_
+          x_decoy (tensor): decoy coordinates [n_nodes, num_atoms=4, 3]
+          emb_decoy (tensor): decoy embedding [n_nodes, emb_size]
+          mask_decoy (tensor): decoy mask [n_nodes, 1]
+          x_native (tensor): narive coordinates [n_nodes, num_atoms=4, 3]
+          emb_native (tensor): native embedding [n_nodes, emb_size]
+          mask_native (tensor): native mask [n_nodes, 1]
+          edge_index (tensor): edge index [2, n_edges]
           f_type (str, optional): 'A_inference' or 'defualt', if 'A_inferece' return each amino acid energy . Defaults to 'Default'.
 
       Returns:
-          _type_: _description_
+        if f_type == 'A_inference':
+            energy: native and decoy energy for each amino acid
+        if f_type == 'Default':
+          energy: native and decoy energy
       """
-      x_decoy  = self.get_graph(x_decoy, emb_decoy) # gettting the graph N,16+emb_size(20)
+      x_decoy  = self.get_graph(x_decoy, emb_decoy,mask_decoy) # gettting the graph N,16+emb_size(20)
       identity = x_decoy # identity for the residual connection
       x = x_decoy
       x = self.fcs1(x) # N,36->N,64
@@ -317,7 +322,7 @@ class PEM(torch.nn.Module):
       x_decoy = self.fc2(x) # N,64->N,1
 
 
-      x_native  = self.get_graph(x_native, emb_native)
+      x_native  = self.get_graph(x_native, emb_native,mask_native)
       identity = x_native
       x = x_native
       x = self.fcs1(x)
@@ -338,11 +343,15 @@ class PEM(torch.nn.Module):
       elif(f_type == 'A_inference'): # return the energy reference to each amino acid
         return torch.cat((x_decoy.unsqueeze(0),x_native.unsqueeze(0)),dim=0)
         
-  def get_graph(self,x, emb):
+  def get_graph(self,x, emb,mask):
     """Get graph representation of protein"""
     D = self.get_dist_matrix(x) # N,N,16
     D = torch.relu(torch.exp(self.gaussian_coef*D**2))
-    
+    # remove masks values
+    mask_index = torch.where(mask == 0)
+    D[mask_index[0],:,:] = 0
+    D[:,mask_index[0],:] = 0
+    # sum over the atoms
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
     Fh = torch.cat([emb,D],dim=1) #N,16+emb_size

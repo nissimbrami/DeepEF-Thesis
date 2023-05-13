@@ -5,8 +5,98 @@ from model.model_cfg import CFG
 import gc
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import numpy as np
 import constants as C
 
+class SidChainDS(Dataset):
+    """Protein dataset."""
+    def __init__(self, data_path ,set_type,debuge):
+        """
+            Initialize the dataset
+        Args:
+            data_path (str): data path
+            set_type (str): 'train','test' or 'valid'
+        """
+        self.data_path = data_path
+        self.set_type = set_type
+        self.data_dir = []
+        if(set_type == 'valid'):
+            self.folders  =[data_path+val_path for val_path in ['valid-10/','valid-20/','valid-30/','valid-40/','valid-50/']]
+            for folder in self.folders:
+                self.data_dir.extend([f for f in os.listdir(folder) if os.path.isdir(os.path.join(folder, f))])
+        else:
+            self.data_dir = [os.path.join(data_path+set_type, f) for f in os.listdir(data_path+set_type) if os.path.isdir(os.path.join(data_path+set_type, f))]   
+        if(debuge):
+            self.data_dir = self.data_dir[:100]
+            
+    def __getitem__(self, index):
+        item_path = self.data_dir[index]
+        # load data
+        id = torch.load(item_path + '/id.pt')
+        crd_backbone = torch.tensor(torch.load(item_path + '/crd_backbone.pt'),dtype=torch.float32) #backbone coordinates N,Calpha,C
+        mask = torch.load(item_path + '/mask.pt')
+        # change to 1,0 mask
+        mask = torch.tensor(np.where(np.array(list(mask))=='+',1,0))
+        seq_one_hot = torch.tensor(torch.load(item_path + '/seq_one_hot.pt'))
+        seq = torch.load(item_path + '/seq.pt')
+        ang = torch.tensor(torch.load(item_path + '/ang.pt')) 
+        ang_backbone = torch.clone(ang)[:,:3] #angles for the backbone phi, psi, omega
+        # Add Cbeta atom to the coordinates
+        crd_backbone = self.add_cb(crd_backbone)
+        crd_backbone = crd_backbone * C.NANO_TO_ANGSTROM # Convert to angstrom
+        # Calculate the distance matrix
+        dist_matrix = self.get_dist_matrix(crd_backbone)
+        # Calculate exponential of the distance matrix
+        dist_matrix = torch.exp(-CFG.gaussian_coef*dist_matrix)
+        
+        return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, dist_matrix
+
+    def __len__(self):
+        return len(self.data_dir)
+
+    def get_dist_matrix(self,X):
+        """
+        Return the node distence matrix
+        Args:
+            X (tensor):X embeded [n_nodes ,num_atoms=4,new_cords_size]
+        Returns:
+            tensor : [n_nodes,n_nodes ,atom_dist=16] tensor
+        """
+        N_residu,N_atoms,coords_size = X.shape
+        X = X.reshape(N_residu*N_atoms,coords_size)
+        D = torch.cdist(X,X,p=2)
+        D = D.reshape(N_residu,N_atoms,N_residu,N_atoms)
+        D = torch.swapaxes(D,1,2)
+        D = D.reshape(N_residu,N_residu,N_atoms*N_atoms)
+        return D
+  
+    def add_cb(self,crd_coords):
+        """
+        Add the Cbeta atom to the coordinates
+        Args:
+            crf_coords (tensor): tensor of shape [n_residues,3,3]
+
+        Returns:
+            crd_coords: tensor shape [n_residues,4,3]
+        """
+        # Get the coordinates of the backbone atoms
+        N, CA, C = crd_coords[:, 0], crd_coords[:, 1], crd_coords[:, 2]
+        # CB = CA + c1*(N-CA) + c2*(C-CA) + c3* (N-CA)x(C-CA)
+        CAmN = N - CA
+        # CAmN = CAmN / torch.sqrt(CAmN ** 2).sum(dim=2, keepdim=True)
+        CAmC = C - CA
+        # CAmC = CAmC / torch.sqrt(CAmC ** 2).sum(dim=2, keepdim=True)
+        ANxAC = torch.cross(CAmN, CAmC, dim=1)
+
+        A = torch.cat((CAmN.reshape(-1, 1), CAmC.reshape(-1, 1), ANxAC.reshape(-1, 1)), dim=1)
+        c = torch.tensor([0.5507, 0.5354, -0.5691]) / 100  # torch.tensor([1.1930, 1.2106, -2.7906]) #
+        b = (A @ c).reshape(-1,3)
+        CB = CA - b
+      
+        # Add Cbeta coordinates to existing coordinates array
+        crd_coords = torch.cat((crd_coords, CB.unsqueeze(1)), dim=1)
+        return crd_coords
+    
 class PEFDataset(Dataset):
     '''
     Deep energy function dataset.
@@ -212,27 +302,40 @@ def fetch_dataloader(data_dir, params):
     Returns:
         data: (dict) contains the DataLoader object for each type in types
     """
-    # Get the filenames from the train folder
-    file_names = os.listdir(data_dir)
-    if params.debug:
-        file_names = file_names[:CFG.debuge_size]
-    # Split the data into train, validation and test set
-    X_train, X_rem, y_train, y_rem = train_test_split(file_names,file_names, train_size=CFG.split_train,
-                                                      random_state=CFG.seed)
-    # Now since we want the valid and test size to be equal (10% each of overall data). 
-    # we have to define valid_size=0.5 (that is 50% of remaining data)
-    X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5)
-    # Now we have the data split in training, validation and test set
-    train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
-                                        num_workers=params.num_workers,
-                                        pin_memory=params.cuda)
-    valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
-                                        num_workers=params.num_workers,
-                                        pin_memory=params.cuda)
+    # Sidechainnet dataset
+    if params.dataset == 'scn':
+        train_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='train', debuge=params.debug), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
+        valid_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='valid', debuge=params.debug), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
 
-    test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
-                                        num_workers=params.num_workers,
-                                        pin_memory=params.cuda)
+        test_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='test', debuge=params.debug), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
+    else:
+        # Get the filenames from the train folder
+        file_names = os.listdir(data_dir)
+        if params.debug:
+            file_names = file_names[:CFG.debuge_size]
+        # Split the data into train, validation and test set
+        X_train, X_rem, y_train, y_rem = train_test_split(file_names,file_names, train_size=CFG.split_train,
+                                                        random_state=CFG.seed)
+        # Now since we want the valid and test size to be equal (10% each of overall data). 
+        # we have to define valid_size=0.5 (that is 50% of remaining data)
+        X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5)
+        # Now we have the data split in training, validation and test set
+        train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
+        valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
+
+        test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
     return train_loader, valid_loader, test_loader
 
 def fetch_inference_loader(data_dir, params):
@@ -250,10 +353,11 @@ def fetch_inference_loader(data_dir, params):
 #TODO: clean dataset from  homology threshold
 
 class params:
-    def __init__(self,batch_size,num_workers,cuda,constraint,debug=False):
+    def __init__(self,batch_size,num_workers,cuda,constraint, dataset,debug=False):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cuda = cuda
         self.debug = debug
         self.constraint = constraint
+        self.dataset = dataset
         

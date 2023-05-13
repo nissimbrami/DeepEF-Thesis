@@ -15,7 +15,6 @@ import sys
 import pandas as pd
 
 # define amino acid inference
-#update
 def A_inference(model, dataloader, device,N,optimizer,type = 'robust'):
     """
     Validation function for the model.

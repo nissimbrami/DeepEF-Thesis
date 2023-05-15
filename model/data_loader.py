@@ -23,11 +23,11 @@ class SidChainDS(Dataset):
         if(set_type == 'valid'):
             self.folders  =[data_path+val_path for val_path in ['valid-10/','valid-20/','valid-30/','valid-40/','valid-50/']]
             for folder in self.folders:
-                self.data_dir.extend([f for f in os.listdir(folder) if os.path.isdir(os.path.join(folder, f))])
+                self.data_dir.extend([folder+f for f in os.listdir(folder) if os.path.isdir(os.path.join(folder, f))])
         else:
             self.data_dir = [os.path.join(data_path+set_type, f) for f in os.listdir(data_path+set_type) if os.path.isdir(os.path.join(data_path+set_type, f))]   
         if(debuge):
-            self.data_dir = self.data_dir[:100]
+            self.data_dir = self.data_dir[:CFG.debuge_size]
             
     def __getitem__(self, index):
         item_path = self.data_dir[index]

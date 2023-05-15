@@ -11,12 +11,12 @@ class CFG:
     data_path = './data/casp12_data_30/' #'./data/data2'
     inference_path = './data/inference_data'
     seed = 42
-    debug = True
+    debug = False
     # Train data parameters
     homothresh = 0.9
     constraint = True
     split_train = 0.8
-    debuge_size  = 100
+    debuge_size  = 10
     # Model parameters
     h = 0.001
     coords_emb = 64

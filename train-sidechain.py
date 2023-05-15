@@ -111,44 +111,39 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
         gc.collect()
         # zero the parameter gradients
         optimizer.zero_grad()
-        # get the inputs; data is a list of [inputs, labels]   
-        seq_one_hot,seq_decoy ,id, Xd,Xn, mask, nativemask, esm_embed = data
-        # Xd = Xd.to(device)
+        id, Xn, mask, seq_one_hot, seq,ang_backbone, ang, dist_matrix = data
+        #Xd = Xd.to(device)
         # Take native structure
         Xd = torch.clone(Xn).to(device)
         Xn = Xn.to(device)
-        esm_embed = esm_embed.to(device)
         seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
-        seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
-        if(seq_one_hot.shape[1]>1000): # skip long sequences due to GPU memory
-            continue
-        if type == 'robust' or type == 'train':
-            seq_decoy = torch.swapaxes(seq_decoy,1,2)
-        else: 
-            seq_decoy = torch.clone(seq_one_hot).to(device)
-            seq_decoy[:,torch.randperm(seq_decoy.shape[1])[:1],:] = seq_decoy[:,torch.randperm(seq_decoy.shape[1])[:1],:]
-        #emb = torch.cat((esm_embed,seq),dim=2)
-        emb = seq_one_hot
-        emb_decoy = seq_decoy.to(device)
+        # seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
+        # create decoy sequence
+        mix_index = torch.randperm(seq_one_hot.shape[1])
+        seq_decoy = torch.clone(seq_one_hot[:,mix_index,:]).to(device)
+        mask_decoy = torch.clone(mask[:,mix_index]).to(device)
         
+        if seq_decoy.shape[1] >1000 : # if the sequence is too long, skip it(GPU limitation)
+            n_skips += 1
+            print(f"skipping {n_skips}")
+            continue
+        #emb = torch.cat((esm_embed,seq),dim=2)
+        emb = seq_one_hot.to(device)
+        emb_decoy = seq_decoy.to(device)
+        # zero the parameter gradients
+        optimizer.zero_grad()
         Xd = Xd.squeeze()
         Xn = Xn.squeeze()
         # Xd = Xd.reshape(Xd.shape[0],-1)
         emb_decoy = emb_decoy.squeeze()
         emb = emb.squeeze()
+        mask = mask.squeeze()
+        mask_decoy = mask_decoy.squeeze()
         
-        # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
-            # create edge_index
-        edge_index = torch.tensor([],dtype=torch.long)
-        # forward + backward + optimize
-        for i in range(Xd.shape[0]):
-            for j in range(i,Xd.shape[0]):
-                if i == j:
-                    continue
-                else:
-                    edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
+        combinations = torch.combinations(torch.arange(Xd.shape[0]))
+        edge_index = combinations[combinations[:, 0] != combinations[:, 1]]
         edge_index = edge_index.to(device)
-        outputs = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous())
+        outputs = model(Xd,emb_decoy,mask_decoy,Xn,emb,mask,edge_index.t().contiguous())
         
         loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
 
@@ -170,8 +165,8 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
     
     validation_plots(Exd_list,Exn_list,seq_len,type)
     df = pd.DataFrame({'id':ids_list,'Exd':Exd_list,'Exn':Exn_list,'seq_len':seq_len,'lossg':lossg_list,'lossd':lossd_list})
-    df.to_csv(f'./results/validation_{type}.csv')
-    print(f"Finished Validation {type}")
+    df.to_csv(f'./results/epoch_{epoch}-validation_{type}.csv')
+    print(f"Finished Validation {type} epoch {epoch}")
             
     return valid_loss/len(dataloader)
 
@@ -249,6 +244,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
         # # evaluate the model
+        validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , type = 'robust')
+        validation(model, valid_loader,CFG.device,epoch , CFG.N, optimizer, type = 'soft')
         # with torch.no_grad():
         #     current_valid_loss = validation(model, valid_loader, device,epoch,N)
         #     epoch_val_loss.append(current_valid_loss)
@@ -262,7 +259,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
     return model, epoch_train_loss,ephoch_val_loss
 
 # define one epoch train
-def training (model, optimizer, dataloader,valid_loader, device,N):
+def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH):
     """
     Training function for the model.
     Args:
@@ -272,10 +269,11 @@ def training (model, optimizer, dataloader,valid_loader, device,N):
         valid_loader (torch.utils.data.DataLoader): dataloader for the validation set
         device (torch.device): device to use ('cpu' or 'cuda' or 'mps')
         N (int): The number of iterations for the iterative optimization
+        epoch (int): The current epoch
     """
     model.train()
     
-    for epoch in range(CFG.num_epochs):  # loop over the dataset multiple times
+    for epoch in (range(EPOCH,CFG.num_epochs+EPOCH)):  # loop over the dataset multiple times
 
         
         torch.cuda.empty_cache()
@@ -344,11 +342,13 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
     print('***Start training***')
-    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
-    # load_checkpoint(CFG.model_path+"4_final_model.pt", model, optimizer,CFG.device)
+    epoch = 5
+    if epoch > 0:
+        load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer,CFG.device)
+    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
     # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , type = 'robust')
     # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'soft')
-    # validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, type = 'train')
+    validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, type = 'train',epoch=CFG.num_epochs)
     # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'inference')   
     # amino acid inference
     # A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,type = 'robust') 

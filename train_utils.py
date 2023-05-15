@@ -40,7 +40,7 @@ def load_checkpoint(path,model,optimizer,device):
     model.load_state_dict(dict['model_state_dict'])
     optimizer.load_state_dict(dict['optimizer_state_dict'])
     
-def validation_plots(Exd,Exn,seq_len,type):
+def validation_plots(Exd,Exn,seq_len,type,epoch):
     """
     Plot the validation data
     inputs:
@@ -77,6 +77,6 @@ def validation_plots(Exd,Exn,seq_len,type):
     ax.legend()
 
     #plt.show()
-    plt.savefig(f'./plots/Edelta_len_{type}.png')
+    plt.savefig(f'./plots/epoch-{epoch}-Edelta_len_{type}.png')
     
     plt.close()

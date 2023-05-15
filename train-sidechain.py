@@ -15,7 +15,7 @@ import sys
 import pandas as pd
 
 # define amino acid inference
-def A_inference(model, dataloader, device,N,optimizer,type = 'robust'):
+def A_inference(model, dataloader, device,N,optimizer,val_type = 'robust'):
     """
     Validation function for the model.
     """
@@ -43,7 +43,7 @@ def A_inference(model, dataloader, device,N,optimizer,type = 'robust'):
             seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
             if(seq_one_hot.shape[1]>1000): # skip long sequences due to GPU memory
                 continue
-            if type == 'robust' or type == 'train':
+            if val_type == 'robust' or val_type == 'train':
                 seq_decoy = torch.swapaxes(seq_decoy,1,2)
             else: 
                 seq_decoy = torch.clone(seq_one_hot).to(device)
@@ -86,12 +86,12 @@ def A_inference(model, dataloader, device,N,optimizer,type = 'robust'):
     df= pd.DataFrame(Exd_A_list)
     df = pd.concat([df,pd.DataFrame(Exn_A_list)])  
     df['id'] = ids_list
-    df.to_csv(f'./results/A_inference_{type}.csv')
-    print(f"Finished amino acid inference {type}")
+    df.to_csv(f'./results/A_inference_{val_type}.csv')
+    print(f"Finished amino acid inference {val_type}")
             
 
 # define validation function
-def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
+def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     """
     Validation function for the model.
     """
@@ -153,7 +153,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
         # update the progress bar
         if index % 1000 == 99:
             print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}")
-            validation_plots(Exd_list,Exn_list,seq_len,type)
+            validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
         #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
         
         Exd_list.append(Exd.item())
@@ -163,10 +163,10 @@ def validation(model, dataloader, device,epoch,N,optimizer,type = 'robust'):
         lossd_list.append(lossd.item())
         ids_list.append(id)
     
-    validation_plots(Exd_list,Exn_list,seq_len,type)
+    validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
     df = pd.DataFrame({'id':ids_list,'Exd':Exd_list,'Exn':Exn_list,'seq_len':seq_len,'lossg':lossg_list,'lossd':lossd_list})
-    df.to_csv(f'./results/epoch_{epoch}-validation_{type}.csv')
-    print(f"Finished Validation {type} epoch {epoch}")
+    df.to_csv(f'./results/epoch_{epoch}-validation_{val_type}.csv')
+    print(f"Finished Validation {val_type} epoch {epoch}")
             
     return valid_loss/len(dataloader)
 
@@ -244,8 +244,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
         # # evaluate the model
-        validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , type = 'robust')
-        validation(model, valid_loader,CFG.device,epoch , CFG.N, optimizer, type = 'soft')
+        validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
+        validation(model, valid_loader,CFG.device,epoch , CFG.N, optimizer, val_type = 'soft')
         # with torch.no_grad():
         #     current_valid_loss = validation(model, valid_loader, device,epoch,N)
         #     epoch_val_loss.append(current_valid_loss)
@@ -342,16 +342,16 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
     print('***Start training***')
-    epoch = 5
+    epoch = 10
     if epoch > 0:
         load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer,CFG.device)
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
-    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , type = 'robust')
-    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'soft')
-    validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, type = 'train',epoch=CFG.num_epochs)
-    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'inference')   
+    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , val_type = 'robust')
+    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, val_type = 'soft')
+    validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, val_type = 'train',epoch=CFG.num_epochs)
+    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, val_type = 'inference')   
     # amino acid inference
-    # A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,type = 'robust') 
+    # A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,val_type = 'robust') 
     return 1
 
     

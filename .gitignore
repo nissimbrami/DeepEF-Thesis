@@ -10,3 +10,5 @@ trianed_models_no_const/*
 .DS_Store
 *.csv
 *.pyc
+*.png
+plots/E_len_robust.png

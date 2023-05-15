@@ -37,7 +37,7 @@ class SidChainDS(Dataset):
         mask = torch.load(item_path + '/mask.pt')
         # change to 1,0 mask
         mask = torch.tensor(np.where(np.array(list(mask))=='+',1,0))
-        seq_one_hot = torch.tensor(torch.load(item_path + '/seq_one_hot.pt'))
+        seq_one_hot = torch.load(item_path + '/seq_one_hot.pt')
         seq = torch.load(item_path + '/seq.pt')
         ang = torch.tensor(torch.load(item_path + '/ang.pt')) 
         ang_backbone = torch.clone(ang)[:,:3] #angles for the backbone phi, psi, omega
@@ -74,7 +74,7 @@ class SidChainDS(Dataset):
         """
         Add the Cbeta atom to the coordinates
         Args:
-            crf_coords (tensor): tensor of shape [n_residues,3,3]
+            crd_coords (tensor): tensor of shape [n_residues,3,3]
 
         Returns:
             crd_coords: tensor shape [n_residues,4,3]

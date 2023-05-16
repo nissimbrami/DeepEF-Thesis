@@ -80,3 +80,16 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
     plt.savefig(f'./plots/epoch-{epoch}-Edelta_len_{type}.png')
     
     plt.close()
+
+def mix_A_acid(seq_one_hot,mask,val_type,device):
+    """ mix the amino acid sequence"""
+    if val_type == 'robust' or val_type == 'train':
+        mix_index = torch.randperm(seq_one_hot.shape[1])
+        seq_decoy = torch.clone(seq_one_hot[:,mix_index,:]).to(device)
+        mask_decoy = torch.clone(mask[:,mix_index]).to(device)
+    else: 
+        mix_index = torch.randperm(seq_one_hot.shape[1])[:2]
+        seq_decoy[:,mix_index[0],:] = seq_decoy[:,[1],:]
+        mask_decoy[:,mix_index[0]] = mask_decoy[:,[1]].to(device)
+    return seq_decoy,mask_decoy
+        

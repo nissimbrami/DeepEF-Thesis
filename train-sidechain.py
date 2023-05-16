@@ -4,7 +4,7 @@ from model.model_cfg import CFG
 # from model.net import ProteinEnergyNet
 from model.hydro_net import PEM
 from model.net import params as model_params
-from train_utils import save_checkpoint,load_checkpoint,validation_plots
+from train_utils import save_checkpoint,load_checkpoint,validation_plots,mix_A_acid
 import torch
 from torch import optim
 from torch.optim import lr_scheduler
@@ -119,9 +119,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
         seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
         # seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
         # create decoy sequence
-        mix_index = torch.randperm(seq_one_hot.shape[1])
-        seq_decoy = torch.clone(seq_one_hot[:,mix_index,:]).to(device)
-        mask_decoy = torch.clone(mask[:,mix_index]).to(device)
+        seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type=val_type,device=device)
         
         if seq_decoy.shape[1] >1000 : # if the sequence is too long, skip it(GPU limitation)
             n_skips += 1
@@ -193,12 +191,13 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             # Take native structure
             Xd = torch.clone(Xn).to(device)
             Xn = Xn.to(device)
-            seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
+            seq_one_hot = seq_one_hot.to(device) # [batch_size,seq_len,20]
             # seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
             # create decoy sequence
-            mix_index = torch.randperm(seq_one_hot.shape[1])
-            seq_decoy = torch.clone(seq_one_hot[:,mix_index,:]).to(device)
-            mask_decoy = torch.clone(mask[:,mix_index]).to(device)
+            seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type='train',device=device)
+            # mix_index = torch.randperm(seq_one_hot.shape[1])
+            # seq_decoy = torch.clone(seq_one_hot[:,mix_index,:]).to(device)
+            # mask_decoy = torch.clone(mask[:,mix_index]).to(device)
             
             if seq_decoy.shape[1] >1000 : # if the sequence is too long, skip it(GPU limitation)
                 n_skips += 1

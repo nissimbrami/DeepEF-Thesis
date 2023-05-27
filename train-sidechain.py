@@ -4,8 +4,9 @@ from model.model_cfg import CFG
 # from model.net import ProteinEnergyNet
 from model.hydro_net import PEM
 from model.net import params as model_params
-from train_utils import save_checkpoint,load_checkpoint,validation_plots,mix_A_acid
+from train_utils import *
 import torch
+import torch.nn.functional as F
 from torch import optim
 from torch.optim import lr_scheduler
 from tqdm import tqdm
@@ -102,9 +103,10 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     lossg_list = []
     lossd_list = []
     ids_list = []
+    n_skips = 0
     # model.eval() # cant use eval because of the loss function calculation
     #with tqdm(dataloader, unit="batch") as tepoch:
-    for index, data in enumerate(dataloader):
+    for index, data in tqdm(enumerate(dataloader)):
         # Clean the GPU cache
         if(device.type == "cuda" or device.type == "mps"):    
             torch.cuda.empty_cache()
@@ -341,16 +343,17 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
     print('***Start training***')
-    epoch = 10
-    if epoch > 0:
-        load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer,CFG.device)
-    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
-    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , val_type = 'robust')
-    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, val_type = 'soft')
-    validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, val_type = 'train',epoch=CFG.num_epochs)
-    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, val_type = 'inference')   
+    epoch = 18
+    # if epoch > 0:
+    #     load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer,CFG.device)
+    # training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
+    # validation(model, valid_loader,CFG.device,epoch-1, CFG.N, optimizer , val_type = 'robust')
+    # validation(model, valid_loader,CFG.device,epoch-1, CFG.N, optimizer, val_type = 'soft')
+    # validation(model, train_loader,CFG.device,epoch-1, CFG.N, optimizer, val_type = 'train')
+    # # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, val_type = 'inference')   
     # amino acid inference
     # A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,val_type = 'robust') 
+    diff_data(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
     return 1
 
     

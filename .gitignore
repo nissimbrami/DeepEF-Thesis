@@ -12,3 +12,5 @@ trianed_models_no_const/*
 *.pyc
 *.png
 plots/E_len_robust.png
+*.sh
+

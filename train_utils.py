@@ -1,8 +1,11 @@
 import torch
+import torch.nn.functional as F
 import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
+import gc
 
 def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
     """
@@ -89,7 +92,66 @@ def mix_A_acid(seq_one_hot,mask,val_type,device):
         mask_decoy = torch.clone(mask[:,mix_index]).to(device)
     else: 
         mix_index = torch.randperm(seq_one_hot.shape[1])[:2]
-        seq_decoy[:,mix_index[0],:] = seq_decoy[:,[1],:]
-        mask_decoy[:,mix_index[0]] = mask_decoy[:,[1]].to(device)
+        mask_decoy = torch.clone(mask).to(device)
+        seq_decoy = torch.clone(seq_one_hot).to(device)
+        seq_decoy[:,mix_index[0],:], seq_decoy[:,[1],:] = seq_decoy[:,mix_index[1],:], seq_decoy[:,[0],:]
+        mask_decoy[:,mix_index[0]] ,mask_decoy[:,[1]] = mask_decoy[:,mix_index[1]], mask_decoy[:,[0]]
     return seq_decoy,mask_decoy
         
+def pad_image(image,desired_size = (500,23)):
+    """ pad the image to desired size"""
+    # Pad the image to 500x500
+    desired_height, desired_width = desired_size
+    pad_height = desired_height - image.size(0)
+    pad_width = desired_width - image.size(1)
+
+    # Compute the amount of padding on each side
+    top_pad = pad_height // 2
+    bottom_pad = pad_height - top_pad
+    left_pad = pad_width // 2
+    right_pad = pad_width - left_pad
+
+    # Apply padding using torch.nn.functional.pad
+    padded_image = F.pad(image, (left_pad, right_pad, top_pad, bottom_pad))
+    
+    return padded_image
+
+def interpolate_image(Xn):
+    """ interpolate the image"""
+    # Interpolate the image to 500x500
+    Xn = F.interpolate(Xn.unsqueeze(0), size=500)
+    Xn = Xn.squeeze(0)
+    return Xn
+
+def diff_data(model, optimizer, dataloader, device,epoch,N,valid_loader):
+    all_Xn = torch.tensor([])
+    all_Xn_int = torch.tensor([])
+    n = 0
+    with tqdm(dataloader, unit="batch") as tepoch:
+        for index, data in enumerate(tepoch):
+            # set progress bar description
+            tepoch.set_description(f"Epoch {epoch}")
+            # Clean the GPU cache
+            torch.cuda.empty_cache()
+            gc.collect()
+            # get the inputs; data is a list of [inputs, labels]   
+            id, Xn, mask, seq_one_hot, seq,ang_backbone, ang, dist_matrix = data
+            
+            mask_flag = torch.where(mask==1,0,1).sum()==0
+            if((seq_one_hot.shape[1] <= 500) & mask_flag):
+                Xn = Xn.squeeze()
+                seq_one_hot = seq_one_hot.squeeze() 
+                Xn = Xn[:,1,:] # take only the first 128 residues
+                mean, std, var = torch.mean(Xn), torch.std(Xn), torch.var(Xn) 
+                Xn  = (Xn-mean)/std
+                Xn = torch.cat((Xn,seq_one_hot),dim=1)
+                Xn_pad = pad_image(Xn)
+                Xn_interpolat = interpolate_image(Xn.swapaxes(0,1)).swapaxes(0,1)
+                all_Xn_int = torch.cat((all_Xn_int,Xn_interpolat.unsqueeze(dim=0)),dim=0)
+                all_Xn = torch.cat((all_Xn,Xn_pad.unsqueeze(dim=0)),dim=0)
+                n = n+1
+                # torch.save(all_Xn,"./all_Xn.pt")
+            tepoch.set_postfix({"n":n})
+        
+        torch.save(all_Xn_int,"./all_Xn_int.pt")
+        torch.save(all_Xn,"./all_Xn_padded.pt")

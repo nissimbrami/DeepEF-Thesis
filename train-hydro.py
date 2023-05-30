@@ -334,6 +334,16 @@ def criterion(E,X_native,X_decoy,model,N,h):
     # print(f"loss g: {round(lossg.item(),4)} loss d: {round(lossd.item(),4)}")
     return lossd+lossg , lossd, lossg,E[1],E[0]
 
+def triainAndTest(model,optimizer,train_loader,valid_loader,device,N):
+    training(model, optimizer, train_loader,valid_loader, device,N)
+    load_checkpoint(CFG.model_path+"4_final_model.pt", model, optimizer,CFG.device)
+    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , type = 'robust')
+    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'soft')
+    # validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, type = 'train')
+    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'inference')   
+    # amino acid inference
+    A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,type = 'robust') 
+    
 def main():
     print('***Start main function***')
     print('***load the data with dataloader***')
@@ -349,14 +359,7 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
     print('***Start training***')
-    # training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N)
-    load_checkpoint(CFG.model_path+"4_final_model.pt", model, optimizer,CFG.device)
-    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer , type = 'robust')
-    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'soft')
-    # validation(model, train_loader,CFG.device,3 , CFG.N, optimizer, type = 'train')
-    # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, type = 'inference')   
-    # amino acid inference
-    A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,type = 'robust') 
+     
     return 1
 
     

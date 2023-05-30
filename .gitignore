@@ -11,6 +11,7 @@ trianed_models_no_const/*
 *.csv
 *.pyc
 *.png
-plots/E_len_robust.png
+experiments/plots/*
+experiments/.ipynb_checkpoints
 *.sh
 

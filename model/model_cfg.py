@@ -16,7 +16,7 @@ class CFG:
     homothresh = 0.9
     constraint = True
     split_train = 0.8
-    debuge_size  = 10
+    debug_size  = 10
     # Model parameters
     h = 0.001
     coords_emb = 64

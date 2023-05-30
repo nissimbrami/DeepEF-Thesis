@@ -10,7 +10,7 @@ import constants as C
 
 class SidChainDS(Dataset):
     """Protein dataset."""
-    def __init__(self, data_path ,set_type,debuge):
+    def __init__(self, data_path ,set_type,debug):
         """
             Initialize the dataset
         Args:
@@ -26,7 +26,7 @@ class SidChainDS(Dataset):
                 self.data_dir.extend([folder+f for f in os.listdir(folder) if os.path.isdir(os.path.join(folder, f))])
         else:
             self.data_dir = [os.path.join(data_path+set_type, f) for f in os.listdir(data_path+set_type) if os.path.isdir(os.path.join(data_path+set_type, f))]   
-        if(debuge):
+        if(debug):
             self.data_dir = self.data_dir[:CFG.debug_size]
             
     def __getitem__(self, index):
@@ -249,7 +249,7 @@ class PEFDataset(Dataset):
             if (self.train_type is not None) and (not self.train_type in id):
                 continue
 
-            # TODO: add mask check and inference
+            
             # scale = 1e-2
             # Mnat = nativemask
             # M = msk & Mnat
@@ -350,7 +350,7 @@ def fetch_inference_loader(data_dir, params):
                                         num_workers=params.num_workers,
                                         pin_memory=params.cuda)
     return amino_inference_loader
-#TODO: clean dataset from  homology threshold
+
 
 class params:
     def __init__(self,batch_size,num_workers,cuda,constraint, dataset,debug=False):

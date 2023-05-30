@@ -265,17 +265,14 @@ class ProteinEnergyNet(nn.Module):
 class PEM(torch.nn.Module):
   """Protein energy model"""
   
-  def __init__(self, dim_in, dim_h, dim_out, layers, model_type, gaussian_coef,heads = 8):
+  def __init__(self, dim_in, dim_h, dim_out, layers, gaussian_coef,heads = 8):
     super().__init__()
-    if model_type == 'GCN':
-      self.graph_model = [GCN(dim_in, dim_h, dim_out) for i in range(layers)]
-    elif model_type == 'GAT':
-        self.graph_model = [GAT(dim_in, dim_h, dim_out) for i in range(layers)]
-      
-    else:
-      raise ValueError('Model type not supported')
+    self.graph_model_gcn = [GCN(dim_in, dim_h, dim_out) for i in range(layers)]
+    self.graph_model_gat = [GAT(dim_in, dim_h, dim_out) for i in range(layers)]
+
     self.gaussian_coef = gaussian_coef
-    self.layers = torch.nn.ModuleList(self.graph_model)
+    self.GAT_layers = torch.nn.ModuleList(self.graph_model_gat)
+    self.GCN_layers = torch.nn.ModuleList(self.graph_model_gcn)
     # First fully connected layer
     self.fcs1 = nn.Linear(36, 64)
     self.fcs2 = nn.Linear(64, 36)
@@ -286,7 +283,7 @@ class PEM(torch.nn.Module):
     # Second fully connected layer that outputs our 10 labels
     self.fc2 = nn.Linear(64, 1)
   
-  def forward(self,x_decoy, emb_decoy,mask_decoy,x_native,emb_native ,mask_native,edge_index,f_type = 'Default'):
+  def forward(self,x_decoy, emb_decoy,mask_decoy,x_native,emb_native ,mask_native,edge_index_gat,edge_index_gcn,f_type = 'Default'):
       """
         Forward function
       Args:
@@ -306,43 +303,39 @@ class PEM(torch.nn.Module):
           energy: native and decoy energy
       """
       x_decoy  = self.get_graph(x_decoy, emb_decoy,mask_decoy) # gettting the graph N,16+emb_size(20)
-      identity = x_decoy # identity for the residual connection
-      x = x_decoy
-      x = self.fcs1(x) # N,36->N,64
-      x = F.relu(x)
-      x = self.fcs2(x) # N,64->N,36
-      x = self.bn1(x)
-      for layer in self.layers:
-        h1,x = layer(x, edge_index) 
-        x = x + identity
-
-      x = self.bn2(x)
-      x  = self.fc1(x) # N,36->N,64
-      x = F.relu(x)
-      x_decoy = self.fc2(x) # N,64->N,1
+      x_decoy = self.forward_x(x_decoy,edge_index_gcn,edge_index_gat)
 
 
       x_native  = self.get_graph(x_native, emb_native,mask_native)
-      identity = x_native
-      x = x_native
-      x = self.fcs1(x)
-      x = F.relu(x)
-      x = self.fcs2(x)
-      x = self.bn1(x)
-      for layer in self.layers:
-        h1,x = layer(x, edge_index) 
-        x = x + identity
+      x_native = self.forward_x(x_native,edge_index_gcn,edge_index_gat)
 
-      x = self.bn2(x)
-      x  = self.fc1(x)
-      x = F.relu(x)
-      x_native = self.fc2(x)
       
       if (f_type == 'Default'):
         return torch.cat((self.get_energy(x_decoy).unsqueeze(0), self.get_energy(x_native).unsqueeze(0)),dim=0)
       elif(f_type == 'A_inference'): # return the energy reference to each amino acid
         return torch.cat((x_decoy.unsqueeze(0),x_native.unsqueeze(0)),dim=0)
         
+  def forward_x(self,x,edge_index_gcn,edge_index_gat):
+        """forward function for the graph model"""
+        identity = x # identity for the residual connection
+        x = x
+        x = self.fcs1(x) # N,36->N,64
+        x = F.relu(x)
+        x = self.fcs2(x) # N,64->N,36
+        x = self.bn1(x)
+        for gcn_layer in self.GCN_layers:
+            h1,x = gcn_layer(x, edge_index_gcn) 
+            x = x + identity
+        for gat_layer in self.GAT_layers:
+            h1,x = gat_layer(x, edge_index_gat) 
+            x = x + identity
+
+        x = self.bn2(x)
+        x  = self.fc1(x) # N,36->N,64
+        x = F.relu(x)
+        x = self.fc2(x) # N,64->N,1
+        return x
+
   def get_graph(self,x, emb,mask):
     """Get graph representation of protein"""
     D = self.get_dist_matrix(x) # N,N,16

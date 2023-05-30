@@ -132,9 +132,13 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             mask_decoy = mask_decoy.squeeze()
             
             combinations = torch.combinations(torch.arange(Xd.shape[0]))
-            edge_index = combinations[combinations[:, 0] != combinations[:, 1]]
-            edge_index = edge_index.to(device)
-            outputs = model(Xd,emb_decoy,mask_decoy,Xn,emb,mask,edge_index.t().contiguous())
+            edge_index_gat = combinations[combinations[:, 0] != combinations[:, 1]]
+            edge_index_gat = edge_index_gat.t().contiguous().to(device)
+            
+            edge_index_gcn = torch.tensor([[i,i+1] for i in range(Xd.shape[0]-1)]).t().contiguous().to(device)
+            
+            outputs = model(Xd,emb_decoy,mask_decoy,Xn,emb,mask,edge_index_gat,edge_index_gcn)
+            
             
             loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
 
@@ -206,9 +210,12 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             mask_decoy = mask_decoy.squeeze()
             
             combinations = torch.combinations(torch.arange(Xd.shape[0]))
-            edge_index = combinations[combinations[:, 0] != combinations[:, 1]]
-            edge_index = edge_index.to(device)
-            outputs = model(Xd,emb_decoy,mask_decoy,Xn,emb,mask,edge_index.t().contiguous())
+            edge_index_gat = combinations[combinations[:, 0] != combinations[:, 1]]
+            edge_index_gat = edge_index_gat.t().contiguous().to(device)
+            
+            edge_index_gcn = torch.tensor([[i,i+1] for i in range(Xd.shape[0]-1)]).t().contiguous().to(device)
+            
+            outputs = model(Xd,emb_decoy,mask_decoy,Xn,emb,mask,edge_index_gat,edge_index_gcn)
             
             loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
             
@@ -335,7 +342,7 @@ def main():
     print('***Build the model***')
     m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
                              cord_size = CFG.coords_emb,h = CFG.h,device=CFG.device)
-    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=CFG.num_layers,model_type='GAT',gaussian_coef=CFG.gaussian_coef).to(CFG.device)
+    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training

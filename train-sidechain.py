@@ -55,21 +55,15 @@ def A_inference(model, dataloader, device,N,optimizer,val_type = 'robust'):
             
             Xd = Xd.squeeze()
             Xn = Xn.squeeze()
-            # Xd = Xd.reshape(Xd.shape[0],-1)
+            
             emb_decoy = emb_decoy.squeeze()
             emb = emb.squeeze()
             
-            # Xd_features = torch.cat((Xd,emb_decoy),dim=1)
-                # create edge_index
-            edge_index = torch.tensor([],dtype=torch.long)
-            # forward + backward + optimize
-            for i in range(Xd.shape[0]):
-                for j in range(i,Xd.shape[0]):
-                    if i == j:
-                        continue
-                    else:
-                        edge_index = torch.cat((edge_index,torch.tensor([[i,j]],dtype=torch.long)),dim=0) 
+            # create edge_index
+            combinations = torch.combinations(torch.arange(Xd.shape[0]))
+            edge_index = combinations[combinations[:, 0] != combinations[:, 1]]
             edge_index = edge_index.to(device)
+            
             E_amino = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous(),f_type = 'A_inference')
             x_decoy,x_native = E_amino[0],E_amino[1]
             Exd_A_list.append(x_decoy.detach().numpy().squeeze())
@@ -105,63 +99,60 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     ids_list = []
     n_skips = 0
     # model.eval() # cant use eval because of the loss function calculation
-    #with tqdm(dataloader, unit="batch") as tepoch:
-    for index, data in tqdm(enumerate(dataloader)):
-        # Clean the GPU cache
-        if(device.type == "cuda" or device.type == "mps"):    
-            torch.cuda.empty_cache()
-        gc.collect()
-        # zero the parameter gradients
-        optimizer.zero_grad()
-        id, Xn, mask, seq_one_hot, seq,ang_backbone, ang, dist_matrix = data
-        #Xd = Xd.to(device)
-        # Take native structure
-        Xd = torch.clone(Xn).to(device)
-        Xn = Xn.to(device)
-        seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
-        # seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
-        # create decoy sequence
-        seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type=val_type,device=device)
-        
-        if seq_decoy.shape[1] >1000 : # if the sequence is too long, skip it(GPU limitation)
-            n_skips += 1
-            print(f"skipping {n_skips}")
-            continue
-        #emb = torch.cat((esm_embed,seq),dim=2)
-        emb = seq_one_hot.to(device)
-        emb_decoy = seq_decoy.to(device)
-        # zero the parameter gradients
-        optimizer.zero_grad()
-        Xd = Xd.squeeze()
-        Xn = Xn.squeeze()
-        # Xd = Xd.reshape(Xd.shape[0],-1)
-        emb_decoy = emb_decoy.squeeze()
-        emb = emb.squeeze()
-        mask = mask.squeeze()
-        mask_decoy = mask_decoy.squeeze()
-        
-        combinations = torch.combinations(torch.arange(Xd.shape[0]))
-        edge_index = combinations[combinations[:, 0] != combinations[:, 1]]
-        edge_index = edge_index.to(device)
-        outputs = model(Xd,emb_decoy,mask_decoy,Xn,emb,mask,edge_index.t().contiguous())
-        
-        loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
+    with tqdm(dataloader, unit="batch") as tepoch:
+        for index, data in (enumerate(tepoch)):
+            # set progress bar description
+            tepoch.set_description(f"Validation: Epoch {epoch}")
+            # Clean the GPU cache
+            if(device.type == "cuda" or device.type == "mps"):    
+                torch.cuda.empty_cache()
+            gc.collect()
+            # zero the parameter gradients
+            optimizer.zero_grad()
+            id, Xn, mask, seq_one_hot, seq,ang_backbone, ang, dist_matrix = data
+            #Xd = Xd.to(device)
+            # Take native structure
+            Xd = torch.clone(Xn).to(device)
+            Xn = Xn.to(device)
+            seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
+            # create decoy sequence
+            seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type=val_type,device=device)
+            
+            #emb = torch.cat((esm_embed,seq),dim=2)
+            emb = seq_one_hot.to(device)
+            emb_decoy = seq_decoy.to(device)
+            # zero the parameter gradients
+            optimizer.zero_grad()
+            Xd = Xd.squeeze()
+            Xn = Xn.squeeze()
+            # Xd = Xd.reshape(Xd.shape[0],-1)
+            emb_decoy = emb_decoy.squeeze()
+            emb = emb.squeeze()
+            mask = mask.squeeze()
+            mask_decoy = mask_decoy.squeeze()
+            
+            combinations = torch.combinations(torch.arange(Xd.shape[0]))
+            edge_index = combinations[combinations[:, 0] != combinations[:, 1]]
+            edge_index = edge_index.to(device)
+            outputs = model(Xd,emb_decoy,mask_decoy,Xn,emb,mask,edge_index.t().contiguous())
+            
+            loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
 
-        valid_loss += loss.item() 
-        torch.cuda.empty_cache()
-        gc.collect()
-        # update the progress bar
-        if index % 1000 == 99:
-            print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}")
-            validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
-        #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
-        
-        Exd_list.append(Exd.item())
-        Exn_list.append(Exn.item())
-        seq_len.append(Xd.shape[0])
-        lossg_list.append(lossg.item())
-        lossd_list.append(lossd.item())
-        ids_list.append(id)
+            valid_loss += loss.item() 
+            torch.cuda.empty_cache()
+            gc.collect()
+            # update the progress bar
+            if index % 1000 == 99:
+                print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}")
+                validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
+            #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
+            
+            Exd_list.append(Exd.item())
+            Exn_list.append(Exn.item())
+            seq_len.append(Xd.shape[0])
+            lossg_list.append(lossg.item())
+            lossd_list.append(lossd.item())
+            ids_list.append(id)
     
     validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
     df = pd.DataFrame({'id':ids_list,'Exd':Exd_list,'Exn':Exn_list,'seq_len':seq_len,'lossg':lossg_list,'lossd':lossd_list})
@@ -180,6 +171,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
     model.train()
     running_loss = 0.0
     n_skips = 0
+    best_val = 1000
     with tqdm(dataloader, unit="batch") as tepoch:
         for index, data in enumerate(tepoch):
             # set progress bar description
@@ -189,19 +181,14 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             gc.collect()
             # get the inputs; data is a list of [inputs, labels]   
             id, Xn, mask, seq_one_hot, seq,ang_backbone, ang, dist_matrix = data
-            #Xd = Xd.to(device)
             # Take native structure
             Xd = torch.clone(Xn).to(device)
             Xn = Xn.to(device)
             seq_one_hot = seq_one_hot.to(device) # [batch_size,seq_len,20]
-            # seq_one_hot = torch.swapaxes(seq_one_hot,1,2) # swap the axes to [batch_size,seq_len,20]
             # create decoy sequence
             seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type='train',device=device)
-            # mix_index = torch.randperm(seq_one_hot.shape[1])
-            # seq_decoy = torch.clone(seq_one_hot[:,mix_index,:]).to(device)
-            # mask_decoy = torch.clone(mask[:,mix_index]).to(device)
             
-            if seq_decoy.shape[1] >1000 : # if the sequence is too long, skip it(GPU limitation)
+            if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
                 n_skips += 1
                 print(f"skipping {n_skips}")
                 continue
@@ -233,8 +220,6 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             running_loss += loss.item()
             if index % 1000 == 999 :    # print every 1000 mini-batches
                 print(f'[{epoch + 1}, {index + 1:5d}] loss: {running_loss / 1000:.3f}')
-                save_checkpoint(epoch, model, optimizer, running_loss/1000,0,CFG.model_path+str(epoch)+str(index+1)+"train_model.pt")
-               
                 epoch_train_loss.append(running_loss/1000)
                 running_loss = 0.0
 
@@ -244,16 +229,13 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
             
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
-        # # evaluate the model
-        validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
-        validation(model, valid_loader,CFG.device,epoch , CFG.N, optimizer, val_type = 'soft')
-        # with torch.no_grad():
-        #     current_valid_loss = validation(model, valid_loader, device,epoch,N)
-        #     epoch_val_loss.append(current_valid_loss)
-        #     print(f"loss: {round(loss.item(),3)} current_valid_loss:{round(current_valid_loss,3)}")
-        #     valid_loss = current_valid_loss
-        #     print('saving model with valid loss: ',valid_loss)
-        #     save_checkpoint(epoch, model, optimizer, loss,valid_loss,CFG.model_path+str(epoch)+"_model.pt")
+        # evaluate the model
+        r_val = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
+        s_val = validation(model, valid_loader,CFG.device,epoch , CFG.N, optimizer, val_type = 'soft')
+        if r_val<best_val and s_val<best_val:
+            print('saving model with valid loss: ',r_val)
+            save_checkpoint(epoch, model, optimizer, loss,r_val,CFG.model_path+"best_model.pt")
+            best_val = r_val
         
         
                 
@@ -328,6 +310,21 @@ def criterion(E,X_native,X_decoy,model,N,h):
     # print(f"loss g: {round(lossg.item(),4)} loss d: {round(lossd.item(),4)}")
     return lossd+lossg , lossd, lossg,E[1],E[0]
 
+def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch):
+    "train and test the model"
+    if epoch > 0:
+        load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer,CFG.device)
+    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
+    #load the best model and check the validation
+    load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
+    validation(model, valid_loader,CFG.device,epoch-1, CFG.N, optimizer , val_type = 'robust')
+    validation(model, valid_loader,CFG.device,epoch-1, CFG.N, optimizer, val_type = 'soft')
+    validation(model, train_loader,CFG.device,epoch-1, CFG.N, optimizer, val_type = 'train')  
+    # amino acid inference
+    # A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,val_type = 'robust') 
+    # create diffucion data
+    # diff_data(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
+    
 def main():
     print('***Start main function***')
     print('***load the data with dataloader***')
@@ -343,17 +340,8 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
     print('***Start training***')
-    epoch = 18
-    # if epoch > 0:
-    #     load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer,CFG.device)
-    # training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
-    # validation(model, valid_loader,CFG.device,epoch-1, CFG.N, optimizer , val_type = 'robust')
-    # validation(model, valid_loader,CFG.device,epoch-1, CFG.N, optimizer, val_type = 'soft')
-    # validation(model, train_loader,CFG.device,epoch-1, CFG.N, optimizer, val_type = 'train')
-    # # validation(model, valid_loader,CFG.device,3 , CFG.N, optimizer, val_type = 'inference')   
-    # amino acid inference
-    # A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,val_type = 'robust') 
-    diff_data(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
+    epoch = 0
+    trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch)
     return 1
 
     

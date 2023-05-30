@@ -63,7 +63,7 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
     ax.legend()
 
     #plt.show()
-    plt.savefig(f'./plots/E_len_{type}.png')
+    plt.savefig(f'./results/plots/E_len_{type}.png')
     
     plt.close()
     
@@ -80,7 +80,7 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
     ax.legend()
 
     #plt.show()
-    plt.savefig(f'./plots/epoch-{epoch}-Edelta_len_{type}.png')
+    plt.savefig(f'./results/plots/epoch-{epoch}-Edelta_len_{type}.png')
     
     plt.close()
 

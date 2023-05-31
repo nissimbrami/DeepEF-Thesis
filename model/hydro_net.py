@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout
 from torch_geometric.nn import GCNConv, GATv2Conv
+from model.model_cfg import CFG
 # import matplotlib.pyplot as plt
 
 class params():
@@ -283,7 +284,8 @@ class PEM(torch.nn.Module):
     # Second fully connected layer that outputs our 10 labels
     self.fc2 = nn.Linear(64, 1)
   
-  def forward(self,x_decoy, emb_decoy,mask_decoy,x_native,emb_native ,mask_native,edge_index_gat,edge_index_gcn,f_type = 'Default'):
+      
+  def forward(self,x,f_type = 'Default'):
       """
         Forward function
       Args:
@@ -302,18 +304,19 @@ class PEM(torch.nn.Module):
         if f_type == 'Default':
           energy: native and decoy energy
       """
-      x_decoy  = self.get_graph(x_decoy, emb_decoy,mask_decoy) # gettting the graph N,16+emb_size(20)
-      x_decoy = self.forward_x(x_decoy,edge_index_gcn,edge_index_gat)
+      edge_index_gcn,edge_index_gat = self.get_edge_index(x)
+      x = self.forward_x(x,edge_index_gcn,edge_index_gat)
 
 
-      x_native  = self.get_graph(x_native, emb_native,mask_native)
-      x_native = self.forward_x(x_native,edge_index_gcn,edge_index_gat)
+    #   x_native  = self.get_graph(x_native, emb_native,mask_native)
+    #   edge_index_gcn,edge_index_gat = self.get_edge_index(x_native)
+    #   x_native = self.forward_x(x_native,edge_index_gcn,edge_index_gat)
 
       
       if (f_type == 'Default'):
-        return torch.cat((self.get_energy(x_decoy).unsqueeze(0), self.get_energy(x_native).unsqueeze(0)),dim=0)
+        return self.get_energy(x)
       elif(f_type == 'A_inference'): # return the energy reference to each amino acid
-        return torch.cat((x_decoy.unsqueeze(0),x_native.unsqueeze(0)),dim=0)
+        return x
         
   def forward_x(self,x,edge_index_gcn,edge_index_gat):
         """forward function for the graph model"""
@@ -336,36 +339,7 @@ class PEM(torch.nn.Module):
         x = self.fc2(x) # N,64->N,1
         return x
 
-  def get_graph(self,x, emb,mask):
-    """Get graph representation of protein"""
-    D = self.get_dist_matrix(x) # N,N,16
-    D = torch.relu(torch.exp(self.gaussian_coef*D**2))
-    # remove masks values
-    mask_index = torch.where(mask == 0)
-    D[mask_index[0],:,:] = 0
-    D[:,mask_index[0],:] = 0
-    # sum over the atoms
-    D = D.sum(dim=1) #N,16
-    D = F.normalize(D,p=2,dim=0)
-    Fh = torch.cat([emb,D],dim=1) #N,16+emb_size
-    
-    return Fh
   
-  def get_dist_matrix(self,Xd):
-      """
-      Return the node distence matrix
-      Args:
-          Xd (tensor):X embeded [n_nodes ,num_atoms=4,new_cords_size]
-      Returns:
-          tensor : [n_nodes,n_nodes ,atom_dist=16] tensor
-      """
-      N_residu,N_atoms,coords_size = Xd.shape
-      Xd = Xd.reshape(N_residu*N_atoms,coords_size)
-      D = torch.cdist(Xd,Xd,p=2)
-      D = D.reshape(N_residu,N_atoms,N_residu,N_atoms)
-      D = torch.swapaxes(D,1,2)
-      D = D.reshape(N_residu,N_residu,N_atoms*N_atoms)
-      return D
   
   def get_energy(self,Fh):
         """
@@ -377,6 +351,16 @@ class PEM(torch.nn.Module):
         """
         E = torch.sum(Fh**2,dim=(0,1))
         return E
+  
+  def get_edge_index(self,x):
+        seq_len = x.shape[0]
+        combinations = torch.combinations(torch.arange(seq_len))
+        edge_index_gat = combinations[combinations[:, 0] != combinations[:, 1]]
+        edge_index_gat = edge_index_gat.t().contiguous().to(CFG.device)
+
+        edge_index_gcn = torch.tensor([[i,i+1] for i in range(seq_len-1)]).t().contiguous().to(CFG.device)
+        
+        return edge_index_gcn,edge_index_gat
     
     
 class GAT(torch.nn.Module):

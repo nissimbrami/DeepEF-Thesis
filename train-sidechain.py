@@ -59,12 +59,8 @@ def A_inference(model, dataloader, device,N,optimizer,val_type = 'robust'):
             emb_decoy = emb_decoy.squeeze()
             emb = emb.squeeze()
             
-            # create edge_index
-            combinations = torch.combinations(torch.arange(Xd.shape[0]))
-            edge_index = combinations[combinations[:, 0] != combinations[:, 1]]
-            edge_index = edge_index.to(device)
             
-            E_amino = model(Xd,emb_decoy,Xn,emb,edge_index.t().contiguous(),f_type = 'A_inference')
+            E_amino = model(Xd,emb_decoy,Xn,emb,f_type = 'A_inference')
             x_decoy,x_native = E_amino[0],E_amino[1]
             Exd_A_list.append(x_decoy.detach().numpy().squeeze())
             Exn_A_list.append(x_native.detach().numpy().squeeze())
@@ -130,15 +126,13 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             emb = emb.squeeze()
             mask = mask.squeeze()
             mask_decoy = mask_decoy.squeeze()
+            X_native = get_graph(Xn, emb,mask)
+            X_decoy = get_graph(Xd, emb_decoy,mask_decoy)
+            X_native.requires_grad = True
             
-            combinations = torch.combinations(torch.arange(Xd.shape[0]))
-            edge_index_gat = combinations[combinations[:, 0] != combinations[:, 1]]
-            edge_index_gat = edge_index_gat.t().contiguous().to(device)
-            
-            edge_index_gcn = torch.tensor([[i,i+1] for i in range(Xd.shape[0]-1)]).t().contiguous().to(device)
-            
-            outputs = model(Xd,emb_decoy,mask_decoy,Xn,emb,mask,edge_index_gat,edge_index_gcn)
-            
+            Exn = model(X_native)
+            Exd = model(X_decoy)
+            outputs = torch.cat((Exd.unsqueeze(0),Exn.unsqueeze(0)),dim=0)
             
             loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
 
@@ -188,13 +182,13 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             # Take native structure
             Xd = torch.clone(Xn).to(device)
             Xn = Xn.to(device)
+            
             seq_one_hot = seq_one_hot.to(device) # [batch_size,seq_len,20]
             # create decoy sequence
             seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type='train',device=device)
             
             if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
                 n_skips += 1
-                print(f"skipping {n_skips}")
                 continue
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot.to(device)
@@ -209,15 +203,16 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             mask = mask.squeeze()
             mask_decoy = mask_decoy.squeeze()
             
-            combinations = torch.combinations(torch.arange(Xd.shape[0]))
-            edge_index_gat = combinations[combinations[:, 0] != combinations[:, 1]]
-            edge_index_gat = edge_index_gat.t().contiguous().to(device)
+              
+            X_native = get_graph(Xn, emb,mask)
+            X_decoy = get_graph(Xd, emb_decoy,mask_decoy)
+            X_native.requires_grad = True
             
-            edge_index_gcn = torch.tensor([[i,i+1] for i in range(Xd.shape[0]-1)]).t().contiguous().to(device)
+            Exn = model(X_native)
+            Exd = model(X_decoy)
+            outputs = torch.cat((Exd.unsqueeze(0),Exn.unsqueeze(0)),dim=0)
             
-            outputs = model(Xd,emb_decoy,mask_decoy,Xn,emb,mask,edge_index_gat,edge_index_gcn)
-            
-            loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
+            loss ,lossd, lossg,Exn,Exd = criterion(outputs,X_decoy,X_native,model,N,CFG.h)
             
             loss.backward()
             # print_par(model) # print the parameters of the model
@@ -227,6 +222,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             running_loss += loss.item()
             if index % 1000 == 999 :    # print every 1000 mini-batches
                 print(f'[{epoch + 1}, {index + 1:5d}] loss: {running_loss / 1000:.3f}')
+                print(f"skipped {n_skips}")
                 epoch_train_loss.append(running_loss/1000)
                 running_loss = 0.0
 
@@ -235,11 +231,14 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader):
             # update the progress bar
             tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
             
+        print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
         # evaluate the model
         r_val = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
         s_val = validation(model, valid_loader,CFG.device,epoch , CFG.N, optimizer, val_type = 'soft')
-        if r_val<best_val and s_val<best_val:
+        print (f"robust validation loss: {r_val}")
+        print (f"soft validation loss: {s_val}")
+        if r_val<best_val:
             print('saving model with valid loss: ',r_val)
             save_checkpoint(epoch, model, optimizer, loss,r_val,CFG.model_path+"best_model.pt")
             best_val = r_val
@@ -285,7 +284,7 @@ def preform_energy_optimization(X_decoy,partial_dx_decoy):
     """
     return 0
 
-def criterion(E,X_native,X_decoy,model,N,h):
+def criterion(E,X_decoy,X_native,model,N,h):
     """
     The loss function for the model coressponds to 3 main losses:
     1. lossg: the partial derivateve of the energy with respect to the native structure
@@ -303,14 +302,15 @@ def criterion(E,X_native,X_decoy,model,N,h):
         loss (tensor): The loss of the model
     """
     # print('***Start criterion function***')
-    # partial_dx_decoy = torch.autograd.grad(E[:,0].sum(),model.parameters(),create_graph=True,allow_unused=True)
-    partial_dx_native = torch.autograd.grad(E[1].sum(),model.parameters(),create_graph=True,allow_unused=True)
+    partial_dx_native = torch.autograd.grad(outputs=E[1], inputs=X_native, grad_outputs=torch.ones_like(E[1]), create_graph=True)[0]
+    # partial_dx_native = torch.autograd.grad(E[1].sum(),model.parameters(),create_graph=True,allow_unused=True)
     # print('***End derivative calc function***')
-    
-    part_dx_native = [1 if part_dx is None else torch.norm(part_dx,p=2) for part_dx in partial_dx_native]
+    part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
+    # part_dx_native = [1 if part_dx is None else torch.norm(part_dx,p=2) for part_dx in partial_dx_native]
     # lossg = torch.log(torch.prod(torch.FloatTensor(part_dx_native),dim=0) +1)
     # change the loss function to the max value of 1
-    lossg = 2/(1+torch.exp(-torch.prod(torch.FloatTensor(part_dx_native),dim=0))) -1
+    # lossg = 2/(1+torch.exp(-torch.prod(torch.FloatTensor(part_dx_native),dim=0))) -1
+    lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1
     lossd = (torch.log((E[1]+1) / (E[0]+1) +1)).mean()
     
     # lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
@@ -324,9 +324,9 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
     #load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
-    validation(model, valid_loader,CFG.device,epoch-1, CFG.N, optimizer , val_type = 'robust')
-    validation(model, valid_loader,CFG.device,epoch-1, CFG.N, optimizer, val_type = 'soft')
-    validation(model, train_loader,CFG.device,epoch-1, CFG.N, optimizer, val_type = 'train')  
+    validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer , val_type = 'robust')
+    validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer, val_type = 'soft')
+    validation(model, train_loader,CFG.device,-1, CFG.N, optimizer, val_type = 'train')  
     # amino acid inference
     # A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,val_type = 'robust') 
     # create diffucion data

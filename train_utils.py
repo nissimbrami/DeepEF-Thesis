@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 import gc
+from model.model_cfg import CFG
 
 def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
     """
@@ -155,3 +156,34 @@ def diff_data(model, optimizer, dataloader, device,epoch,N,valid_loader):
         
         torch.save(all_Xn_int,"./all_Xn_int.pt")
         torch.save(all_Xn,"./all_Xn_padded.pt")
+
+def get_graph(x, emb,mask):
+    """Get graph representation of protein"""
+    D = get_dist_matrix(x) # N,N,16
+    D = torch.relu(torch.exp(CFG.gaussian_coef*D**2))
+    # remove masks values
+    mask_index = torch.where(mask == 0)
+    D[mask_index[0],:,:] = 0
+    D[:,mask_index[0],:] = 0
+    # sum over the atoms
+    D = D.sum(dim=1) #N,16
+    D = F.normalize(D,p=2,dim=0)
+    Fh = torch.cat([emb,D],dim=1) #N,16+emb_size
+    
+    return Fh
+  
+def get_dist_matrix(Xd):
+    """
+    Return the node distence matrix
+    Args:
+        Xd (tensor):X embeded [n_nodes ,num_atoms=4,new_cords_size]
+    Returns:
+        tensor : [n_nodes,n_nodes ,atom_dist=16] tensor
+    """
+    N_residu,N_atoms,coords_size = Xd.shape
+    Xd = Xd.reshape(N_residu*N_atoms,coords_size)
+    D = torch.cdist(Xd,Xd,p=2)
+    D = D.reshape(N_residu,N_atoms,N_residu,N_atoms)
+    D = torch.swapaxes(D,1,2)
+    D = D.reshape(N_residu,N_residu,N_atoms*N_atoms)
+    return D

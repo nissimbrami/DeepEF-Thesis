@@ -304,14 +304,14 @@ def fetch_dataloader(data_dir, params):
     """
     # Sidechainnet dataset
     if params.dataset == 'scn':
-        train_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='train', debuge=params.debug), batch_size=params.batch_size, shuffle=True,
+        train_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='train', debug=params.debug), batch_size=params.batch_size, shuffle=True,
                                             num_workers=params.num_workers,
                                             pin_memory=params.cuda)
-        valid_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='valid', debuge=params.debug), batch_size=params.batch_size, shuffle=True,
+        valid_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='valid', debug=params.debug), batch_size=params.batch_size, shuffle=True,
                                             num_workers=params.num_workers,
                                             pin_memory=params.cuda)
 
-        test_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='test', debuge=params.debug), batch_size=params.batch_size, shuffle=True,
+        test_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='test', debug=params.debug), batch_size=params.batch_size, shuffle=True,
                                             num_workers=params.num_workers,
                                             pin_memory=params.cuda)
     else:

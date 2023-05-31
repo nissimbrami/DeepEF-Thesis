@@ -11,7 +11,7 @@ class CFG:
     data_path = './data/casp12_data_30/' #'./data/data2'
     inference_path = './data/inference_data'
     seed = 42
-    debug = True
+    debug = False
     # Train data parameters
     homothresh = 0.9
     constraint = True
@@ -32,4 +32,4 @@ class CFG:
     num_workers = 2
     N = 10
     num_epochs = 10
-    seq_len = 10000
+    seq_len = 1000

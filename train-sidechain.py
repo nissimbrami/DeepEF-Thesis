@@ -126,6 +126,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             emb = emb.squeeze()
             mask = mask.squeeze()
             mask_decoy = mask_decoy.squeeze()
+            
             X_native = get_graph(Xn, emb,mask)
             X_decoy = get_graph(Xd, emb_decoy,mask_decoy)
             X_native.requires_grad = True
@@ -134,8 +135,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Exd = model(X_decoy)
             outputs = torch.cat((Exd.unsqueeze(0),Exn.unsqueeze(0)),dim=0)
             
-            loss ,lossd, lossg,Exn,Exd = criterion(outputs,Xd,Xn,model,N,CFG.h)
-
+            loss ,lossd, lossg,Exn,Exd = criterion(outputs,X_decoy,X_native,model,N,CFG.h)
             valid_loss += loss.item() 
             torch.cuda.empty_cache()
             gc.collect()

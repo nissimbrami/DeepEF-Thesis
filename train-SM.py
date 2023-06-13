@@ -2,7 +2,7 @@ from model.data_loader import fetch_dataloader,fetch_inference_loader
 from model.data_loader import params as data_params
 from model.model_cfg import CFG
 # from model.net import ProteinEnergyNet
-from model.hydro_net import PEM
+from model.hydro_net import PEMSM
 from model.net import params as model_params
 from train_utils import *
 import torch
@@ -112,33 +112,35 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Xn = Xn.to(device)
             seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
             
-            # create decoy sequence
-            seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type=val_type,device=device)
-            if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
+                
+            if seq_one_hot.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
                 n_skips += 1
                 continue
             #emb = torch.cat((esm_embed,seq),dim=2)
-            emb = seq_one_hot.to(device)
-            emb_decoy = seq_decoy.to(device)
+            emb = proT5_emb.to(device)
+            # emb_decoy = seq_decoy.to(device)
             # zero the parameter gradients
             optimizer.zero_grad()
-            Xd = Xd.squeeze()
+            # Xd = Xd.squeeze()
             Xn = Xn.squeeze()
             # Xd = Xd.reshape(Xd.shape[0],-1)
-            emb_decoy = emb_decoy.squeeze()
+            # emb_decoy = emb_decoy.squeeze()
             emb = emb.squeeze()
             mask = mask.squeeze()
-            mask_decoy = mask_decoy.squeeze()
+            # mask_decoy = mask_decoy.squeeze()
             
+              
             X_native = get_graph(Xn, emb,mask)
-            X_decoy = get_graph(Xd, emb_decoy,mask_decoy)
-            X_native.requires_grad = True
-            
-            Exn = model(X_native)
+            # X_decoy = get_graph(Xd, emb_decoy,mask_decoy)
+            # X_native.requires_grad = True
+            # Add guassian noise to the native structure, to preform score matching
+            X_decoy = add_gaussian_noise(X_native,CFG.sigma)
+            X_decoy.to(device)
+            X_decoy.requires_grad = True
             Exd = model(X_decoy)
-            outputs = torch.cat((Exd.unsqueeze(0),Exn.unsqueeze(0)),dim=0)
+            Exn = model(X_native)
             
-            loss ,lossd, lossg,Exn,Exd = criterion(outputs,X_decoy,X_native,model,N,CFG.h)
+            loss  = score_matching_loss(Exd,X_decoy,X_native,CFG.sigma)
             valid_loss += loss.item() 
             torch.cuda.empty_cache()
             gc.collect()
@@ -151,18 +153,17 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Exd_list.append(Exd.item())
             Exn_list.append(Exn.item())
             seq_len.append(Xd.shape[0])
-            lossg_list.append(lossg.item())
-            lossd_list.append(lossd.item())
             ids_list.append(id)
+            lossg_list.append(loss.item())
     
     validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
-    df = pd.DataFrame({'id':ids_list,'Exd':Exd_list,'Exn':Exn_list,'seq_len':seq_len,'lossg':lossg_list,'lossd':lossd_list})
-    df.to_csv(f'./results/epoch_{epoch}-validation_{val_type}.csv')
+    df = pd.DataFrame({'id':ids_list,'Exd':Exd_list,'Exn':Exn_list,'seq_len':seq_len,'loss':lossg_list})
+    df.to_csv(f'./results-SM/epoch_{epoch}-validation_{val_type}.csv')
     print(f"Finished Validation {val_type} epoch {epoch}")
             
     return valid_loss/len(dataloader)
 
-def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000):
+def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val= 1000):
     """
     Training function for the model.
     
@@ -187,34 +188,34 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             
             seq_one_hot = seq_one_hot.to(device) # [batch_size,seq_len,20]
             # create decoy sequence
-            seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type='train',device=device)
-            
-            if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
+            # seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type='train',device=device)
+    
+            if seq_one_hot.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
                 n_skips += 1
                 continue
             #emb = torch.cat((esm_embed,seq),dim=2)
-            emb = seq_one_hot.to(device)
-            emb_decoy = seq_decoy.to(device)
+            emb = proT5_emb.to(device)
+            # emb_decoy = seq_decoy.to(device)
             # zero the parameter gradients
             optimizer.zero_grad()
-            Xd = Xd.squeeze()
+            # Xd = Xd.squeeze()
             Xn = Xn.squeeze()
             # Xd = Xd.reshape(Xd.shape[0],-1)
-            emb_decoy = emb_decoy.squeeze()
+            # emb_decoy = emb_decoy.squeeze()
             emb = emb.squeeze()
             mask = mask.squeeze()
-            mask_decoy = mask_decoy.squeeze()
+            # mask_decoy = mask_decoy.squeeze()
             
               
             X_native = get_graph(Xn, emb,mask)
-            X_decoy = get_graph(Xd, emb_decoy,mask_decoy)
-            X_native.requires_grad = True
-            
-            Exn = model(X_native)
+            # X_decoy = get_graph(Xd, emb_decoy,mask_decoy)
+            # X_native.requires_grad = True
+            # Add guassian noise to the native structure, to preform score matching
+            X_decoy = add_gaussian_noise(X_native,CFG.sigma)
+            X_decoy.requires_grad = True
             Exd = model(X_decoy)
-            outputs = torch.cat((Exd.unsqueeze(0),Exn.unsqueeze(0)),dim=0)
             
-            loss ,lossd, lossg,Exn,Exd = criterion(outputs,X_decoy,X_native,model,N,CFG.h)
+            loss  = score_matching_loss(Exd,X_decoy,X_native,CFG.sigma)
             
             loss.backward()
             # print_par(model) # print the parameters of the model
@@ -231,7 +232,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             torch.cuda.empty_cache()
             gc.collect()
             # update the progress bar
-            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
+            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"Exd":round(Exd.item(),3)})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -247,7 +248,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         
         
                 
-    return model, epoch_train_loss,r_val
+    return model, epoch_train_loss,ephoch_val_loss,best_val
 
 # define one epoch train
 def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_loss):
@@ -270,7 +271,7 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         torch.cuda.empty_cache()
         gc.collect()
         model.train()
-        model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss)
+        model,epoch_train_loss,ephoch_val_loss,valid_loss =  train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss)
        
         
     print('Finished Training')
@@ -312,13 +313,20 @@ def criterion(E,X_decoy,X_native,model,N,h):
     
     # lossc = preform_energy_optimization(X_decoy,partial_dx_decoy)
     # print(f"loss g: {round(lossg.item(),4)} loss d: {round(lossd.item(),4)}")
-    return lossd+lossg , lossd, lossg,E[1],E[0]   
+    return lossd+lossg , lossd, lossg,E[1],E[0]
+
+def score_matching_loss(Exd,X_decoy,X_native,sigma=1):
+    # print('***Start criterion function***')
+    partial_dx_decoy = torch.autograd.grad(outputs=Exd, inputs=X_decoy, grad_outputs=torch.ones_like(Exd), create_graph=True)[0]
+    part_dx_norm = 0.5*torch.norm(partial_dx_decoy - (X_native-X_decoy)/sigma,p=2)**2
+    return torch.log(part_dx_norm+1)
+    
 
 def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch):
     "train and test the model"
     valid_loss = 100
     if epoch > 0:
-        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
+         model,optimizer,epoch,loss,valid_loss =load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer,CFG.device)
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss)
     #load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
@@ -340,7 +348,7 @@ def main():
     print('***Build the model***')
     m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
                              cord_size = CFG.coords_emb,h = CFG.h,device=CFG.device)
-    model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
+    model = PEMSM(dim_in=1040,dim_h=512,dim_out=1040,layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Run training
@@ -358,5 +366,5 @@ def print_par(model):
 if __name__ == '__main__':
     if len(sys.argv)>1:
         CFG.model_path = sys.argv[1]
-        CFG.SM = False#int(sys.argv[2])
+        CFG.results_path = sys.argv[2]
     main()

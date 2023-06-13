@@ -268,6 +268,105 @@ class PEM(torch.nn.Module):
   
   def __init__(self, dim_in, dim_h, dim_out, layers, gaussian_coef,heads = 8):
     super().__init__()
+    # self.graph_model_gcn = [GCN(dim_in, dim_h, dim_out) for i in range(layers)]
+    self.graph_model_gat = [GAT(dim_in, dim_h, dim_out) for i in range(layers)]
+
+    self.gaussian_coef = gaussian_coef
+    self.GAT_layers = torch.nn.ModuleList(self.graph_model_gat)
+    # self.GCN_layers = torch.nn.ModuleList(self.graph_model_gcn)
+    # First fully connected layer
+    self.fcs1 = nn.Linear(dim_in, 64)
+    self.fcs2 = nn.Linear(64, dim_in)
+    self.bn1  = nn.BatchNorm1d(dim_in)
+    self.bn2  = nn.BatchNorm1d(dim_in)
+    # First fully connected layer
+    self.fc1 = nn.Linear(dim_in, 64)
+    # Second fully connected layer that outputs our 10 labels
+    self.fc2 = nn.Linear(64, 1)
+  
+      
+  def forward(self,x,f_type = 'Default'):
+      """
+        Forward function
+      Args:
+          x_decoy (tensor): decoy coordinates [n_nodes, num_atoms=4, 3]
+          emb_decoy (tensor): decoy embedding [n_nodes, emb_size]
+          mask_decoy (tensor): decoy mask [n_nodes, 1]
+          x_native (tensor): narive coordinates [n_nodes, num_atoms=4, 3]
+          emb_native (tensor): native embedding [n_nodes, emb_size]
+          mask_native (tensor): native mask [n_nodes, 1]
+          edge_index (tensor): edge index [2, n_edges]
+          f_type (str, optional): 'A_inference' or 'defualt', if 'A_inferece' return each amino acid energy . Defaults to 'Default'.
+
+      Returns:
+        if f_type == 'A_inference':
+            energy: native and decoy energy for each amino acid
+        if f_type == 'Default':
+          energy: native and decoy energy
+      """
+      edge_index_gcn,edge_index_gat = self.get_edge_index(x)
+      x = self.forward_x(x,edge_index_gcn,edge_index_gat)
+
+
+    #   x_native  = self.get_graph(x_native, emb_native,mask_native)
+    #   edge_index_gcn,edge_index_gat = self.get_edge_index(x_native)
+    #   x_native = self.forward_x(x_native,edge_index_gcn,edge_index_gat)
+
+      
+      if (f_type == 'Default'):
+        return self.get_energy(x)
+      elif(f_type == 'A_inference'): # return the energy reference to each amino acid
+        return x
+        
+  def forward_x(self,x,edge_index_gcn,edge_index_gat):
+        """forward function for the graph model"""
+        identity = x # identity for the residual connection
+        x = x
+        x = self.fcs1(x) # N,36->N,64
+        x = F.relu(x)
+        x = self.fcs2(x) # N,64->N,36
+        x = self.bn1(x)
+        # for gcn_layer in self.GCN_layers:
+        #     h1,x = gcn_layer(x, edge_index_gcn) 
+        #     x = x + identity
+        for gat_layer in self.GAT_layers:
+            h1,x = gat_layer(x, edge_index_gat) 
+            x = x + identity
+
+        x = self.bn2(x)
+        x  = self.fc1(x) # N,36->N,64
+        x = F.relu(x)
+        x = self.fc2(x) # N,64->N,1
+        return x
+
+  
+  
+  def get_energy(self,Fh):
+        """
+        Calculates the energy of the protein
+        Inputs:
+            Fh: a [n_nodes , embedding_size+N_residu] tensor
+        Returns:
+            Energy [batch_size] tensor
+        """
+        E = torch.sum(Fh**2,dim=(0,1))
+        return E
+  
+  def get_edge_index(self,x):
+        seq_len = x.shape[0]
+        combinations = torch.combinations(torch.arange(seq_len))
+        edge_index_gat = combinations[combinations[:, 0] != combinations[:, 1]]
+        edge_index_gat = edge_index_gat.t().contiguous().to(CFG.device)
+
+        edge_index_gcn = torch.tensor([[i,i+1] for i in range(seq_len-1)]).t().contiguous().to(CFG.device)
+        
+        return edge_index_gcn,edge_index_gat
+    
+class PEMSM(torch.nn.Module):
+  """Protein energy model"""
+  
+  def __init__(self, dim_in, dim_h, dim_out, layers, gaussian_coef,heads = 8):
+    super().__init__()
     self.graph_model_gcn = [GCN(dim_in, dim_h, dim_out) for i in range(layers)]
     self.graph_model_gat = [GAT(dim_in, dim_h, dim_out) for i in range(layers)]
 
@@ -275,14 +374,14 @@ class PEM(torch.nn.Module):
     self.GAT_layers = torch.nn.ModuleList(self.graph_model_gat)
     self.GCN_layers = torch.nn.ModuleList(self.graph_model_gcn)
     # First fully connected layer
-    self.fcs1 = nn.Linear(36, 64)
-    self.fcs2 = nn.Linear(64, 36)
-    self.bn1  = nn.BatchNorm1d(36)
-    self.bn2  = nn.BatchNorm1d(36)
+    self.fcs1 = nn.Linear(dim_in, 512)
+    self.fcs2 = nn.Linear(512, dim_in)
+    self.bn1  = nn.BatchNorm1d(dim_in)
+    self.bn2  = nn.BatchNorm1d(dim_in)
     # First fully connected layer
-    self.fc1 = nn.Linear(36, 64)
+    self.fc1 = nn.Linear(dim_in, 512)
     # Second fully connected layer that outputs our 10 labels
-    self.fc2 = nn.Linear(64, 1)
+    self.fc2 = nn.Linear(512, 1)
   
       
   def forward(self,x,f_type = 'Default'):
@@ -361,7 +460,6 @@ class PEM(torch.nn.Module):
         edge_index_gcn = torch.tensor([[i,i+1] for i in range(seq_len-1)]).t().contiguous().to(CFG.device)
         
         return edge_index_gcn,edge_index_gat
-    
     
 class GAT(torch.nn.Module):
   

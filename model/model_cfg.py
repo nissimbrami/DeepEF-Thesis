@@ -10,6 +10,7 @@ class CFG:
         
     data_path = './data/casp12_data_30/' #'./data/data2'
     inference_path = './data/inference_data'
+    results_path = './results/'
     seed = 42
     debug = False
     # Train data parameters
@@ -17,6 +18,7 @@ class CFG:
     constraint = True
     split_train = 0.8
     debug_size  = 10
+    sigma = 0.1 # for score matching loss
     # Model parameters
     h = 0.001
     coords_emb = 64
@@ -31,5 +33,6 @@ class CFG:
     batch_size = 1
     num_workers = 2
     N = 10
-    num_epochs = 10
+    num_epochs = 40
     seq_len = 1000
+    SM = False # score matching loss

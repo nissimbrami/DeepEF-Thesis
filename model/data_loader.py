@@ -39,7 +39,8 @@ class SidChainDS(Dataset):
         mask = torch.tensor(np.where(np.array(list(mask))=='+',1,0))
         seq_one_hot = torch.load(item_path + '/seq_one_hot.pt')
         seq = torch.load(item_path + '/seq.pt')
-        ang = torch.tensor(torch.load(item_path + '/ang.pt')) 
+        proT5_emb = torch.load(item_path + '/proT5_emb.pt')
+        ang = torch.tensor(torch.load(item_path + '/ang.pt'))
         ang_backbone = torch.clone(ang)[:,:3] #angles for the backbone phi, psi, omega
         # Add Cbeta atom to the coordinates
         crd_backbone = self.add_cb(crd_backbone)
@@ -49,7 +50,7 @@ class SidChainDS(Dataset):
         # Calculate exponential of the distance matrix
         dist_matrix = torch.exp(-CFG.gaussian_coef*dist_matrix)
         
-        return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, dist_matrix
+        return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, dist_matrix
 
     def __len__(self):
         return len(self.data_dir)

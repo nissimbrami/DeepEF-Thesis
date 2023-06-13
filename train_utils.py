@@ -43,6 +43,7 @@ def load_checkpoint(path,model,optimizer,device):
     # print(f"Epoch: {dict['epoch']},loss: {dict['loss']},valid_loss: {dict['valid_loss']}")
     model.load_state_dict(dict['model_state_dict'])
     optimizer.load_state_dict(dict['optimizer_state_dict'])
+    return model,optimizer,dict['epoch'],dict['loss'],dict['valid_loss']
     
 def validation_plots(Exd,Exn,seq_len,type,epoch):
     """
@@ -53,6 +54,9 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
         seq_len (int) : sequence length
         type (str) : type of the plot
     """
+    # create the directory if not exist
+    os.makedirs(CFG.results_path+'plots', exist_ok=True)
+    plot_dir = CFG.results_path+'plots'
     # Plot the validation data
     fig, ax = plt.subplots()
     ax.set_title(f'Validation data for {type},number of sequences: {len(Exd)}')
@@ -64,7 +68,7 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
     ax.legend()
 
     #plt.show()
-    plt.savefig(f'./results/plots/E_len_{type}.png')
+    plt.savefig(f'{plot_dir}/E_len_{type}.png')
     
     plt.close()
     
@@ -81,7 +85,7 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
     ax.legend()
 
     #plt.show()
-    plt.savefig(f'./results/plots/epoch-{epoch}-Edelta_len_{type}.png')
+    plt.savefig(f'{plot_dir}/epoch-{epoch}-Edelta_len_{type}.png')
     
     plt.close()
 
@@ -187,3 +191,10 @@ def get_dist_matrix(Xd):
     D = torch.swapaxes(D,1,2)
     D = D.reshape(N_residu,N_residu,N_atoms*N_atoms)
     return D
+
+def add_gaussian_noise(X_native,sigma):
+    """ add gaussian noise to the native structure"""
+    device = X_native.device
+    noise = (torch.randn(X_native.shape)*sigma).clone().to(device)
+    X_decoy = X_native + noise
+    return X_decoy

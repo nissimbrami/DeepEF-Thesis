@@ -14,9 +14,13 @@ import gc
 import time
 import sys
 import pandas as pd
+import wandb
 
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
+# Set wandb
+wandb.init(project="deepmeshi")
+
 
 # define amino acid inference
 def A_inference(model, dataloader, device,N,optimizer,val_type = 'robust'):
@@ -235,6 +239,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             gc.collect()
             # update the progress bar
             tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
+            # Log metrics
+            wandb.log({"epoch": epoch, "loss": loss.item(),"lossd":lossd.item(),"lossg":lossg.item(),"Exn":Exn.item(),"Exd":Exd.item()})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -274,7 +280,9 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         gc.collect()
         model.train()
         model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss)
-       
+        # After training, log additional information
+        wandb.config.learning_rate = CFG.lr
+        wandb.config.batch_size = 1
         
     print('Finished Training')
 

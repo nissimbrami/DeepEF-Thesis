@@ -1,0 +1,42 @@
+{
+    "os": "macOS-10.16-x86_64-i386-64bit",
+    "python": "3.10.4",
+    "heartbeatAt": "2023-06-18T14:08:51.526179",
+    "startedAt": "2023-06-18T14:08:49.033110",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/Users/shaharcohen/Studies/MSc/research/DeepPEF/train-sidechain.py",
+    "codePath": "train-sidechain.py",
+    "git": {
+        "remote": "https://github.com/shaharec/DeepPEF.git",
+        "commit": "936b23cc761a0ae29649be68e710fae7d9165bc8"
+    },
+    "email": "52333216+shaharec@users.noreply.github.com",
+    "root": "/Users/shaharcohen/Studies/MSc/research/DeepPEF",
+    "host": "Shahars-MacBook-Air-2.local",
+    "username": "shaharcohen",
+    "executable": "/Users/shaharcohen/opt/anaconda3/envs/esm2_env/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 2400,
+        "min": 2400,
+        "max": 2400
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2400,
+            "min": 2400,
+            "max": 2400
+        }
+    ],
+    "disk": {
+        "total": 228.27386474609375,
+        "used": 175.8539047241211
+    },
+    "memory": {
+        "total": 16.0
+    }
+}

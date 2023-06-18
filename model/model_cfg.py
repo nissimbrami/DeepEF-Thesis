@@ -16,12 +16,12 @@ class CFG:
     # Train data parameters
     homothresh = 0.9
     constraint = True
-    split_train = 0.8
+    split_train_size = 0.8
     debug_size  = 10
     sigma = 0.1 # for score matching loss
     # Model parameters
     h = 0.001
-    coords_emb = 64
+    coords_emb_size = 64
     embedding_size = 20
     filters = 64
     num_layers = 1
@@ -36,3 +36,5 @@ class CFG:
     num_epochs = 40
     seq_len = 1000
     SM = False # score matching loss
+    # defalut parameters
+    torch_default_dtype = torch.float32

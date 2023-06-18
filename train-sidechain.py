@@ -15,6 +15,9 @@ import time
 import sys
 import pandas as pd
 
+# Set the default data type to float32
+torch.set_default_dtype(CFG.torch_default_dtype)
+
 # define amino acid inference
 def A_inference(model, dataloader, device,N,optimizer,val_type = 'robust'):
     """
@@ -338,8 +341,8 @@ def main():
     # amino_inference_loader = fetch_inference_loader(data_dir=CFG.inference_path, params=d_params)
     # Build the model
     print('***Build the model***')
-    m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
-                             cord_size = CFG.coords_emb,h = CFG.h,device=CFG.device)
+    # m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
+    #                          h = CFG.h,device=CFG.device)
     model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)

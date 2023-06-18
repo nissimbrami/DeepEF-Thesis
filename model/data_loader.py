@@ -30,16 +30,18 @@ class SidChainDS(Dataset):
             self.data_dir = self.data_dir[:CFG.debug_size]
             
     def __getitem__(self, index):
+        
         item_path = self.data_dir[index]
         # load data
         id = torch.load(item_path + '/id.pt')
-        crd_backbone = torch.tensor(torch.load(item_path + '/crd_backbone.pt'),dtype=torch.float32) #backbone coordinates N,Calpha,C
+        crd_backbone = torch.tensor(torch.load(item_path + '/crd_backbone.pt'),dtype=torch.get_default_dtype()) #backbone coordinates N,Calpha,C
         mask = torch.load(item_path + '/mask.pt')
         # change to 1,0 mask
         mask = torch.tensor(np.where(np.array(list(mask))=='+',1,0))
         seq_one_hot = torch.load(item_path + '/seq_one_hot.pt')
         seq = torch.load(item_path + '/seq.pt')
         proT5_emb = torch.load(item_path + '/proT5_emb.pt')
+        # proT5_emb = torch.zeros(1) # for testing
         ang = torch.tensor(torch.load(item_path + '/ang.pt'))
         ang_backbone = torch.clone(ang)[:,:3] #angles for the backbone phi, psi, omega
         # Add Cbeta atom to the coordinates
@@ -321,7 +323,7 @@ def fetch_dataloader(data_dir, params):
         if params.debug:
             file_names = file_names[:CFG.debug_size]
         # Split the data into train, validation and test set
-        X_train, X_rem, y_train, y_rem = train_test_split(file_names,file_names, train_size=CFG.split_train,
+        X_train, X_rem, y_train, y_rem = train_test_split(file_names,file_names, train_size=CFG.split_train_size,
                                                         random_state=CFG.seed)
         # Now since we want the valid and test size to be equal (10% each of overall data). 
         # we have to define valid_size=0.5 (that is 50% of remaining data)

@@ -164,18 +164,34 @@ def diff_data(model, optimizer, dataloader, device,epoch,N,valid_loader):
 def get_graph(x, emb,mask):
     """Get graph representation of protein"""
     D = get_dist_matrix(x) # N,N,16
-    D = torch.relu(torch.exp(CFG.gaussian_coef*D**2))
+    D = torch.relu(torch.exp( CFG.gaussian_coef*D**2))
     # remove masks values
     mask_index = torch.where(mask == 0)
     D[mask_index[0],:,:] = 0
     D[:,mask_index[0],:] = 0
+    # get bonded features
+    Fb = get_bonded_features(D) # N,32
     # sum over the atoms
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
-    Fh = torch.cat([emb,D],dim=1) #N,16+emb_size
+    Fh = torch.cat([D,Fb,emb],dim=1) #N,16+32+emb_size
     
     return Fh
-  
+
+def get_bonded_features(D):
+    """Get bonded features from distance matrix"""
+    n_range = torch.arange(D.shape[0])
+    # get abobve and below diagonal
+    f1, f2 = D[n_range[:-1], n_range[1:]], D[n_range[1:], n_range[:-1]]
+    # pad with zeros
+    zero_row = torch.zeros((1, D.shape[-1])).to(D.device)
+    f1 = torch.cat([f1, zero_row], dim=0)
+    f2 = torch.cat([zero_row, f2], dim=0)
+    # concat features
+    Fb = torch.cat([f1, f2], dim=-1)
+    return Fb    
+    
+      
 def get_dist_matrix(Xd):
     """
     Return the node distence matrix
@@ -184,12 +200,12 @@ def get_dist_matrix(Xd):
     Returns:
         tensor : [n_nodes,n_nodes ,atom_dist=16] tensor
     """
-    N_residu,N_atoms,coords_size = Xd.shape
-    Xd = Xd.reshape(N_residu*N_atoms,coords_size)
-    D = torch.cdist(Xd,Xd,p=2)
-    D = D.reshape(N_residu,N_atoms,N_residu,N_atoms)
+    N_residu, N_atoms, coords_size = Xd.shape
+    Xd = Xd.reshape(N_residu*N_atoms, coords_size)
+    D = torch.cdist(Xd, Xd, p=2)
+    D = D.reshape(N_residu, N_atoms, N_residu, N_atoms)
     D = torch.swapaxes(D,1,2)
-    D = D.reshape(N_residu,N_residu,N_atoms*N_atoms)
+    D = D.reshape(N_residu, N_residu, N_atoms*N_atoms)
     return D
 
 def add_gaussian_noise(X_native,sigma):

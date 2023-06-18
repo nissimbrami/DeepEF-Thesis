@@ -264,67 +264,82 @@ class ProteinEnergyNet(nn.Module):
         return torch.sum(pairwise_differences,axis=-1)
     
 class PEM(torch.nn.Module):
-  """Protein energy model"""
+    """Protein energy model"""
   
-  def __init__(self, dim_in, dim_h, dim_out, layers, gaussian_coef,heads = 8):
-    super().__init__()
-    # self.graph_model_gcn = [GCN(dim_in, dim_h, dim_out) for i in range(layers)]
-    self.graph_model_gat = [GAT(dim_in, dim_h, dim_out) for i in range(layers)]
-
-    self.gaussian_coef = gaussian_coef
-    self.GAT_layers = torch.nn.ModuleList(self.graph_model_gat)
-    # self.GCN_layers = torch.nn.ModuleList(self.graph_model_gcn)
-    # First fully connected layer
-    self.fcs1 = nn.Linear(dim_in, 64)
-    self.fcs2 = nn.Linear(64, dim_in)
-    self.bn1  = nn.BatchNorm1d(dim_in)
-    self.bn2  = nn.BatchNorm1d(dim_in)
-    # First fully connected layer
-    self.fc1 = nn.Linear(dim_in, 64)
-    # Second fully connected layer that outputs our 10 labels
-    self.fc2 = nn.Linear(64, 1)
-  
-      
-  def forward(self,x,f_type = 'Default'):
-      """
-        Forward function
-      Args:
-          x_decoy (tensor): decoy coordinates [n_nodes, num_atoms=4, 3]
-          emb_decoy (tensor): decoy embedding [n_nodes, emb_size]
-          mask_decoy (tensor): decoy mask [n_nodes, 1]
-          x_native (tensor): narive coordinates [n_nodes, num_atoms=4, 3]
-          emb_native (tensor): native embedding [n_nodes, emb_size]
-          mask_native (tensor): native mask [n_nodes, 1]
-          edge_index (tensor): edge index [2, n_edges]
-          f_type (str, optional): 'A_inference' or 'defualt', if 'A_inferece' return each amino acid energy . Defaults to 'Default'.
-
-      Returns:
-        if f_type == 'A_inference':
-            energy: native and decoy energy for each amino acid
-        if f_type == 'Default':
-          energy: native and decoy energy
-      """
-      edge_index_gcn,edge_index_gat = self.get_edge_index(x)
-      x = self.forward_x(x,edge_index_gcn,edge_index_gat)
-
-
-    #   x_native  = self.get_graph(x_native, emb_native,mask_native)
-    #   edge_index_gcn,edge_index_gat = self.get_edge_index(x_native)
-    #   x_native = self.forward_x(x_native,edge_index_gcn,edge_index_gat)
-
-      
-      if (f_type == 'Default'):
-        return self.get_energy(x)
-      elif(f_type == 'A_inference'): # return the energy reference to each amino acid
-        return x
+    def __init__(self, dim_in, dim_h, dim_out, layers, gaussian_coef,heads = 8):
+        super().__init__()
+        # GCN layers
+        gcn_dim_in = 36
+        gcn_dim_h = 64
+        gcn_dim_out = 36
+        self.graph_model_gcn = [GCN(gcn_dim_in, gcn_dim_h, gcn_dim_out) for i in range(layers)]
+        # GAT layers
+        gat_dim_in = 36
+        gat_dim_h = 64
+        gat_dim_out = 36
+        self.graph_model_gat = [GAT(gat_dim_in, gat_dim_h, gat_dim_out) for i in range(layers)]
+        # Gaussian coefficient
+        self.gaussian_coef = gaussian_coef
+        # graph attention layers
+        self.GAT_layers = torch.nn.ModuleList(self.graph_model_gat)
+        self.GCN_layers = torch.nn.ModuleList(self.graph_model_gcn)
+        # Fully connected layers - GCN
+        self.fc1_gcn = nn.Linear(52, 64) # 52 = 32(dist) + 20(one-hot)
+        self.fc2_gcn = nn.Linear(64, gcn_dim_in)
+        # Fully connected layers - GAT
+        self.fc1_gat = nn.Linear(36, 64) # 36 = 16(dist) + 20(one-hot)
+        self.fc2_gat = nn.Linear(64, gat_dim_in)
+        # Batch normalization
+        self.bn1  = nn.BatchNorm1d(36)
+        self.bn2  = nn.BatchNorm1d(72)
+        # Fc layers for the final output
+        self.fc1 = nn.Linear(72, 32)
+        self.fc2 = nn.Linear(32, 1)
+    
         
-  def forward_x(self,x,edge_index_gcn,edge_index_gat):
+    def forward(self,x,f_type = 'Default'):
+        """
+                Forward function
+             Args:
+            x_decoy (tensor): decoy coordinates [n_nodes, num_atoms=4, 3]
+            emb_decoy (tensor): decoy embedding [n_nodes, emb_size]
+            mask_decoy (tensor): decoy mask [n_nodes, 1]
+            x_native (tensor): narive coordinates [n_nodes, num_atoms=4, 3]
+            emb_native (tensor): native embedding [n_nodes, emb_size]
+            mask_native (tensor): native mask [n_nodes, 1]
+            edge_index (tensor): edge index [2, n_edges]
+            f_type (str, optional): 'A_inference' or 'defualt', if 'A_inferece' return each amino acid energy . Defaults to 'Default'.
+
+        Returns:
+            if f_type == 'A_inference':
+                energy: native and decoy energy for each amino acid
+            if f_type == 'Default':
+            energy: native and decoy energy
+        """
+        edge_index_gcn,edge_index_gat = self.get_edge_index(x)
+        x_gcn = torch.cat((x[:,:32],x[:,-20:]),dim=-1) # N,52
+        x_gat = torch.cat((x[:,32:48],x[:,-20:]),dim=-1) # N,36
+        x1 = self.forward_gcn(x_gcn,edge_index_gcn) # N,52->N,36
+        x2 = self.forward_gat(x_gat,edge_index_gat) # N,36->N,36
+        # concat features
+        x = torch.cat((x1,x2),dim=-1) # N,36+36->N,72
+        # fc layers
+        x = self.bn2(x)
+        x  = self.fc1(x) # N,36->N,64
+        x = F.relu(x)
+        x = self.fc2(x) # N,64->N,1
+        # return energy        
+        if (f_type == 'Default'):
+            return self.get_energy(x)
+        elif(f_type == 'A_inference'): # return the energy reference to each amino acid
+            return x
+        
+    def forward_gat(self,x,edge_index_gat):
         """forward function for the graph model"""
         identity = x # identity for the residual connection
-        x = x
-        x = self.fcs1(x) # N,36->N,64
+        x = self.fc1_gat(x) # N,36->N,64
         x = F.relu(x)
-        x = self.fcs2(x) # N,64->N,36
+        x = self.fc2_gat(x) # N,64->N,36
         x = self.bn1(x)
         # for gcn_layer in self.GCN_layers:
         #     h1,x = gcn_layer(x, edge_index_gcn) 
@@ -333,15 +348,21 @@ class PEM(torch.nn.Module):
             h1,x = gat_layer(x, edge_index_gat) 
             x = x + identity
 
-        x = self.bn2(x)
-        x  = self.fc1(x) # N,36->N,64
-        x = F.relu(x)
-        x = self.fc2(x) # N,64->N,1
         return x
 
+    def forward_gcn(self,x,edge_index_gcn):
+        """forward function for the graph model"""
+        x = self.fc1_gcn(x) # N,36->N,64
+        x = F.relu(x)
+        x = self.fc2_gcn(x) # N,64->N,36
+        x = self.bn1(x)
+        identity = x # identity for the residual connection
+        for gcn_layer in self.GCN_layers:
+            h1,out = gcn_layer(x, edge_index_gcn) 
+            x = out + identity
+        return x
   
-  
-  def get_energy(self,Fh):
+    def get_energy(self,Fh):
         """
         Calculates the energy of the protein
         Inputs:
@@ -352,7 +373,7 @@ class PEM(torch.nn.Module):
         E = torch.sum(Fh**2,dim=(0,1))
         return E
   
-  def get_edge_index(self,x):
+    def get_edge_index(self,x):
         seq_len = x.shape[0]
         combinations = torch.combinations(torch.arange(seq_len))
         edge_index_gat = combinations[combinations[:, 0] != combinations[:, 1]]

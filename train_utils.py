@@ -89,19 +89,22 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
     
     plt.close()
 
-def mix_A_acid(seq_one_hot,mask,val_type,device):
+def mix_A_acid(seq_one_hot,emb,mask,val_type,device):
     """ mix the amino acid sequence"""
     if val_type == 'robust' or val_type == 'train':
         mix_index = torch.randperm(seq_one_hot.shape[1])
         seq_decoy = torch.clone(seq_one_hot[:,mix_index,:]).to(device)
         mask_decoy = torch.clone(mask[:,mix_index]).to(device)
+        emb_decoy = torch.clone(emb[:,mix_index,:]).to(device)
     else: 
         mix_index = torch.randperm(seq_one_hot.shape[1])[:2]
         mask_decoy = torch.clone(mask).to(device)
         seq_decoy = torch.clone(seq_one_hot).to(device)
+        emb_decoy = torch.clone(emb).to(device)
         seq_decoy[:,mix_index[0],:], seq_decoy[:,[1],:] = seq_decoy[:,mix_index[1],:], seq_decoy[:,[0],:]
         mask_decoy[:,mix_index[0]] ,mask_decoy[:,[1]] = mask_decoy[:,mix_index[1]], mask_decoy[:,[0]]
-    return seq_decoy,mask_decoy
+        emb_decoy[:,mix_index[0],:], emb_decoy[:,[1],:] = emb_decoy[:,mix_index[1],:], emb_decoy[:,[0],:]
+    return seq_decoy, mask_decoy, emb_decoy
         
 def pad_image(image,desired_size = (500,23)):
     """ pad the image to desired size"""
@@ -161,7 +164,7 @@ def diff_data(model, optimizer, dataloader, device,epoch,N,valid_loader):
         torch.save(all_Xn_int,"./all_Xn_int.pt")
         torch.save(all_Xn,"./all_Xn_padded.pt")
 
-def get_graph(x, emb,mask):
+def get_graph(x, one_hot, emb, mask):
     """Get graph representation of protein"""
     D = get_dist_matrix(x) # N,N,16
     D = torch.relu(torch.exp( CFG.gaussian_coef*D**2))
@@ -174,14 +177,14 @@ def get_graph(x, emb,mask):
     # sum over the atoms
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
-    Fh = torch.cat([D,Fb,emb],dim=1) #N,16+32+emb_size
+    Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
     
     return Fh
 
 def get_bonded_features(D):
     """Get bonded features from distance matrix"""
     n_range = torch.arange(D.shape[0])
-    # get abobve and below diagonal
+    # get above and below diagonal
     f1, f2 = D[n_range[:-1], n_range[1:]], D[n_range[1:], n_range[:-1]]
     # pad with zeros
     zero_row = torch.zeros((1, D.shape[-1])).to(D.device)
@@ -189,7 +192,7 @@ def get_bonded_features(D):
     f2 = torch.cat([zero_row, f2], dim=0)
     # concat features
     Fb = torch.cat([f1, f2], dim=-1)
-    return Fb    
+    return Fb # N,32   
     
       
 def get_dist_matrix(Xd):

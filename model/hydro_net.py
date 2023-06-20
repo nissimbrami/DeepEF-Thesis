@@ -293,8 +293,8 @@ class PEM(torch.nn.Module):
         self.bn1  = nn.BatchNorm1d(36)
         self.bn2  = nn.BatchNorm1d(72)
         # Fc layers for the final output
-        self.fc1 = nn.Linear(72, 32)
-        self.fc2 = nn.Linear(32, 1)
+        self.fc1 = nn.Linear(1096, 64)
+        self.fc2 = nn.Linear(64, 1)
     
         
     def forward(self,x,f_type = 'Default'):
@@ -316,16 +316,22 @@ class PEM(torch.nn.Module):
             if f_type == 'Default':
             energy: native and decoy energy
         """
+        # Get the edge index
         edge_index_gcn,edge_index_gat = self.get_edge_index(x)
+        # split features to 2 graphs, bonded and non-bonded
         x_gcn = torch.cat((x[:,:32],x[:,-20:]),dim=-1) # N,52
         x_gat = torch.cat((x[:,32:48],x[:,-20:]),dim=-1) # N,36
+        x_emb_features = x[:,-1044:-20] # N,1024
+        # forward pass through the graph attention and convolution layers
         x1 = self.forward_gcn(x_gcn,edge_index_gcn) # N,52->N,36
         x2 = self.forward_gat(x_gat,edge_index_gat) # N,36->N,36
         # concat features
         x = torch.cat((x1,x2),dim=-1) # N,36+36->N,72
-        # fc layers
         x = self.bn2(x)
-        x  = self.fc1(x) # N,36->N,64
+        # Add LLM features
+        x = torch.cat((x,x_emb_features),dim=-1) # N,72+1024->N,1096
+        # fc layers
+        x  = self.fc1(x) # N,1096->N,64
         x = F.relu(x)
         x = self.fc2(x) # N,64->N,1
         # return energy        

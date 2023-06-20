@@ -40,8 +40,8 @@ class SidChainDS(Dataset):
         mask = torch.tensor(np.where(np.array(list(mask))=='+',1,0))
         seq_one_hot = torch.load(item_path + '/seq_one_hot.pt')
         seq = torch.load(item_path + '/seq.pt')
-        proT5_emb = torch.load(item_path + '/proT5_emb.pt')
-        # proT5_emb = torch.zeros(1) # for testing
+        # proT5_emb = torch.load(item_path + '/proT5_emb.pt')
+        proT5_emb = torch.zeros((len(seq),1024)) # for testing
         ang = torch.tensor(torch.load(item_path + '/ang.pt'))
         ang_backbone = torch.clone(ang)[:,:3] #angles for the backbone phi, psi, omega
         # Add Cbeta atom to the coordinates

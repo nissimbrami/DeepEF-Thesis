@@ -19,7 +19,8 @@ import wandb
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
 # Set wandb
-wandb.init(project="deepmeshi")
+if not CFG.debug:
+    wandb.init(project="deepmeshi")
 
 
 # define amino acid inference
@@ -120,7 +121,8 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
             
             # create decoy sequence
-            seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type=val_type,device=device)
+            seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
+            
             if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
                 n_skips += 1
                 continue
@@ -129,16 +131,14 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             emb_decoy = seq_decoy.to(device)
             # zero the parameter gradients
             optimizer.zero_grad()
-            Xd = Xd.squeeze()
-            Xn = Xn.squeeze()
-            # Xd = Xd.reshape(Xd.shape[0],-1)
-            emb_decoy = emb_decoy.squeeze()
-            emb = emb.squeeze()
-            mask = mask.squeeze()
-            mask_decoy = mask_decoy.squeeze()
-            
-            X_native = get_graph(Xn, emb,mask)
-            X_decoy = get_graph(Xd, emb_decoy,mask_decoy)
+            # squeeze the data
+            Xd, Xn= Xd.squeeze(), Xn.squeeze()
+            emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
+            mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
+            proT5_emb_decoy, proT5_emb = proT5_emb_decoy.squeeze(), proT5_emb.squeeze()
+              
+            X_native = get_graph(Xn, emb, proT5_emb, mask)
+            X_decoy = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy)
             X_native.requires_grad = True
             
             Exn = model(X_native)
@@ -187,14 +187,14 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             torch.cuda.empty_cache()
             gc.collect()
             # get the inputs; data is a list of [inputs, labels]   
-            id, Xn, mask, seq_one_hot, seq,ang_backbone, ang,proT5_emb, dist_matrix = data
+            id, Xn, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, dist_matrix = data
             # Take native structure
             Xd = torch.clone(Xn).to(device)
             Xn = Xn.to(device)
             
             seq_one_hot = seq_one_hot.to(device) # [batch_size,seq_len,20]
             # create decoy sequence
-            seq_decoy,mask_decoy = mix_A_acid(seq_one_hot = seq_one_hot,mask = mask,val_type='train',device=device)
+            seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
             
             if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
                 n_skips += 1
@@ -204,17 +204,14 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             emb_decoy = seq_decoy.to(device)
             # zero the parameter gradients
             optimizer.zero_grad()
-            Xd = Xd.squeeze()
-            Xn = Xn.squeeze()
-            # Xd = Xd.reshape(Xd.shape[0],-1)
-            emb_decoy = emb_decoy.squeeze()
-            emb = emb.squeeze()
-            mask = mask.squeeze()
-            mask_decoy = mask_decoy.squeeze()
-            
+            # squeeze the data
+            Xd, Xn= Xd.squeeze(), Xn.squeeze()
+            emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
+            mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
+            proT5_emb_decoy, proT5_emb = proT5_emb_decoy.squeeze(), proT5_emb.squeeze()
               
-            X_native = get_graph(Xn, emb,mask)
-            X_decoy = get_graph(Xd, emb_decoy,mask_decoy)
+            X_native = get_graph(Xn, emb, proT5_emb, mask)
+            X_decoy = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy)
             X_native.requires_grad = True
             
             Exn = model(X_native)
@@ -233,6 +230,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 print(f'[{epoch + 1}, {index + 1:5d}] loss: {running_loss / 1000:.3f}')
                 print(f"skipped {n_skips}")
                 epoch_train_loss.append(running_loss/1000)
+                if not CFG.debug:
+                    wandb.log({"running_loss": running_loss/1000})
                 running_loss = 0.0
 
             torch.cuda.empty_cache()
@@ -240,7 +239,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # update the progress bar
             tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
             # Log metrics
-            wandb.log({"epoch": epoch, "loss": loss.item(),"lossd":lossd.item(),"lossg":lossg.item(),"Exn":Exn.item(),"Exd":Exd.item()})
+            if not CFG.debug:
+                wandb.log({"epoch": epoch, "loss": loss.item(),"lossd":lossd.item(),"lossg":lossg.item(),"Exn":Exn.item(),"Exd":Exd.item(),"Edelta": (Exn-Exd).item()})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")

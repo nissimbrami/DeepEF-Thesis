@@ -115,7 +115,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             optimizer.zero_grad()
             id, Xn, mask, seq_one_hot, seq,ang_backbone, ang,proT5_emb, dist_matrix = data
             
-            # Take native structure
+            # Take native structure.
             Xd = torch.clone(Xn).to(device)
             Xn = Xn.to(device)
             seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]

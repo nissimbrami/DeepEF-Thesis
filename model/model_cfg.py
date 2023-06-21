@@ -10,7 +10,7 @@ class CFG:
         
     data_path = './data/casp12_data_30/' #'./data/data2'
     inference_path = './data/inference_data'
-    results_path = './results/'
+    results_path = './res/results-emb/'
     seed = 42
     debug = True
     # Train data parameters
@@ -25,7 +25,7 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 1
-    model_path = "./trianed_models/"
+    model_path = "./res/trianed_models/"
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001

@@ -25,4 +25,4 @@ echo -e "SLURM_JOB_NODELIST:\t" $SLURM_JOB_NODELIST "\n\n"
 
 module load anaconda ### load anaconda module
 source activate esm2_env ### activating Conda environment, environment must be configured before running the job
-python train-sidechain.py ./trianed_models/ 0 ### execute python script – replace with your own command
+python train-sidechain.py ./res/trianed_models-emb/ 0 ### execute python script – replace with your own command

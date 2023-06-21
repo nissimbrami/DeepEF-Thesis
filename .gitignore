@@ -14,4 +14,5 @@ trianed_models_no_const/*
 experiments/plots/*
 experiments/.ipynb_checkpoints
 *.sh
+wandb/*
 

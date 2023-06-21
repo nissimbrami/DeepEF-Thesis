@@ -15,7 +15,7 @@
 # Note: the following 4 lines are commented out
 #BATCH --mail-user=shaharax@post.bgu.ac.il        ### user's email for sending job status messages
 #SBATCH --mail-type=END,FAIL                   ### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
-##SBATCH --mem=24G                              ### ammount of RAM memory, allocating more than 60G requires IT team's permission
+##SBATCH --mem=48G                              ### ammount of RAM memory, allocating more than 60G requires IT team's permission
 
 ### Print some data to output file ###
 echo `date`

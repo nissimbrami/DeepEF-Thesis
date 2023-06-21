@@ -12,7 +12,7 @@ class CFG:
     inference_path = './data/inference_data'
     results_path = './res/results-emb/'
     seed = 42
-    debug = True
+    debug = False
     # Train data parameters
     homothresh = 0.9
     constraint = True

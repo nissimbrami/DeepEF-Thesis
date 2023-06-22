@@ -251,6 +251,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         # evaluate the model
         r_val = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
         s_val = validation(model, valid_loader,CFG.device,epoch , CFG.N, optimizer, val_type = 'soft')
+         # update wandb metrics
+        if not CFG.debug:
+            wandb.log({"robust validation loss": r_val,"soft validation loss": s_val, "learning rate": optimizer.param_groups[0]["lr"]})
          # Update the learning rate based on the validation loss
         scheduler.step(r_val)
         print (f"robust validation loss: {r_val}")
@@ -259,9 +262,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             print('saving model with valid loss: ',r_val)
             save_checkpoint(epoch, model, optimizer, loss,r_val,CFG.model_path+"best_model.pt")
             best_val = r_val
-        # update wandb metrics
-        if not CFG.debug:
-            wandb.log({"robust validation loss": r_val,"soft validation loss": s_val})
+       
         
                 
     return model, epoch_train_loss,r_val
@@ -288,10 +289,7 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         gc.collect()
         model.train()
         model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss, scheduler)
-        # After training, log additional information
-        if not CFG.debug:
-            wandb.config.learning_rate = optimizer.param_groups[0]['lr']
-            wandb.config.batch_size = 1
+        
         
     print('Finished Training')
 
@@ -361,10 +359,12 @@ def main():
     # m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
     #                          h = CFG.h,device=CFG.device)
     model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
-    
+    model.name = "PEM-With LLM embedding"
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
+    # configurate wandb
+    wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
     epoch = 0

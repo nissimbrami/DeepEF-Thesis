@@ -217,3 +217,15 @@ def add_gaussian_noise(X_native,sigma):
     noise = (torch.randn(X_native.shape)*sigma).clone().to(device)
     X_decoy = X_native + noise
     return X_decoy
+
+def wandb_config(wandb, model, optimizer, scheduler, dataloader):
+    """wandb_config """
+    if not CFG.debug:
+        wandb.config.learning_rate = optimizer.param_groups[0]['lr']
+        wandb.config.batch_size = CFG.batch_size
+        wandb.config.epochs = CFG.num_epochs
+        wandb.config.optimizer = type(optimizer).__name__
+        wandb.config.scheduler = type(scheduler).__name__
+        wandb.config.model = type(model).__name__
+        wandb.config.dataset = type(dataloader.dataset).__name__
+        wandb.config.wd = CFG.wd

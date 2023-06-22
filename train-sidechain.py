@@ -235,7 +235,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 print(f"skipped {n_skips}")
                 epoch_train_loss.append(running_loss/1000)
                 if not CFG.debug:
-                    wandb.log({"running_loss": running_loss/1000})
+                    wandb.log({"epoch": epoch,"running_loss": running_loss/1000})
                 running_loss = 0.0
 
             torch.cuda.empty_cache()
@@ -253,7 +253,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         s_val = validation(model, valid_loader,CFG.device,epoch , CFG.N, optimizer, val_type = 'soft')
          # update wandb metrics
         if not CFG.debug:
-            wandb.log({"robust validation loss": r_val,"soft validation loss": s_val, "learning rate": optimizer.param_groups[0]["lr"]})
+            wandb.log({"epoch" : epoch ,"robust validation loss": r_val,"soft validation loss": s_val, "learning rate": optimizer.param_groups[0]["lr"]})
          # Update the learning rate based on the validation loss
         scheduler.step(r_val)
         print (f"robust validation loss: {r_val}")

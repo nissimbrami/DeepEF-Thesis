@@ -169,7 +169,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             
     return valid_loss/len(dataloader)
 
-def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000):
+def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None):
     """
     Training function for the model.
     
@@ -247,19 +247,23 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         # evaluate the model
         r_val = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
         s_val = validation(model, valid_loader,CFG.device,epoch , CFG.N, optimizer, val_type = 'soft')
+         # Update the learning rate based on the validation loss
+        scheduler.step(r_val)
         print (f"robust validation loss: {r_val}")
         print (f"soft validation loss: {s_val}")
         if r_val<best_val:
             print('saving model with valid loss: ',r_val)
             save_checkpoint(epoch, model, optimizer, loss,r_val,CFG.model_path+"best_model.pt")
             best_val = r_val
-        
+        # update wandb metrics
+        if not CFG.debug:
+            wandb.log({"robust validation loss": r_val,"soft validation loss": s_val})
         
                 
     return model, epoch_train_loss,r_val
 
 # define one epoch train
-def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_loss):
+def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_loss,scheduler):
     """
     Training function for the model.
     Args:
@@ -279,9 +283,9 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         torch.cuda.empty_cache()
         gc.collect()
         model.train()
-        model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss)
+        model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss, scheduler)
         # After training, log additional information
-        wandb.config.learning_rate = CFG.lr
+        wandb.config.learning_rate = optimizer.param_groups[0]['lr']
         wandb.config.batch_size = 1
         
     print('Finished Training')
@@ -325,12 +329,12 @@ def criterion(E,X_decoy,X_native,model,N,h):
     # print(f"loss g: {round(lossg.item(),4)} loss d: {round(lossd.item(),4)}")
     return lossd+lossg , lossd, lossg,E[1],E[0]   
 
-def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch):
+def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch,scheduler):
     "train and test the model"
     valid_loss = 100
     if epoch > 0:
         model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
-    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss)
+    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
     #load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
     validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer , val_type = 'robust')
@@ -354,10 +358,12 @@ def main():
     model = PEM(dim_in=36,dim_h=64,dim_out=36,layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
+    # Define the learning rate scheduler based on loss
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
     # Run training
     print('***Start training***')
     epoch = 0
-    trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch)
+    trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 
     

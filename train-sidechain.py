@@ -85,7 +85,7 @@ def A_inference(model, dataloader, device,N,optimizer,val_type = 'robust'):
     df= pd.DataFrame(Exd_A_list)
     df = pd.concat([df,pd.DataFrame(Exn_A_list)])  
     df['id'] = ids_list
-    df.to_csv(f'./results/A_inference_{val_type}.csv')
+    df.to_csv(f'./res/results/A_inference_{val_type}.csv')
     print(f"Finished amino acid inference {val_type}")
             
 
@@ -129,6 +129,8 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot.to(device)
             emb_decoy = seq_decoy.to(device)
+            # move proT5_emb to device
+            proT5_emb_decoy, proT5_emb = proT5_emb_decoy.to(device), proT5_emb.to(device)
             # zero the parameter gradients
             optimizer.zero_grad()
             # squeeze the data
@@ -164,7 +166,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     
     validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
     df = pd.DataFrame({'id':ids_list,'Exd':Exd_list,'Exn':Exn_list,'seq_len':seq_len,'lossg':lossg_list,'lossd':lossd_list})
-    df.to_csv(f'./results/epoch_{epoch}-validation_{val_type}.csv')
+    df.to_csv(f'./res/results/epoch_{epoch}-validation_{val_type}.csv')
     print(f"Finished Validation {val_type} epoch {epoch}")
             
     return valid_loss/len(dataloader)
@@ -202,6 +204,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot.to(device)
             emb_decoy = seq_decoy.to(device)
+            # move proT5_emb to device
+            proT5_emb_decoy, proT5_emb = proT5_emb_decoy.to(device), proT5_emb.to(device)
             # zero the parameter gradients
             optimizer.zero_grad()
             # squeeze the data
@@ -240,7 +244,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
             # Log metrics
             if not CFG.debug:
-                wandb.log({"epoch": epoch, "loss": loss.item(),"lossd":lossd.item(),"lossg":lossg.item(),"Exn":Exn.item(),"Exd":Exd.item(),"Edelta": (Exn-Exd).item()})
+                wandb.log({"epoch": epoch, "loss": loss.item(),"lossd":lossd.item(),"lossg":lossg.item(),"Exn":Exn.item(),"Exd":Exd.item(),"Edelta": (Exd-Exn).item()})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -285,8 +289,9 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         model.train()
         model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss, scheduler)
         # After training, log additional information
-        wandb.config.learning_rate = optimizer.param_groups[0]['lr']
-        wandb.config.batch_size = 1
+        if not CFG.debug:
+            wandb.config.learning_rate = optimizer.param_groups[0]['lr']
+            wandb.config.batch_size = 1
         
     print('Finished Training')
 

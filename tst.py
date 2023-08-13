@@ -37,14 +37,25 @@ def get_emb(sequence_examples):
     emb_0 = embedding_repr.last_hidden_state[0,:seq_len]
     return emb_0
 
-def print_files_in_directory(directory):
+def print_files_in_directory(directory,mutation=False):
     n_saved = 0
+    if mutation:
+        emb_file_name = 'proT5_emb_mut.pt'
+    else:
+        emb_file_name = 'proT5_emb.pt'
+    
     for root, dirs, files in os.walk(directory):
         for file_name in files:
             if (file_name == 'seq.pt'):
                 seq = torch.load(os.path.join(root, file_name))
+                if mutation:
+                    mix_index = torch.randperm(len(seq))[:2] # randomly select 2 positions to swap
+                    l1,l2 = seq[mix_index[0]], seq[mix_index[1]] # save the letters at these positions
+                    # swap the letters at these positions
+                    seq = seq[:mix_index[0]] + l2 + seq[mix_index[0]+1:]
+                    seq = seq[:mix_index[1]] + l1 + seq[mix_index[1]+1:]
                 proT5_emb = get_emb([seq]).to('cpu')
-                torch.save(proT5_emb, os.path.join(root, 'proT5_emb.pt'))  
+                torch.save(proT5_emb, os.path.join(root, emb_file_name))  
                 n_saved += 1
                 if (n_saved % 1000 == 0):
                     print('Saved {} files'.format(n_saved))
@@ -53,4 +64,4 @@ def print_files_in_directory(directory):
 # Provide the directory path here
 directory_path = './data/casp12_data_30/'
 
-print_files_in_directory(directory_path)
+print_files_in_directory(directory_path,mutation=True)

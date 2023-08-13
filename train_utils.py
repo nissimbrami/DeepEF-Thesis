@@ -174,6 +174,25 @@ def get_graph(x, one_hot, emb, mask):
     D[:,mask_index[0],:] = 0
     # get bonded features
     Fb = get_bonded_features(D) # N,32
+    # sum over the atoms,
+    D = D.sum(dim=1) #N,16
+    D = F.normalize(D,p=2,dim=0)
+    Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
+    
+    return Fh
+
+def get_unfolded_graph(x, one_hot, emb, mask):
+    """Get graph representation of a unfolded protein"""
+    D = get_dist_matrix(x) # N,N,16
+    D = torch.relu(torch.exp( CFG.gaussian_coef*D**2))
+    # remove masks values
+    mask_index = torch.where(mask == 0)
+    D[mask_index[0],:,:] = 0
+    D[:,mask_index[0],:] = 0
+    # remove all values except the diagonal
+    D = zero_except_udiagonal(D)
+    # get bonded features
+    Fb = get_bonded_features(D) # N,32
     # sum over the atoms
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
@@ -229,3 +248,14 @@ def wandb_config(wandb, model, optimizer, scheduler, dataloader):
         wandb.config.model = type(model).__name__
         wandb.config.dataset = type(dataloader.dataset).__name__
         wandb.config.wd = CFG.wd
+
+def zero_except_udiagonal(D):
+    """Zero all values except the diagonal and its neighbors"""
+    n_range = torch.arange(D.shape[0])
+    f1, f2 = D[n_range[:-1], n_range[1:]], D[n_range[1:], n_range[:-1]]
+    diag = D[n_range, n_range]
+    D[:, :, :] = 0
+    D[n_range[:-1], n_range[1:]] = f1
+    D[n_range[1:], n_range[:-1]] = f2
+    D[n_range, n_range] = diag
+    return D

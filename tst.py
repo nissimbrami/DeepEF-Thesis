@@ -5,7 +5,7 @@ from transformers import T5Tokenizer, T5EncoderModel
 import torch
 import re
 import os
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')#"mps" if torch.backends.mps.is_available() else 'cpu')
 print("Using device: {}".format(device))
 
 #@title Load encoder-part of ProtT5 in half-precision. { display-mode: "form" }
@@ -54,6 +54,7 @@ def print_files_in_directory(directory,mutation=False):
                     # swap the letters at these positions
                     seq = seq[:mix_index[0]] + l2 + seq[mix_index[0]+1:]
                     seq = seq[:mix_index[1]] + l1 + seq[mix_index[1]+1:]
+                    torch.save(seq,os.path.join(root, "seq_mut.pt"))
                 proT5_emb = get_emb([seq]).to('cpu')
                 torch.save(proT5_emb, os.path.join(root, emb_file_name))  
                 n_saved += 1

@@ -8,6 +8,30 @@ from tqdm import tqdm
 import gc
 from model.model_cfg import CFG
 
+# amino acid one hot map
+AA_MAP = {
+    'A': 0,
+    'C': 1,
+    'D': 2,
+    'E': 3,
+    'F': 4,
+    'G': 5,
+    'H': 6,
+    'I': 7,
+    'K': 8,
+    'L': 9,
+    'M': 10,
+    'N': 11,
+    'P': 12,
+    'Q': 13,
+    'R': 14,
+    'S': 15,
+    'T': 16,
+    'V': 17,
+    'W': 18,
+    'Y': 19
+}
+
 def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
     """
     Save the model check point
@@ -259,3 +283,10 @@ def zero_except_udiagonal(D):
     D[n_range[1:], n_range[:-1]] = f2
     D[n_range, n_range] = diag
     return D
+
+def get_one_hot(seq):
+  """get one hot from sequence"""
+  seq_one_hot = torch.zeros((len(seq),20))
+  for i,a in enumerate(seq):
+    seq_one_hot[i][AA_MAP[a]] = 1
+  return seq_one_hot

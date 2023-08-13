@@ -33,7 +33,7 @@ class CFG:
     batch_size = 1
     num_workers = 2
     N = 10
-    num_epochs = 40
+    num_epochs = 50
     seq_len = 1000
     SM = False # score matching loss
     # defalut parameters

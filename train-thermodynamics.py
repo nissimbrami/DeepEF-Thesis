@@ -255,7 +255,7 @@ def criterion(Eif, Ejf, Eiu, Eju):
         loss (tensor): The loss of the model
     """
     lossg = ((Eju+Ejf)-(Eiu+Eif))**2
-    lossd = torch.exp(Eju-Ejf) + torch.exp(Eiu-Eif)
+    lossd = torch.exp(Ejf-Eju) + torch.exp(Eif-Eiu)
     
     return lossd+lossg , lossd, lossg  
 
@@ -306,6 +306,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if len(sys.argv)>1:
-        CFG.model_path = sys.argv[1]
+        # CFG.model_path = sys.argv[1]
         CFG.SM = False#int(sys.argv[2])
     main()

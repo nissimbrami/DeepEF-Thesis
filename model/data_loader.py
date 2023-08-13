@@ -40,19 +40,19 @@ class SidChainDS(Dataset):
         mask = torch.tensor(np.where(np.array(list(mask))=='+',1,0))
         seq_one_hot = torch.load(item_path + '/seq_one_hot.pt')
         seq = torch.load(item_path + '/seq.pt')
-        # proT5_emb = torch.load(item_path + '/proT5_emb.pt')
-        proT5_emb = torch.zeros((len(seq),1024)) # for testing
+        proT5_emb = torch.load(item_path + '/proT5_emb.pt')
+        # proT5_emb = torch.zeros((len(seq),1024)) # for testing
         ang = torch.tensor(torch.load(item_path + '/ang.pt'))
         ang_backbone = torch.clone(ang)[:,:3] #angles for the backbone phi, psi, omega
         # Add Cbeta atom to the coordinates
         crd_backbone = self.add_cb(crd_backbone)
         crd_backbone = crd_backbone * C.NANO_TO_ANGSTROM # Convert to angstrom
-        # Calculate the distance matrix
-        dist_matrix = self.get_dist_matrix(crd_backbone)
-        # Calculate exponential of the distance matrix
-        dist_matrix = torch.exp(-CFG.gaussian_coef*dist_matrix)
         
-        return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, dist_matrix
+        # ProT5 embedding for protein mutation
+        proT5_mut = torch.load(item_path + '/proT5_emb_mut.pt')
+        seq_mut =  torch.load(item_path + '/seq_mut.pt')
+        
+        return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, proT5_mut,seq_mut
 
     def __len__(self):
         return len(self.data_dir)

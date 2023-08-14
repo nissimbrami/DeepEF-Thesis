@@ -20,7 +20,7 @@ import wandb
 torch.set_default_dtype(CFG.torch_default_dtype)
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="")
+    wandb.init(project="DeepPEF")
 
             
 
@@ -46,8 +46,6 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             if(device.type == "cuda" or device.type == "mps"):    
                 torch.cuda.empty_cache()
             gc.collect()
-            # zero the parameter gradients
-            optimizer.zero_grad()
             # get the inputs; data is a list of [inputs, labels]   
             id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, proT5_mut,seq_mut = data
             
@@ -289,7 +287,7 @@ def main():
     model.name = "PEM-thermodynamic cycle"
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
     # Define the learning rate scheduler based on loss
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2)
     # configurate wandb
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training

@@ -254,7 +254,7 @@ def criterion(Eif, Ejf, Eiu, Eju):
     output:
         loss (tensor): The loss of the model
     """
-    lossg = ((Eju+Ejf)-(Eiu+Eif))**2
+    lossg = ((Eju-Ejf)-(Eiu-Eif))**2
     lossd = torch.exp(Ejf-Eju) + torch.exp(Eif-Eiu)
     
     return lossd+lossg , lossd, lossg  

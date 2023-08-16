@@ -254,7 +254,7 @@ def criterion(Ejf, Ekf, Eju, Eku):
     """
     delta_g1, delta_g2, delta_g3, delta_g4 = Ejf-Eju, Ekf-Ejf, Eku-Eju, Ekf-Eku # themodynamic cycle, from the paper
     lossg = ((delta_g1+delta_g2)-(delta_g3+delta_g4))**2
-    lossd = torch.exp(Ekf-Eku) + torch.exp(Ejf-Eju)
+    lossd = torch.log((torch.exp(Ekf-Eku) + torch.exp(Ejf-Eju)) +1)
     
     return lossd+lossg , lossd, lossg  
 

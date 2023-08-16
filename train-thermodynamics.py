@@ -20,7 +20,7 @@ import wandb
 torch.set_default_dtype(CFG.torch_default_dtype)
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="DeepPEF")
+    wandb.init(project="Thermodynamic cycle")
 
             
 

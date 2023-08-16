@@ -49,10 +49,10 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             # get the inputs; data is a list of [inputs, labels]   
             id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, proT5_mut,seq_mut = data
             
-            Xif = crd_backbone.to(device) # wilde type structure folded
-            Xjf = torch.clone(Xif).to(device) # mutant structure folded
-            Xiu = torch.clone(Xif).to(device) # wilde type structure unfolded
-            Xju = torch.clone(Xif).to(device) # mutant structure unfolded
+            Xjf = crd_backbone.to(device) # wilde type structure folded
+            Xkf = torch.clone(Xjf).to(device) # mutant structure folded
+            Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
+            Xku = torch.clone(Xjf).to(device) # mutant structure unfolded
 
             mask = mask.to(device)
             mask_decoy = torch.clone(mask).to(device)
@@ -71,18 +71,18 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             # zero the parameter gradients
             optimizer.zero_grad()
             # squeeze the data
-            Xif, Xjf, Xiu, Xju = Xif.squeeze(), Xjf.squeeze(), Xiu.squeeze(), Xju.squeeze()
+            Xjf, Xkf, Xju, Xku = Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze()
             emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
             mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
             proT5_mut, proT5_emb = proT5_mut.squeeze(), proT5_emb.squeeze()
             # get folded graph  
-            Xif,Xjf = get_graph(Xif, emb, proT5_emb, mask), get_graph(Xjf, emb, proT5_mut, mask)
+            Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb, proT5_mut, mask)
             # get unfolded graph
-            Xiu,Xju = get_unfolded_graph(Xiu, emb, proT5_emb, mask), get_unfolded_graph(Xju, emb, proT5_mut, mask)
+            Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb, proT5_mut, mask)
             # calculate the energy for the folded unfolded structures
-            Eif, Ejf, Eiu, Eju = model(Xif), model(Xjf), model(Xiu), model(Xju)
+            Ejf, Ekf, Eju, Eku = model(Xjf), model(Xkf), model(Xju), model(Xku)
             
-            loss ,lossd, lossg = criterion(Eif, Ejf, Eiu, Eju)
+            loss ,lossd, lossg = criterion(Ejf, Ekf, Eju, Eku)
             valid_loss += loss.item() 
             torch.cuda.empty_cache()
             gc.collect()
@@ -126,10 +126,10 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # get the inputs; data is a list of [inputs, labels]   
             id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, proT5_mut,seq_mut = data
             
-            Xif = crd_backbone.to(device) # wilde type structure folded
-            Xjf = torch.clone(Xif).to(device) # mutant structure folded
-            Xiu = torch.clone(Xif).to(device) # wilde type structure unfolded
-            Xju = torch.clone(Xif).to(device) # mutant structure unfolded
+            Xjf = crd_backbone.to(device) # wilde type structure folded
+            Xkf = torch.clone(Xjf).to(device) # mutant structure folded
+            Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
+            Xku = torch.clone(Xjf).to(device) # mutant structure unfolded
 
             mask = mask.to(device)
             mask_decoy = torch.clone(mask).to(device)
@@ -148,18 +148,18 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # zero the parameter gradients
             optimizer.zero_grad()
             # squeeze the data
-            Xif, Xjf, Xiu, Xju = Xif.squeeze(), Xjf.squeeze(), Xiu.squeeze(), Xju.squeeze()
+            Xjf, Xkf, Xju, Xku = Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze()
             emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
             mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
             proT5_mut, proT5_emb = proT5_mut.squeeze(), proT5_emb.squeeze()
             # get folded graph  
-            Xif,Xjf = get_graph(Xif, emb, proT5_emb, mask), get_graph(Xjf, emb, proT5_mut, mask)
+            Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb, proT5_mut, mask)
             # get unfolded graph
-            Xiu,Xju = get_unfolded_graph(Xiu, emb, proT5_emb, mask), get_unfolded_graph(Xju, emb, proT5_mut, mask)
+            Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb, proT5_mut, mask)
             # calculate the energy for the folded unfolded structures
-            Eif, Ejf, Eiu, Eju = model(Xif), model(Xjf), model(Xiu), model(Xju)
+            Ejf, Ekf, Eju, Eku = model(Xjf), model(Xkf), model(Xju), model(Xku)
             
-            loss ,lossd, lossg = criterion(Eif, Ejf, Eiu, Eju)
+            loss ,lossd, lossg = criterion(Ejf, Ekf, Eju, Eku)
             
             loss.backward()
             # print_par(model) # print the parameters of the model
@@ -181,7 +181,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3)})
             # Log metrics
             if not CFG.debug:
-                wandb.log({"epoch": epoch, "loss": loss.item(),"lossd":lossd.item(),"lossg":lossg.item(),"Eju":Eju.item(),"Ejf":Ejf.item(),"Eiu": Eiu.item(), "Eif":Eif.item(), "sequence_len": Xif.shape[0]})
+                wandb.log({"epoch": epoch, "loss": loss.item(),"lossd":lossd.item(),"lossg":lossg.item(),"Eku":Eku.item(),"Ekf":Ekf.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "sequence_len": Xjf.shape[0]})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -239,21 +239,22 @@ def preform_energy_optimization(X_decoy,partial_dx_decoy):
     """
     return 0
 
-def criterion(Eif, Ejf, Eiu, Eju):
+def criterion(Ejf, Ekf, Eju, Eku):
     """
     The loss function for the model coressponds to 2 main losses:
     1. lossg: delta energy betweeen the folded and unfolded structures
     2. lossd: the thermodynamic cycle loss
     Args:
-        Eif (tensor): The energy of the folded structure
-        Ejf (tensor): The energy of the folded structure with mutation
-        Eiu (tensor): The energy of the unfolded structure
-        Eju (tensor): The energy of the unfolded structure with mutation
+        Ejf (tensor): The energy of the folded structure
+        Ekf (tensor): The energy of the folded structure with mutation
+        Eju (tensor): The energy of the unfolded structure
+        Eku (tensor): The energy of the unfolded structure with mutation
     output:
         loss (tensor): The loss of the model
     """
-    lossg = ((Eju-Ejf)-(Eiu-Eif))**2
-    lossd = torch.exp(Ejf-Eju) + torch.exp(Eif-Eiu)
+    delta_g1, delta_g2, delta_g3, delta_g4 = Ejf-Eju, Ekf-Ejf, Eku-Eju, Ekf-Eku # themodynamic cycle, from the paper
+    lossg = ((delta_g1+delta_g2)-(delta_g3+delta_g4))**2
+    lossd = torch.exp(Ekf-Eku) + torch.exp(Ejf-Eju)
     
     return lossd+lossg , lossd, lossg  
 

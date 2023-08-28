@@ -160,8 +160,12 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb, proT5_mut, mask)
             # get unfolded graph
             Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb, proT5_mut, mask)
+            # create a batch of Xjf,Xkf,Xju,Xku
+            Xjf,Xkf,Xju,Xku = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0)
+            X = torch.cat((Xjf,Xkf,Xju,Xku),dim=0)
             # calculate the energy for the folded unfolded structures
-            Ejf, Ekf, Eju, Eku = model(Xjf), model(Xkf), model(Xju), model(Xku)
+            E = model(X)
+            Ejf, Ekf, Eju, Eku = E[0],E[1],E[2],E[3]
             
             loss ,lossd, lossg = criterion(Ejf, Ekf, Eju, Eku)
             

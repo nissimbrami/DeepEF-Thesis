@@ -400,7 +400,7 @@ class PEM(torch.nn.Module):
             
             counter += seq_len
         
-        return edge_index_gcn,edge_index_gat
+        return edge_index_gcn_all,edge_index_gat_all
     
 class PEMSM(torch.nn.Module):
   """Protein energy model"""

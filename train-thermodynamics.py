@@ -252,21 +252,37 @@ def criterion(Ejf, Ekf, Eju, Eku):
     output:
         loss (tensor): The loss of the model
     """
-    softplus = torch.nn.Softplus(beta=0.2)
+    
+    # Ejf, Ekf, Eju, Eku = torch.tanh(Ejf), torch.tanh(Ekf), torch.tanh(Eju), torch.tanh(Eku) # clip the energy to be between -1 and 1
     delta_g1, delta_g2, delta_g3, delta_g4 = Ejf-Eju, Ekf-Ejf, Eku-Eju, Ekf-Eku # themodynamic cycle, from the paper
     lossg = ((delta_g1+delta_g2)-(delta_g3+delta_g4))**2
-    # lossd = torch.log((torch.exp(Ekf-Eku) + torch.exp(Ejf-Eju)) +1)
-    lossd = softplus(Ekf-Eku) + softplus(Ejf-Eju)
+    # lossd = torch.log(torch.exp(Ekf-Eku) +1)+ torch.log(torch.exp(Ejf-Eju) +1)
+    lossd = energy_softplus(Ejf, Ekf, Eju, Eku)
+    # lossd = torch.sigmoid(Ekf-Eku) + torch.sigmoid(Ejf-Eju)
     
     return lossd+lossg , lossd, lossg  
+
+def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
+    """Energy softplus,
+    As we know the energy diffrence between an unfolded protein and folded protein is positive.
+    Therefore we will add it to the loss as lossd"""
+    softplus = torch.nn.Softplus(beta=beta)
+    
+    lossd1 = softplus(Ekf-Eku)
+    lossd1 =  torch.where(lossd1 < 0.05, torch.tensor(0.0).to(lossd1.device), torch.min(torch.tensor(10.0).to(lossd1.device), lossd1))
+    
+    lossd2 = softplus(Ejf-Eju)
+    lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.min(torch.tensor(10.0).to(lossd2.device), lossd2))
+    
+    return lossd1+lossd2
 
 def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch,scheduler):
     "train and test the model"
     valid_loss = 100
-    # if epoch > 0:
-    #     model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
-    # training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
-    #load the best model and check the validation
+    if epoch > 0:
+        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
+    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
+    # load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
     validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer , val_type = 'robust')
     validation(model, train_loader,CFG.device,-1, CFG.N, optimizer, val_type = 'train')  

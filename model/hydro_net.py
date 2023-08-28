@@ -295,13 +295,20 @@ class PEM(torch.nn.Module):
         # Fc layers for the final output
         self.fc1 = nn.Linear(1096, 64)
         self.fc2 = nn.Linear(64, 1)
+        
+        # embedding indexes
+        self.one_hot_index = -20
+        self.bonded_index = 32
+        self.non_bonded_index = 48
+        self.llm_index = -1044
+        
     
         
     def forward(self,x,f_type = 'Default'):
         """
                 Forward function
              Args:
-            x (tensor): [batch, n_nodes, 1096]
+            x (tensor): [batch, n_nodes, bonded_featurs+non_bonded_features+LLM_features]
             f_type (str, optional): 'A_inference' or 'defualt', if 'A_inferece' return each amino acid energy . Defaults to 'Default'.
 
         Returns:
@@ -316,9 +323,9 @@ class PEM(torch.nn.Module):
         B,N,_ = x.shape
         x = x.reshape(B*N,-1)
         # split features to 2 graphs, bonded and non-bonded
-        x_gcn = torch.cat((x[:,:32],x[:,-20:]),dim=-1) # B*N,52
-        x_gat = torch.cat((x[:,32:48],x[:,-20:]),dim=-1) # B*N,36
-        x_emb_features = x[:,-1044:-20] # B*N,1024
+        x_gcn = torch.cat((x[:,:self.bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
+        x_gat = torch.cat((x[:,self.bonded_index:self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,36
+        x_emb_features = x[:,self.llm_index:self.one_hot_index] # B*N,1024
         # forward pass through the graph attention and convolution layers
         x1 = self.forward_gcn(x_gcn,edge_index_gcn) # B*N,52->N,36
         x2 = self.forward_gat(x_gat,edge_index_gat) # B*N,36->N,36
@@ -403,7 +410,7 @@ class PEM(torch.nn.Module):
         return edge_index_gcn_all,edge_index_gat_all
     
 class PEMSM(torch.nn.Module):
-  """Protein energy model"""
+  """Score matching Protein energy model"""
   
   def __init__(self, dim_in, dim_h, dim_out, layers, gaussian_coef,heads = 8):
     super().__init__()

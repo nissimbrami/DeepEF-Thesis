@@ -266,7 +266,7 @@ class ProteinEnergyNet(nn.Module):
 class PEM(torch.nn.Module):
     """Protein energy model"""
   
-    def __init__(self, dim_in, dim_h, dim_out, layers, gaussian_coef,heads = 8):
+    def __init__(self, layers, gaussian_coef):
         super().__init__()
         # GCN layers
         gcn_dim_in = 36
@@ -308,7 +308,7 @@ class PEM(torch.nn.Module):
         """
                 Forward function
              Args:
-            x (tensor): [batch, n_nodes, bonded_featurs+non_bonded_features+LLM_features]
+            x (tensor): [batch, n_nodes, bonded_features+non_bonded_features+LLM_features]
             f_type (str, optional): 'A_inference' or 'defualt', if 'A_inferece' return each amino acid energy . Defaults to 'Default'.
 
         Returns:

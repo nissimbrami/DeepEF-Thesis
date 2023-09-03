@@ -266,7 +266,7 @@ class ProteinEnergyNet(nn.Module):
 class PEM(torch.nn.Module):
     """Protein energy model"""
   
-    def __init__(self, dim_in, dim_h, dim_out, layers, gaussian_coef,heads = 8):
+    def __init__(self, layers, gaussian_coef):
         super().__init__()
         # GCN layers
         gcn_dim_in = 36
@@ -295,19 +295,20 @@ class PEM(torch.nn.Module):
         # Fc layers for the final output
         self.fc1 = nn.Linear(1096, 64)
         self.fc2 = nn.Linear(64, 1)
+        
+        # embedding indexes
+        self.one_hot_index = -20
+        self.bonded_index = 32
+        self.non_bonded_index = 48
+        self.llm_index = -1044
+        
     
         
     def forward(self,x,f_type = 'Default'):
         """
                 Forward function
              Args:
-            x_decoy (tensor): decoy coordinates [n_nodes, num_atoms=4, 3]
-            emb_decoy (tensor): decoy embedding [n_nodes, emb_size]
-            mask_decoy (tensor): decoy mask [n_nodes, 1]
-            x_native (tensor): narive coordinates [n_nodes, num_atoms=4, 3]
-            emb_native (tensor): native embedding [n_nodes, emb_size]
-            mask_native (tensor): native mask [n_nodes, 1]
-            edge_index (tensor): edge index [2, n_edges]
+            x (tensor): [batch, n_nodes, bonded_features+non_bonded_features+LLM_features]
             f_type (str, optional): 'A_inference' or 'defualt', if 'A_inferece' return each amino acid energy . Defaults to 'Default'.
 
         Returns:
@@ -318,22 +319,27 @@ class PEM(torch.nn.Module):
         """
         # Get the edge index
         edge_index_gcn,edge_index_gat = self.get_edge_index(x)
+        # reshape x to [batch_size*n_nodes,1096]
+        B,N,_ = x.shape
+        x = x.reshape(B*N,-1)
         # split features to 2 graphs, bonded and non-bonded
-        x_gcn = torch.cat((x[:,:32],x[:,-20:]),dim=-1) # N,52
-        x_gat = torch.cat((x[:,32:48],x[:,-20:]),dim=-1) # N,36
-        x_emb_features = x[:,-1044:-20] # N,1024
+        x_gcn = torch.cat((x[:,:self.bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
+        x_gat = torch.cat((x[:,self.bonded_index:self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,36
+        x_emb_features = x[:,self.llm_index:self.one_hot_index] # B*N,1024
         # forward pass through the graph attention and convolution layers
-        x1 = self.forward_gcn(x_gcn,edge_index_gcn) # N,52->N,36
-        x2 = self.forward_gat(x_gat,edge_index_gat) # N,36->N,36
+        x1 = self.forward_gcn(x_gcn,edge_index_gcn) # B*N,52->N,36
+        x2 = self.forward_gat(x_gat,edge_index_gat) # B*N,36->N,36
         # concat features
-        x = torch.cat((x1,x2),dim=-1) # N,36+36->N,72
+        x = torch.cat((x1,x2),dim=-1) # B*N,36+36->B*N,72
         x = self.bn2(x)
         # Add LLM features
-        x = torch.cat((x,x_emb_features),dim=-1) # N,72+1024->N,1096
+        x = torch.cat((x,x_emb_features),dim=-1) # B*N,72+1024->B*N,1096
         # fc layers
-        x  = self.fc1(x) # N,1096->N,64
+        x  = self.fc1(x) # B*N,1096->B*N,64
         x = F.relu(x)
-        x = self.fc2(x) # N,64->N,1
+        x = self.fc2(x) # B*N,64->B*N,1
+        # reshape to [batch_size,n_nodes]
+        x = x.reshape(B,N,1)
         # return energy        
         if (f_type == 'Default'):
             return self.get_energy(x)
@@ -376,21 +382,35 @@ class PEM(torch.nn.Module):
         Returns:
             Energy [batch_size] tensor
         """
-        E = torch.sum(Fh**2,dim=(0,1))
+        E = torch.sum(Fh**2,dim=(1,2))
         return E
   
     def get_edge_index(self,x):
-        seq_len = x.shape[0]
-        combinations = torch.combinations(torch.arange(seq_len))
-        edge_index_gat = combinations[combinations[:, 0] != combinations[:, 1]]
-        edge_index_gat = edge_index_gat.t().contiguous().to(CFG.device)
+        """Return the edge index for the graph convolution and attention layers
+        The edge index of the gcn is a line from the amino acid to the next amino acid.
+        The edge index of the gat is a full connected graph."""
+        batches = x.shape[0]
+        counter = 0 # counter for the edge index sequence length
+        for i in range(batches):
+            seq_len = x[i].shape[0]
+            combinations = torch.combinations(torch.arange(counter,counter+ seq_len))
+            edge_index_gat = combinations[combinations[:, 0] != combinations[:, 1]]
+            edge_index_gat = edge_index_gat.t().contiguous().to(CFG.device)
 
-        edge_index_gcn = torch.tensor([[i,i+1] for i in range(seq_len-1)]).t().contiguous().to(CFG.device)
+            edge_index_gcn = torch.tensor([[counter+i,counter+i+1] for i in range(seq_len-1)]).t().contiguous().to(CFG.device)
+            if i == 0:
+                edge_index_gat_all = edge_index_gat
+                edge_index_gcn_all = edge_index_gcn
+            else:
+                edge_index_gat_all = torch.cat((edge_index_gat_all,edge_index_gat),dim=-1)
+                edge_index_gcn_all = torch.cat((edge_index_gcn_all,edge_index_gcn),dim=-1)
+            
+            counter += seq_len
         
-        return edge_index_gcn,edge_index_gat
+        return edge_index_gcn_all,edge_index_gat_all
     
 class PEMSM(torch.nn.Module):
-  """Protein energy model"""
+  """Score matching Protein energy model"""
   
   def __init__(self, dim_in, dim_h, dim_out, layers, gaussian_coef,heads = 8):
     super().__init__()

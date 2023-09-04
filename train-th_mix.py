@@ -88,9 +88,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb, proT5_mut, mask)
             # get decoy graph
             Xd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy)
-            Xjf.requires_grad = True
             # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
             Xjf,Xkf,Xju,Xku,Xd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0)    
+            Xjf.requires_grad = True
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd),dim=0)
             
             # calculate the energy for the folded unfolded and decoy structure
@@ -280,9 +280,12 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native):
         Exd (tensor): The energy of the decoy structure
     output:
         loss (tensor): The loss of the model
+        lossd (tensor): The loss of the model due to the energy of the native structure divided by the decoy energy
+        lossg (tensor): The loss of the model due to the partial derivative of the energy with respect to the native structure
+        lossc (tensor): The loss of the model due to the energy softplus function for the native and mutant structure(unfolded and folded)
     """
     # print('***Start criterion function***')
-    partial_dx_native = torch.autograd.grad(outputs=Ejf, inputs=X_native, grad_outputs=torch.zeros_like(Ejf), create_graph=True)[0]
+    partial_dx_native = torch.autograd.grad(outputs=Ejf, inputs=X_native, grad_outputs=torch.ones_like(Ejf), create_graph=True)[0]
     part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
    
     lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1

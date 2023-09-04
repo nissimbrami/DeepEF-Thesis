@@ -20,7 +20,7 @@ import wandb
 torch.set_default_dtype(CFG.torch_default_dtype)
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="deepmeshi")
+    wandb.init(project="Thermodynamic+decoy")
 
 
 
@@ -80,7 +80,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Xd, Xjf, Xkf, Xju, Xku = Xd.squeeze(), Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze()
             emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
             mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
-            proT5_emb_decoy, proT5_emb = proT5_emb_decoy.squeeze(), proT5_emb.squeeze()
+            proT5_emb_decoy, proT5_emb, proT5_mut = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_mut.squeeze()
             
             # get folded graph  
             Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb, proT5_mut, mask)
@@ -169,7 +169,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             Xd, Xjf, Xkf, Xju, Xku = Xd.squeeze(), Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze()
             emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
             mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
-            proT5_emb_decoy, proT5_emb = proT5_emb_decoy.squeeze(), proT5_emb.squeeze()
+            proT5_emb_decoy, proT5_emb, proT5_mut = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_mut.squeeze()
             
             # get folded graph  
             Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb, proT5_mut, mask)
@@ -282,7 +282,7 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native):
         loss (tensor): The loss of the model
     """
     # print('***Start criterion function***')
-    partial_dx_native = torch.autograd.grad(outputs=Ejf, inputs=X_native, grad_outputs=torch.ones_like(Ejf), create_graph=True)[0]
+    partial_dx_native = torch.autograd.grad(outputs=Ejf, inputs=X_native, grad_outputs=torch.zeros_like(Ejf), create_graph=True)[0]
     part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
    
     lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1

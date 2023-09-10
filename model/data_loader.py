@@ -51,6 +51,8 @@ class SidChainDS(Dataset):
         # ProT5 embedding for protein mutation
         proT5_mut = torch.load(item_path + '/proT5_emb_mut.pt')
         seq_mut =  torch.load(item_path + '/seq_mut.pt')
+        # proT5_mut = torch.zeros((len(seq),1024)) # for testing
+        # seq_mut = torch.zeros((len(seq),1)) # for testing
         
         return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, proT5_mut,seq_mut
 

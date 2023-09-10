@@ -118,7 +118,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             
     return valid_loss/len(dataloader)
 
-def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None):
+def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None,scaler=None):
     """
     Training function for the model.
     
@@ -182,15 +182,24 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             Xjf,Xkf,Xju,Xku,Xd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0)    
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd),dim=0)
             
-            # calculate the energy for the folded unfolded and decoy structure
-            E = model(X)
-            Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]
-            # calculate the loss   
-            loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
+            # half precision training
+            with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+                # calculate the energy for the folded unfolded and decoy structure
+                E = model(X)
+                Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]
+                # calculate the loss   
+                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
             
-            loss.backward()
-            # print_par(model) # print the parameters of the model
-            optimizer.step()
+            # Scales the loss, and calls backward()
+            # to create scaled gradients
+            scaler.scale(loss).backward()
+
+            # Unscales gradients and calls
+            # or skips optimizer.step()
+            scaler.step(optimizer)
+
+            # Updates the scale for next iteration
+            scaler.update()
 
             # print statistics
             running_loss += loss.item()
@@ -243,14 +252,15 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         epoch (int): The current epoch
     """
     model.train()
-    
+    # setup half precision training
+    scaler = torch.cuda.amp.GradScaler()
     for epoch in (range(EPOCH,CFG.num_epochs+EPOCH)):  # loop over the dataset multiple times
 
         
         torch.cuda.empty_cache()
         gc.collect()
         model.train()
-        model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss, scheduler)
+        model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss, scheduler,scaler)
         
         
     print('Finished Training')
@@ -290,7 +300,7 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native):
    
     lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1
     lossd = (torch.log((Ejf+1) / (Exd+1) +1))
-    lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
+    lossc = relu_energy(Ejf, Ekf, Eju, Eku)
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
@@ -305,8 +315,18 @@ def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     
     lossd2 = softplus(Ejf-Eju)
     lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.min(torch.tensor(10.0).to(lossd2.device), lossd2))
-    
     return lossd1+lossd2
+
+
+def relu_energy(Ejf, Ekf, Eju, Eku, offset = 5):
+    """calculate the energy diffrence between an unfolded protein and folded protein is positive.
+    log(min(max(diff+offset,0),6)+1)
+    """
+    relu6 = torch.nn.ReLU6()
+    lossd = lambda x: torch.log(relu6(x+offset)+1)
+    return lossd(Ekf-Eku)+lossd(Ejf-Eju)
+
+    
 def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch,scheduler):
     "train and test the model"
     valid_loss = 100

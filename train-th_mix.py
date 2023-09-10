@@ -128,8 +128,6 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
     model.train()
     running_loss = 0.0
     n_skips = 0
-    # change the model to half precision
-    model.half()
     with tqdm(dataloader, unit="batch") as tepoch:
         for index, data in enumerate(tepoch):
             # set progress bar description
@@ -183,9 +181,6 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
             Xjf,Xkf,Xju,Xku,Xd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0)    
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd),dim=0)
-            
-            # move to half precision 
-            X = X.to(torch.float16)
             
             # calculate the energy for the folded unfolded and decoy structure
             E = model(X)

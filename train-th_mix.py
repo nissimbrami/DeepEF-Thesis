@@ -108,7 +108,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
             #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
             if not CFG.debug:
-                wandb.log({"epoch": epoch,"val_lossg": lossg,"val_lossd": lossd,"val_loss": loss,"val_lossc": lossc,"val_Ejn": Eju.item(),"val_Ekn": Eku.item(),"val_Ejd": Ejf.item(),"val_Ekd": Ekf.item(),"val_Ed": Exd.item(),"val_Edelta": (Exd-Ejf).item(),"val_sequence_len": Xd.shape[0],"val_id": id})
+                wandb.log({"epoch": epoch,"step_val_lossg": lossg,"step_val_lossd": lossd,"step_val_loss": loss,"step_val_lossc": lossc,"step_val_Ejn": Eju.item(),"step_val_Ekn": Eku.item(),"step_val_Ejd": Ejf.item(),"step_val_Ekd": Ekf.item(),"step_val_Ed": Exd.item(),"step_val_Edelta": (Exd-Ejf).item(),"step_val_sequence_len": Xd.shape[0],"val_id": id})
             
     
     validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)

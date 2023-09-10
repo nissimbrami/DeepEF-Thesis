@@ -293,8 +293,8 @@ class PEM(torch.nn.Module):
         self.bn1  = nn.BatchNorm1d(36)
         self.bn2  = nn.BatchNorm1d(72)
         # Fc layers for the final output
-        self.fc1 = nn.Linear(1096, 64)
-        self.fc2 = nn.Linear(64, 1)
+        self.fc1 = nn.Linear(1096, 128)
+        self.fc2 = nn.Linear(128, 1)
         
         # embedding indexes
         self.one_hot_index = -20

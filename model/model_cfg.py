@@ -8,11 +8,11 @@ class CFG:
     else:
         cuda = False
         
-    data_path = './data/casp12_data_30/' #'./data/data2'
+    data_path = './data/casp12_data_100/' #'./data/data2'
     inference_path = './data/inference_data'
     results_path = './res/results-emb/'
     seed = 42
-    debug = True
+    debug = False
     # Train data parameters
     homothresh = 0.9
     constraint = True
@@ -24,8 +24,8 @@ class CFG:
     coords_emb_size = 64
     embedding_size = 20
     filters = 64
-    num_layers = 1
-    model_path = "./res/trianed_models_th_mix/"
+    num_layers = 3
+    model_path = "./res/trianed_models_th_mix_100/"
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001
@@ -34,7 +34,7 @@ class CFG:
     num_workers = 2
     N = 10
     num_epochs = 50
-    seq_len = 1000
+    seq_len = 600
     SM = False # score matching loss
     # defalut parameters
     torch_default_dtype = torch.float32

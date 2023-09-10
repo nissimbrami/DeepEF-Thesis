@@ -69,7 +69,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot.to(device)
             emb_decoy = seq_decoy.to(device)
-            emb_mut = seq_one_hot.to(device)
+            emb_mut = get_one_hot(seq_mut).to(device)
             
             # move proT5_emb to device
             proT5_mut, proT5_emb_decoy, proT5_emb = proT5_mut.to(device), proT5_emb_decoy.to(device), proT5_emb.to(device)
@@ -83,9 +83,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             proT5_emb_decoy, proT5_emb, proT5_mut = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_mut.squeeze()
             
             # get folded graph  
-            Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb, proT5_mut, mask)
+            Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb_mut, proT5_mut, mask)
             # get unfolded graph
-            Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb, proT5_mut, mask)
+            Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb_mut, proT5_mut, mask)
             # get decoy graph
             Xd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy)
             # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
@@ -158,7 +158,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot.to(device)
             emb_decoy = seq_decoy.to(device)
-            emb_mut = seq_one_hot.to(device)
+            emb_mut = get_one_hot(seq_mut).to(device)
             
             # move proT5_emb to device
             proT5_mut, proT5_emb_decoy, proT5_emb = proT5_mut.to(device), proT5_emb_decoy.to(device), proT5_emb.to(device)
@@ -172,9 +172,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             proT5_emb_decoy, proT5_emb, proT5_mut = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_mut.squeeze()
             
             # get folded graph  
-            Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb, proT5_mut, mask)
+            Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb_mut, proT5_mut, mask)
             # get unfolded graph
-            Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb, proT5_mut, mask)
+            Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb_mut, proT5_mut, mask)
             # get decoy graph
             Xd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy)
             Xjf.requires_grad = True

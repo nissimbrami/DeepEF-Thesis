@@ -69,7 +69,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot.to(device)
             emb_decoy = seq_decoy.to(device)
-            emb_mut = get_one_hot(seq_mut).to(device)
+            emb_mut = get_one_hot(seq_mut[0]).to(device)
             
             # move proT5_emb to device
             proT5_mut, proT5_emb_decoy, proT5_emb = proT5_mut.to(device), proT5_emb_decoy.to(device), proT5_emb.to(device)
@@ -78,7 +78,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             optimizer.zero_grad()
             # squeeze the data
             Xd, Xjf, Xkf, Xju, Xku = Xd.squeeze(), Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze()
-            emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
+            emb_decoy, emb, emb_mut = emb_decoy.squeeze(), emb.squeeze(), emb_mut.squeeze()
             mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
             proT5_emb_decoy, proT5_emb, proT5_mut = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_mut.squeeze()
             
@@ -108,7 +108,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
             #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
             if not CFG.debug:
-                wandb.log({"epoch": epoch,"val_lossg": lossg,"val_lossd": lossd,"val_loss": loss,"val_lossc": lossc,"val_Ejn": Eju.item(),"val_Ekn": Eku.item(),"val_Ejd": Ejf.item(),"val_Ekd": Ekf.item(),"val_Ed": Exd.item(),"val_Edelta": (Exd-Ejf).item(),"val_sequence_len": Xd.shape[0],"val_id": id})
+                wandb.log({"epoch": epoch,"val_lossg": lossg,"val_lossd": lossd,"val_loss": loss,"val_lossc": lossc,"val_Ejn": Eju.item(),"val_Ekn": Eku.item(),"val_Ejd": Ejf.item(),"val_Ekd": Ekf.item(),"val_Ed": Exd.item(),"val_Edelta": (Exd-Ejf).item(),"val_sequence_len": len(seq[0])})
             
     
     validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
@@ -158,7 +158,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot.to(device)
             emb_decoy = seq_decoy.to(device)
-            emb_mut = get_one_hot(seq_mut).to(device)
+            emb_mut = get_one_hot(seq_mut[0]).to(device)
             
             # move proT5_emb to device
             proT5_mut, proT5_emb_decoy, proT5_emb = proT5_mut.to(device), proT5_emb_decoy.to(device), proT5_emb.to(device)
@@ -167,7 +167,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             optimizer.zero_grad()
             # squeeze the data
             Xd, Xjf, Xkf, Xju, Xku = Xd.squeeze(), Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze()
-            emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
+            emb_decoy, emb, emb_mut = emb_decoy.squeeze(), emb.squeeze(), emb_mut.squeeze()
             mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
             proT5_emb_decoy, proT5_emb, proT5_mut = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_mut.squeeze()
             

@@ -322,8 +322,8 @@ def relu_energy(Ejf, Ekf, Eju, Eku, offset = 5):
     """calculate the energy diffrence between an unfolded protein and folded protein is positive.
     log(min(max(diff+offset,0),6)+1)
     """
-    relu6 = torch.nn.ReLU6()
-    lossd = lambda x: torch.log(relu6(x+offset)+1)
+    htanh = torch.nn.Hardtanh(min_val=0, max_val=10)
+    lossd = lambda x: torch.log(htanh(x+offset)+1)
     return lossd(Ekf-Eku)+lossd(Ejf-Eju)
 
     

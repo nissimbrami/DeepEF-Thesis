@@ -225,7 +225,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         val_loss = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
          # update wandb metrics
         if not CFG.debug:
-            wandb.log({"epoch" : epoch ,"robust validation loss": val_loss, "learning rate": optimizer.param_groups[0]["lr"]})
+            wandb.log({"epoch" : epoch ,"validation loss": val_loss, "learning rate": optimizer.param_groups[0]["lr"]})
          # Update the learning rate based on the validation loss
         scheduler.step(val_loss)
         print (f"validation loss: {val_loss}")

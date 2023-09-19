@@ -93,12 +93,14 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Xjf.requires_grad = True
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd),dim=0)
             
-            # calculate the energy for the folded unfolded and decoy structure
-            E = model(X)
-            Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]
-            # calculate the loss   
-            loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
-            
+             # half precision validation
+            with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+                # calculate the energy for the folded unfolded and decoy structure
+                E = model(X)
+                Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]
+                # calculate the loss   
+                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
+                
             valid_loss += loss.item() 
             torch.cuda.empty_cache()
             gc.collect()
@@ -183,7 +185,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd),dim=0)
             
             # half precision training
-            with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+            with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                 # calculate the energy for the folded unfolded and decoy structure
                 E = model(X)
                 Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]

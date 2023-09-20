@@ -38,4 +38,4 @@ class CFG:
     SM = False # score matching loss
     # defalut parameters
     torch_default_dtype = torch.float32
-    precision = torch.float16
+    precision = torch.float32

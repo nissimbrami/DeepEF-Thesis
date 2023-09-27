@@ -32,6 +32,7 @@ class SidChainDS(Dataset):
     def __getitem__(self, index):
         
         item_path = self.data_dir[index]
+        decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]
         # load data
         id = torch.load(item_path + '/id.pt')
         crd_backbone = torch.tensor(torch.load(item_path + '/crd_backbone.pt'),dtype=torch.get_default_dtype()) #backbone coordinates N,Calpha,C

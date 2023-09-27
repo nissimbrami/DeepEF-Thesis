@@ -520,10 +520,10 @@ class GAT(torch.nn.Module):
                                       weight_decay=5e-4)
 
   def forward(self, x, edge_index):
-    h = F.dropout(x, p=0.2, training=self.training)
+    # h = F.dropout(x, p=0.2, training=self.training)
     h = self.gat1(x, edge_index)
     h = F.elu(h)
-    h = F.dropout(h, p=0.2, training=self.training)
+    # h = F.dropout(h, p=0.2, training=self.training)
     h = self.gat2(h, edge_index)
     return h, F.log_softmax(h, dim=1)
 
@@ -538,9 +538,9 @@ class GCN(torch.nn.Module):
                                       weight_decay=5e-4)
 
   def forward(self, x, edge_index):
-    h = F.dropout(x, p=0.2, training=self.training)
+    # h = F.dropout(x, p=0.2, training=self.training)
     h = self.gcn1(h, edge_index)
     h = torch.relu(h)
-    h = F.dropout(h, p=0.2, training=self.training)
+    # h = F.dropout(h, p=0.2, training=self.training)
     h = self.gcn2(h, edge_index)
     return h, F.log_softmax(h, dim=1)

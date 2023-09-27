@@ -37,7 +37,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     lossd_list = []
     ids_list = []
     n_skips = 0
-    # model.eval() # cant use eval because of the loss function calculation
+    model.eval() # cant use eval because of the loss function calculation
     with tqdm(dataloader, unit="batch") as tepoch:
         for index, data in (enumerate(tepoch)):
             # set progress bar description
@@ -300,9 +300,11 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native):
     partial_dx_native = torch.autograd.grad(outputs=Ejf, inputs=X_native, grad_outputs=torch.ones_like(Ejf), create_graph=True)[0]
     part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
    
-    lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1
+    # lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1
+    lossg = torch.log(part_dx_native_norm+1)
     lossd = (torch.log((Ejf+1) / (Exd+1) +1))
-    lossc = relu_energy(Ejf, Ekf, Eju, Eku)
+    # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
+    lossc = torch.log(Ekf)
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   

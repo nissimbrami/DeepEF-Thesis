@@ -25,7 +25,7 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 3
-    model_path = "./res/trianed_models_th_mix_100_gcn/"
+    model_path = "./res/trianed_models_th_mix_100_fc3/"
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001

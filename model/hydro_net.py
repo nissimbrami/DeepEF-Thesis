@@ -294,7 +294,8 @@ class PEM(torch.nn.Module):
         self.bn2  = nn.BatchNorm1d(72)
         # Fc layers for the final output
         self.fc1 = nn.Linear(1096, 128)
-        self.fc2 = nn.Linear(128, 1)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, 1)
         
         # embedding indexes
         self.one_hot_index = -20
@@ -335,9 +336,11 @@ class PEM(torch.nn.Module):
         # Add LLM features
         x = torch.cat((x,x_emb_features),dim=-1) # B*N,72+1024->B*N,1096
         # fc layers
-        x  = self.fc1(x) # B*N,1096->B*N,64
+        x  = self.fc1(x) # B*N,1096->B*N,128
         x = F.relu(x)
-        x = self.fc2(x) # B*N,64->B*N,1
+        x = self.fc2(x) # B*N,128->B*N,64
+        x = F.relu(x)
+        x = self.fc3(x) # B*N,64->B*N,1
         # reshape to [batch_size,n_nodes]
         x = x.reshape(B,N,1)
         # return energy        

@@ -30,6 +30,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     Validation function for the model.
     """
     valid_loss = 0
+    valid_lossd = 0
+    valid_lossg = 0
+    valid_lossc = 0
     Exd_list = []
     Exn_list = []
     seq_len = []
@@ -102,6 +105,11 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
                 
             valid_loss += loss.item() 
+            valid_lossd += lossd.item()
+            valid_lossg += lossg.item()
+            valid_lossc += lossc.item()
+            # delete all the variables
+            del Xjf,Xkf,Xju,Xku,Xd,emb_decoy, emb, emb_mut, mask_decoy, mask, proT5_emb_decoy, proT5_emb, proT5_mut, X, E, Ejf, Ekf, Eju, Eku, Exd
             torch.cuda.empty_cache()
             gc.collect()
             # update the progress bar
@@ -118,7 +126,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     df.to_csv(f'./res/results/epoch_{epoch}-validation_{val_type}.csv')
     print(f"Finished Validation {val_type} epoch {epoch}")
             
-    return valid_loss/len(dataloader)
+    return valid_loss/len(dataloader),valid_lossd/len(dataloader),valid_lossg/len(dataloader),valid_lossc/len(dataloader)
 
 def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None,scaler=None):
     """
@@ -224,10 +232,10 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
         # evaluate the model
-        val_loss = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
+        val_loss, val_lossd,val_lossg,valid_lossc = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
          # update wandb metrics
         if not CFG.debug:
-            wandb.log({"epoch" : epoch ,"validation loss": val_loss, "learning rate": optimizer.param_groups[0]["lr"]})
+            wandb.log({"epoch" : epoch ,"validation loss": val_loss, "learning rate": optimizer.param_groups[0]["lr"], "validation lossd": val_lossd, "validation lossg": val_lossg, "validation lossc": valid_lossc})
          # Update the learning rate based on the validation loss
         scheduler.step(val_loss)
         print (f"validation loss: {val_loss}")

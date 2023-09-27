@@ -303,8 +303,7 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native):
     # lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1
     lossg = torch.log(part_dx_native_norm+1)
     lossd = (torch.log((Ejf+1) / (Exd+1) +1))
-    # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
-    lossc = torch.log(Ekf)
+    lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   

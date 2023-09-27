@@ -357,8 +357,8 @@ class PEM(torch.nn.Module):
         #     h1,x = gcn_layer(x, edge_index_gcn) 
         #     x = x + identity
         for gat_layer in self.GAT_layers:
-            h1,x = gat_layer(x, edge_index_gat) 
-            x = x + identity
+            h1,z = gat_layer(x, edge_index_gat) 
+            x = h1 + identity
 
         return x
 
@@ -370,8 +370,8 @@ class PEM(torch.nn.Module):
         x = self.bn1(x)
         identity = x # identity for the residual connection
         for gcn_layer in self.GCN_layers:
-            h1,out = gcn_layer(x, edge_index_gcn) 
-            x = out + identity
+            h1,z = gcn_layer(x, edge_index_gcn) 
+            x = h1 + identity
         return x
   
     def get_energy(self,Fh):

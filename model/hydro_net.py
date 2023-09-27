@@ -353,9 +353,6 @@ class PEM(torch.nn.Module):
         x = F.relu(x)
         x = self.fc2_gat(x) # N,64->N,36
         x = self.bn1(x)
-        # for gcn_layer in self.GCN_layers:
-        #     h1,x = gcn_layer(x, edge_index_gcn) 
-        #     x = x + identity
         for gat_layer in self.GAT_layers:
             h1,z = gat_layer(x, edge_index_gat) 
             x = h1 + identity
@@ -515,16 +512,16 @@ class GAT(torch.nn.Module):
     super().__init__()
     self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
     self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
-    self.optimizer = torch.optim.Adam(self.parameters(),
-                                      lr=0.005,
-                                      weight_decay=5e-4)
+    self.bn  = nn.BatchNorm1d(dim_out)
+    self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
-    # h = F.dropout(x, p=0.2, training=self.training)
-    h = self.gat1(x, edge_index)
+    h = self.dropout(x)
+    h = self.gat1(h, edge_index)
     h = F.elu(h)
     # h = F.dropout(h, p=0.2, training=self.training)
     h = self.gat2(h, edge_index)
+    h = self.bn(h)
     return h, F.log_softmax(h, dim=1)
 
 class GCN(torch.nn.Module):
@@ -533,14 +530,12 @@ class GCN(torch.nn.Module):
     super().__init__()
     self.gcn1 = GCNConv(dim_in, dim_h)
     self.gcn2 = GCNConv(dim_h, dim_out)
-    self.optimizer = torch.optim.Adam(self.parameters(),
-                                      lr=0.01,
-                                      weight_decay=5e-4)
+    self.bn  = nn.BatchNorm1d(dim_out)
+    self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
-    # h = F.dropout(x, p=0.2, training=self.training)
-    h = self.gcn1(h, edge_index)
+    h = self.dropout(x)
     h = torch.relu(h)
-    # h = F.dropout(h, p=0.2, training=self.training)
     h = self.gcn2(h, edge_index)
+    h = self.bn(h)
     return h, F.log_softmax(h, dim=1)

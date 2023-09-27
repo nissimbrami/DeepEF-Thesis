@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout
-from torch_geometric.nn import GCNConv, GATv2Conv
+from torch_geometric.nn import GCNConv, GATv2Conv, BatchNorm
 from model.model_cfg import CFG
 # import matplotlib.pyplot as plt
 
@@ -512,14 +512,13 @@ class GAT(torch.nn.Module):
     super().__init__()
     self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
     self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
-    self.bn  = nn.BatchNorm1d(dim_out)
+    self.bn  = BatchNorm(dim_out)
     self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
     h = self.dropout(x)
     h = self.gat1(h, edge_index)
     h = F.elu(h)
-    # h = F.dropout(h, p=0.2, training=self.training)
     h = self.gat2(h, edge_index)
     h = self.bn(h)
     return h, F.log_softmax(h, dim=1)
@@ -530,11 +529,12 @@ class GCN(torch.nn.Module):
     super().__init__()
     self.gcn1 = GCNConv(dim_in, dim_h)
     self.gcn2 = GCNConv(dim_h, dim_out)
-    self.bn  = nn.BatchNorm1d(dim_out)
+    self.bn  = BatchNorm(dim_out)
     self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
     h = self.dropout(x)
+    h = self.gcn1(h, edge_index)
     h = torch.relu(h)
     h = self.gcn2(h, edge_index)
     h = self.bn(h)

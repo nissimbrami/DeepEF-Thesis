@@ -30,6 +30,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     Validation function for the model.
     """
     valid_loss = 0
+    valid_lossd = 0
+    valid_lossg = 0
+    valid_lossc = 0
     Exd_list = []
     Exn_list = []
     seq_len = []
@@ -37,7 +40,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     lossd_list = []
     ids_list = []
     n_skips = 0
-    # model.eval() # cant use eval because of the loss function calculation
+    model.eval() # cant use eval because of the loss function calculation
     with tqdm(dataloader, unit="batch") as tepoch:
         for index, data in (enumerate(tepoch)):
             # set progress bar description
@@ -69,7 +72,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot.to(device)
             emb_decoy = seq_decoy.to(device)
-            emb_mut = seq_one_hot.to(device)
+            emb_mut = get_one_hot(seq_mut[0]).to(device)
             
             # move proT5_emb to device
             proT5_mut, proT5_emb_decoy, proT5_emb = proT5_mut.to(device), proT5_emb_decoy.to(device), proT5_emb.to(device)
@@ -78,14 +81,14 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             optimizer.zero_grad()
             # squeeze the data
             Xd, Xjf, Xkf, Xju, Xku = Xd.squeeze(), Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze()
-            emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
+            emb_decoy, emb, emb_mut = emb_decoy.squeeze(), emb.squeeze(), emb_mut.squeeze()
             mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
             proT5_emb_decoy, proT5_emb, proT5_mut = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_mut.squeeze()
             
             # get folded graph  
-            Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb, proT5_mut, mask)
+            Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb_mut, proT5_mut, mask)
             # get unfolded graph
-            Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb, proT5_mut, mask)
+            Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb_mut, proT5_mut, mask)
             # get decoy graph
             Xd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy)
             # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
@@ -93,13 +96,20 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Xjf.requires_grad = True
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd),dim=0)
             
-            # calculate the energy for the folded unfolded and decoy structure
-            E = model(X)
-            Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]
-            # calculate the loss   
-            loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
-            
+             # half precision validation
+            with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+                # calculate the energy for the folded unfolded and decoy structure
+                E = model(X)
+                Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]
+                # calculate the loss   
+                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
+                
             valid_loss += loss.item() 
+            valid_lossd += lossd.item()
+            valid_lossg += lossg.item()
+            valid_lossc += lossc.item()
+            # delete all the variables
+            del Xjf,Xkf,Xju,Xku,Xd,emb_decoy, emb, emb_mut, mask_decoy, mask, proT5_emb_decoy, proT5_emb, proT5_mut, X, E, Ejf, Ekf, Eju, Eku, Exd
             torch.cuda.empty_cache()
             gc.collect()
             # update the progress bar
@@ -107,8 +117,8 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}, n_skips: {n_skips}")
                 validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
             #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
-            if not CFG.debug:
-                wandb.log({"epoch": epoch,"step_val_lossg": lossg,"step_val_lossd": lossd,"step_val_loss": loss,"step_val_lossc": lossc,"step_val_Ejn": Eju.item(),"step_val_Ekn": Eku.item(),"step_val_Ejd": Ejf.item(),"step_val_Ekd": Ekf.item(),"step_val_Ed": Exd.item(),"step_val_Edelta": (Exd-Ejf).item(),"step_val_sequence_len": Xd.shape[0],"val_id": id})
+            # if not CFG.debug:
+            #     wandb.log({"epoch": epoch,"val_lossg": lossg,"val_lossd": lossd,"val_loss": loss,"val_lossc": lossc,"val_Ejn": Eju.item(),"val_Ekn": Eku.item(),"val_Ejd": Ejf.item(),"val_Ekd": Ekf.item(),"val_Ed": Exd.item(),"val_Edelta": (Exd-Ejf).item(),"val_sequence_len": len(seq[0])})
             
     
     validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
@@ -116,9 +126,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     df.to_csv(f'./res/results/epoch_{epoch}-validation_{val_type}.csv')
     print(f"Finished Validation {val_type} epoch {epoch}")
             
-    return valid_loss/len(dataloader)
+    return valid_loss/len(dataloader),valid_lossd/len(dataloader),valid_lossg/len(dataloader),valid_lossc/len(dataloader)
 
-def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None):
+def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None,scaler=None):
     """
     Training function for the model.
     
@@ -158,7 +168,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             #emb = torch.cat((esm_embed,seq),dim=2)
             emb = seq_one_hot.to(device)
             emb_decoy = seq_decoy.to(device)
-            emb_mut = seq_one_hot.to(device)
+            emb_mut = get_one_hot(seq_mut[0]).to(device)
             
             # move proT5_emb to device
             proT5_mut, proT5_emb_decoy, proT5_emb = proT5_mut.to(device), proT5_emb_decoy.to(device), proT5_emb.to(device)
@@ -167,14 +177,14 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             optimizer.zero_grad()
             # squeeze the data
             Xd, Xjf, Xkf, Xju, Xku = Xd.squeeze(), Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze()
-            emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
+            emb_decoy, emb, emb_mut = emb_decoy.squeeze(), emb.squeeze(), emb_mut.squeeze()
             mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
             proT5_emb_decoy, proT5_emb, proT5_mut = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_mut.squeeze()
             
             # get folded graph  
-            Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb, proT5_mut, mask)
+            Xjf,Xkf = get_graph(Xjf, emb, proT5_emb, mask), get_graph(Xkf, emb_mut, proT5_mut, mask)
             # get unfolded graph
-            Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb, proT5_mut, mask)
+            Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb_mut, proT5_mut, mask)
             # get decoy graph
             Xd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy)
             Xjf.requires_grad = True
@@ -182,15 +192,24 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             Xjf,Xkf,Xju,Xku,Xd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0)    
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd),dim=0)
             
-            # calculate the energy for the folded unfolded and decoy structure
-            E = model(X)
-            Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]
-            # calculate the loss   
-            loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
+            # half precision training
+            with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+                # calculate the energy for the folded unfolded and decoy structure
+                E = model(X)
+                Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]
+                # calculate the loss   
+                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
             
-            loss.backward()
-            # print_par(model) # print the parameters of the model
-            optimizer.step()
+            # Scales the loss, and calls backward()
+            # to create scaled gradients
+            scaler.scale(loss).backward()
+
+            # Unscales gradients and calls
+            # or skips optimizer.step()
+            scaler.step(optimizer)
+
+            # Updates the scale for next iteration
+            scaler.update()
 
             # print statistics
             running_loss += loss.item()
@@ -213,10 +232,10 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
         # evaluate the model
-        val_loss = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
+        val_loss, val_lossd,val_lossg,valid_lossc = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
          # update wandb metrics
         if not CFG.debug:
-            wandb.log({"epoch" : epoch ,"robust validation loss": val_loss, "learning rate": optimizer.param_groups[0]["lr"]})
+            wandb.log({"epoch" : epoch ,"validation loss": val_loss, "learning rate": optimizer.param_groups[0]["lr"], "validation lossd": val_lossd, "validation lossg": val_lossg, "validation lossc": valid_lossc})
          # Update the learning rate based on the validation loss
         scheduler.step(val_loss)
         print (f"validation loss: {val_loss}")
@@ -243,14 +262,15 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         epoch (int): The current epoch
     """
     model.train()
-    
+    # setup half precision training
+    scaler = torch.cuda.amp.GradScaler()
     for epoch in (range(EPOCH,CFG.num_epochs+EPOCH)):  # loop over the dataset multiple times
 
         
         torch.cuda.empty_cache()
         gc.collect()
         model.train()
-        model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss, scheduler)
+        model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss, scheduler,scaler)
         
         
     print('Finished Training')
@@ -288,7 +308,8 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native):
     partial_dx_native = torch.autograd.grad(outputs=Ejf, inputs=X_native, grad_outputs=torch.ones_like(Ejf), create_graph=True)[0]
     part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
    
-    lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1
+    # lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1
+    lossg = torch.log(part_dx_native_norm+1)
     lossd = (torch.log((Ejf+1) / (Exd+1) +1))
     lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     
@@ -305,8 +326,18 @@ def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     
     lossd2 = softplus(Ejf-Eju)
     lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.min(torch.tensor(10.0).to(lossd2.device), lossd2))
-    
     return lossd1+lossd2
+
+
+def relu_energy(Ejf, Ekf, Eju, Eku, offset = 5):
+    """calculate the energy diffrence between an unfolded protein and folded protein is positive.
+    log(min(max(diff+offset,0),6)+1)
+    """
+    htanh = torch.nn.Hardtanh(min_val=0, max_val=10)
+    lossd = lambda x: torch.log(htanh(x+offset)+1)
+    return lossd(Ekf-Eku)+lossd(Ejf-Eju)
+
+    
 def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch,scheduler):
     "train and test the model"
     valid_loss = 100

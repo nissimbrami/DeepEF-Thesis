@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout
-from torch_geometric.nn import GCNConv, GATv2Conv
+from torch_geometric.nn import GCNConv, GATv2Conv, BatchNorm
 from model.model_cfg import CFG
 # import matplotlib.pyplot as plt
 
@@ -294,7 +294,8 @@ class PEM(torch.nn.Module):
         self.bn2  = nn.BatchNorm1d(72)
         # Fc layers for the final output
         self.fc1 = nn.Linear(1096, 128)
-        self.fc2 = nn.Linear(128, 1)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, 1)
         
         # embedding indexes
         self.one_hot_index = -20
@@ -335,9 +336,11 @@ class PEM(torch.nn.Module):
         # Add LLM features
         x = torch.cat((x,x_emb_features),dim=-1) # B*N,72+1024->B*N,1096
         # fc layers
-        x  = self.fc1(x) # B*N,1096->B*N,64
+        x  = self.fc1(x) # B*N,1096->B*N,128
         x = F.relu(x)
-        x = self.fc2(x) # B*N,64->B*N,1
+        x = self.fc2(x) # B*N,128->B*N,64
+        x = F.relu(x)
+        x = self.fc3(x) # B*N,64->B*N,1
         # reshape to [batch_size,n_nodes]
         x = x.reshape(B,N,1)
         # return energy        
@@ -353,12 +356,9 @@ class PEM(torch.nn.Module):
         x = F.relu(x)
         x = self.fc2_gat(x) # N,64->N,36
         x = self.bn1(x)
-        # for gcn_layer in self.GCN_layers:
-        #     h1,x = gcn_layer(x, edge_index_gcn) 
-        #     x = x + identity
         for gat_layer in self.GAT_layers:
-            h1,x = gat_layer(x, edge_index_gat) 
-            x = x + identity
+            h1,z = gat_layer(x, edge_index_gat) 
+            x = h1 + identity
 
         return x
 
@@ -370,8 +370,8 @@ class PEM(torch.nn.Module):
         x = self.bn1(x)
         identity = x # identity for the residual connection
         for gcn_layer in self.GCN_layers:
-            h1,out = gcn_layer(x, edge_index_gcn) 
-            x = out + identity
+            h1,z = gcn_layer(x, edge_index_gcn) 
+            x = h1 + identity
         return x
   
     def get_energy(self,Fh):
@@ -515,16 +515,16 @@ class GAT(torch.nn.Module):
     super().__init__()
     self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
     self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
-    self.optimizer = torch.optim.Adam(self.parameters(),
-                                      lr=0.005,
-                                      weight_decay=5e-4)
+    self.bn  = BatchNorm(dim_out)
+    self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
-    h = F.dropout(x, p=0.6, training=self.training)
-    h = self.gat1(x, edge_index)
+    h=x
+    # h = self.dropout(x)
+    h = self.gat1(h, edge_index)
     h = F.elu(h)
-    h = F.dropout(h, p=0.6, training=self.training)
     h = self.gat2(h, edge_index)
+    h = self.bn(h)
     return h, F.log_softmax(h, dim=1)
 
 class GCN(torch.nn.Module):
@@ -533,14 +533,14 @@ class GCN(torch.nn.Module):
     super().__init__()
     self.gcn1 = GCNConv(dim_in, dim_h)
     self.gcn2 = GCNConv(dim_h, dim_out)
-    self.optimizer = torch.optim.Adam(self.parameters(),
-                                      lr=0.01,
-                                      weight_decay=5e-4)
+    self.bn  = BatchNorm(dim_out)
+    self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
-    h = F.dropout(x, p=0.5, training=self.training)
+    # h = self.dropout(x)
+    h=x
     h = self.gcn1(h, edge_index)
     h = torch.relu(h)
-    h = F.dropout(h, p=0.5, training=self.training)
     h = self.gcn2(h, edge_index)
+    h = self.bn(h)
     return h, F.log_softmax(h, dim=1)

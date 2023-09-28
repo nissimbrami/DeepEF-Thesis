@@ -32,6 +32,7 @@ class SidChainDS(Dataset):
     def __getitem__(self, index):
         
         item_path = self.data_dir[index]
+        decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]
         # load data
         id = torch.load(item_path + '/id.pt')
         crd_backbone = torch.tensor(torch.load(item_path + '/crd_backbone.pt'),dtype=torch.get_default_dtype()) #backbone coordinates N,Calpha,C
@@ -51,6 +52,8 @@ class SidChainDS(Dataset):
         # ProT5 embedding for protein mutation
         proT5_mut = torch.load(item_path + '/proT5_emb_mut.pt')
         seq_mut =  torch.load(item_path + '/seq_mut.pt')
+        # proT5_mut = torch.zeros((len(seq),1024)) # for testing
+        # seq_mut = seq # for testing
         
         return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, proT5_mut,seq_mut
 

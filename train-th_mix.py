@@ -51,14 +51,25 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             gc.collect()
             # zero the parameter gradients
             optimizer.zero_grad()
-            id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, proT5_mut,seq_mut = data
+            id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
+                proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy = data
             
             # wild type and mutant type
             Xjf = crd_backbone.to(device) # wilde type structure folded
             Xkf = torch.clone(Xjf).to(device) # mutant structure folded
             Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
             Xku = torch.clone(Xjf).to(device) # mutant structure unfolded
+            Xcd = crd_decoy.to(device) # decoy structure
             
+            # change the decoy len to match the native len
+            if Xcd.shape[1] > Xjf.shape[1]:
+                Xcd = Xcd[:,:Xjf.shape[1],:,:]
+                mask_crd_decoy = mask_crd_decoy[:,:Xjf.shape[1]]
+            elif Xcd.shape[1] < Xjf.shape[1]:
+                # add zeros to the end of the decoy
+                Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0],Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:])), dim=1)
+                mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(Xjf.shape[0],Xjf.shape[1] - mask_crd_decoy.shape[1])), dim=1)
+              
             # native structure and decoy structure
             Xd = torch.clone(Xjf).to(device)
             seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
@@ -80,9 +91,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             # zero the parameter gradients
             optimizer.zero_grad()
             # squeeze the data
-            Xd, Xjf, Xkf, Xju, Xku = Xd.squeeze(), Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze()
+            Xd, Xjf, Xkf, Xju, Xku, Xcd = Xd.squeeze(), Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze(), Xcd.squeeze()
             emb_decoy, emb, emb_mut = emb_decoy.squeeze(), emb.squeeze(), emb_mut.squeeze()
-            mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
+            mask_decoy, mask, mask_crd_decoy= mask_decoy.squeeze(), mask.squeeze(), mask_crd_decoy.squeeze()
             proT5_emb_decoy, proT5_emb, proT5_mut = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_mut.squeeze()
             
             # get folded graph  
@@ -90,19 +101,19 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             # get unfolded graph
             Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb_mut, proT5_mut, mask)
             # get decoy graph
-            Xd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy)
-            # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
-            Xjf,Xkf,Xju,Xku,Xd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0)    
+            Xd, Xcd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy)
             Xjf.requires_grad = True
-            X = torch.cat((Xjf,Xkf,Xju,Xku,Xd),dim=0)
+            # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
+            Xjf,Xkf,Xju,Xku,Xd,Xcd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0)    
+            X = torch.cat((Xjf,Xkf,Xju,Xku,Xd,Xcd),dim=0)
             
              # half precision validation
             with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                 # calculate the energy for the folded unfolded and decoy structure
                 E = model(X)
-                Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]
+                Ejf, Ekf, Eju, Eku, Exd, Ecd = E[0], E[1], E[2], E[3], E[4], E[5]
                 # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
+                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd)
                 
             valid_loss += loss.item() 
             valid_lossd += lossd.item()
@@ -147,13 +158,25 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             gc.collect()
              # zero the parameter gradients
             optimizer.zero_grad()
-            id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, proT5_mut,seq_mut = data
+            id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
+                proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy = data
             
             # wild type and mutant type
             Xjf = crd_backbone.to(device) # wilde type structure folded
             Xkf = torch.clone(Xjf).to(device) # mutant structure folded
             Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
             Xku = torch.clone(Xjf).to(device) # mutant structure unfolded
+            Xcd = crd_decoy.to(device) # decoy structure
+            
+            # change the decoy len to match the native len
+            if Xcd.shape[1] > Xjf.shape[1]:
+                Xcd = Xcd[:,:Xjf.shape[1],:,:]
+                mask_crd_decoy = mask_crd_decoy[:,:Xjf.shape[1]]
+            elif Xcd.shape[1] < Xjf.shape[1]:
+                # add zeros to the end of the decoy
+                Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0],Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:])), dim=1)
+                mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(Xjf.shape[0],Xjf.shape[1] - mask_crd_decoy.shape[1])), dim=1)
+                
             
             # native structure and decoy structure
             Xd = torch.clone(Xjf).to(device)
@@ -176,9 +199,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # zero the parameter gradients
             optimizer.zero_grad()
             # squeeze the data
-            Xd, Xjf, Xkf, Xju, Xku = Xd.squeeze(), Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze()
+            Xd, Xjf, Xkf, Xju, Xku, Xcd = Xd.squeeze(), Xjf.squeeze(), Xkf.squeeze(), Xju.squeeze(), Xku.squeeze(), Xcd.squeeze()
             emb_decoy, emb, emb_mut = emb_decoy.squeeze(), emb.squeeze(), emb_mut.squeeze()
-            mask_decoy, mask= mask_decoy.squeeze(), mask.squeeze()
+            mask_decoy, mask, mask_crd_decoy= mask_decoy.squeeze(), mask.squeeze(), mask_crd_decoy.squeeze()
             proT5_emb_decoy, proT5_emb, proT5_mut = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_mut.squeeze()
             
             # get folded graph  
@@ -186,19 +209,19 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # get unfolded graph
             Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb_mut, proT5_mut, mask)
             # get decoy graph
-            Xd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy)
+            Xd, Xcd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy)
             Xjf.requires_grad = True
             # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
-            Xjf,Xkf,Xju,Xku,Xd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0)    
-            X = torch.cat((Xjf,Xkf,Xju,Xku,Xd),dim=0)
+            Xjf,Xkf,Xju,Xku,Xd,Xcd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0)    
+            X = torch.cat((Xjf,Xkf,Xju,Xku,Xd,Xcd),dim=0)
             
             # half precision training
             with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                 # calculate the energy for the folded unfolded and decoy structure
                 E = model(X)
-                Ejf, Ekf, Eju, Eku, Exd = E[0], E[1], E[2], E[3], E[4]
+                Ejf, Ekf, Eju, Eku, Exd, Ecd = E[0], E[1], E[2], E[3], E[4], E[5]
                 # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf)
+                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd)
             
             # Scales the loss, and calls backward()
             # to create scaled gradients
@@ -286,7 +309,7 @@ def preform_energy_optimization(X_decoy,partial_dx_decoy):
     """
     return 0
 
-def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native):
+def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd ):
     """
     The loss function for the model corresponds to 3 main losses:
     1. lossg: the partial derivative of the energy with respect to the native structure
@@ -297,7 +320,8 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native):
         Ekf (tensor): The energy of the folded mutant structure
         Eju (tensor): The energy of the unfolded native structure
         Eku (tensor): The energy of the unfolded mutant structure
-        Exd (tensor): The energy of the decoy structure
+        Exd (tensor): The energy of the decoy sequence
+        Ecd (tensor): The energy of the decoy structure
     output:
         loss (tensor): The loss of the model
         lossd (tensor): The loss of the model due to the energy of the native structure divided by the decoy energy
@@ -310,7 +334,7 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native):
    
     # lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1
     lossg = torch.log(part_dx_native_norm+1)
-    lossd = (torch.log((Ejf+1) / (Exd+1) +1))
+    lossd = (torch.log((Ejf+1) / (Exd+1) +1)) + (torch.log((Ekf+1) / (Ecd+1) +1))
     lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     
     return lossd+lossg+lossc , lossd, lossg, lossc

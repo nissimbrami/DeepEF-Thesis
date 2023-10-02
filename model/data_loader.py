@@ -34,21 +34,33 @@ class SidChainDS(Dataset):
         
         item_path = self.data_dir[index]
         decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]
+        # make sure the decoy is not the same as the item
+        while decoy_path == item_path:
+            decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]
         # load data
         id = torch.load(item_path + '/id.pt')
         crd_backbone = torch.tensor(torch.load(item_path + '/crd_backbone.pt'),dtype=torch.get_default_dtype()) #backbone coordinates N,Calpha,C
+        crd_decoy = torch.tensor(torch.load(decoy_path + '/crd_backbone.pt'),dtype=torch.get_default_dtype()) #backbone coordinates N,Calpha,C
+        
         mask = torch.load(item_path + '/mask.pt')
+        mask_decoy = torch.load(decoy_path + '/mask.pt')
         # change to 1,0 mask
         mask = torch.tensor(np.where(np.array(list(mask))=='+',1,0))
+        mask_decoy = torch.tensor(np.where(np.array(list(mask_decoy))=='+',1,0))
+        # one hot encoding of the sequence
         seq_one_hot = torch.load(item_path + '/seq_one_hot.pt')
         seq = torch.load(item_path + '/seq.pt')
+        seq_decoy = torch.load(decoy_path + '/seq.pt')
         proT5_emb = torch.load(item_path + '/proT5_emb.pt')
         # proT5_emb = torch.zeros((len(seq),1024)) # for testing
         ang = torch.tensor(torch.load(item_path + '/ang.pt'))
         ang_backbone = torch.clone(ang)[:,:3] #angles for the backbone phi, psi, omega
         # Add Cbeta atom to the coordinates
         crd_backbone = self.add_cb(crd_backbone)
-        crd_backbone = crd_backbone * C.NANO_TO_ANGSTROM # Convert to angstrom
+        crd_decoy = self.add_cb(crd_decoy)
+        # Convert to angstrom
+        crd_backbone = crd_backbone * C.NANO_TO_ANGSTROM 
+        crd_decoy = crd_decoy * C.NANO_TO_ANGSTROM 
         
         # ProT5 embedding for protein mutation
         proT5_mut = torch.load(item_path + '/proT5_emb_mut.pt')
@@ -56,7 +68,8 @@ class SidChainDS(Dataset):
         # proT5_mut = torch.zeros((len(seq),1024)) # for testing
         # seq_mut = seq # for testing
         
-        return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang, proT5_emb, proT5_mut,seq_mut
+        return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, \
+            ang, proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_decoy, seq_decoy
 
     def __len__(self):
         return len(self.data_dir)

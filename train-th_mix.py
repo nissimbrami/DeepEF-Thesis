@@ -60,15 +60,15 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
             Xku = torch.clone(Xjf).to(device) # mutant structure unfolded
             Xcd = crd_decoy.to(device) # decoy structure
-            
+
             # change the decoy len to match the native len
             if Xcd.shape[1] > Xjf.shape[1]:
                 Xcd = Xcd[:,:Xjf.shape[1],:,:]
                 mask_crd_decoy = mask_crd_decoy[:,:Xjf.shape[1]]
             elif Xcd.shape[1] < Xjf.shape[1]:
                 # add zeros to the end of the decoy
-                Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0],Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:])), dim=1)
-                mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(Xjf.shape[0],Xjf.shape[1] - mask_crd_decoy.shape[1])), dim=1)
+                Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0],Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:]).to(device)), dim=1)
+                mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(mask_crd_decoy.shape[0],mask.shape[1] - mask_crd_decoy.shape[1])), dim=1)
               
             # native structure and decoy structure
             Xd = torch.clone(Xjf).to(device)
@@ -174,8 +174,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 mask_crd_decoy = mask_crd_decoy[:,:Xjf.shape[1]]
             elif Xcd.shape[1] < Xjf.shape[1]:
                 # add zeros to the end of the decoy
-                Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0],Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:])), dim=1)
-                mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(Xjf.shape[0],Xjf.shape[1] - mask_crd_decoy.shape[1])), dim=1)
+                Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0],Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:]).to(device)), dim=1)
+                mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(mask.shape[0],mask.shape[1] - mask_crd_decoy.shape[1])), dim=1)
                 
             
             # native structure and decoy structure

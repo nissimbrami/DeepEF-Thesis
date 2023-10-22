@@ -13,7 +13,7 @@ class CFG:
     inference_path = './data/inference_data'
     results_path = './res/results-emb/'
     seed = 42
-    debug = True
+    debug = False
     # Train data parameters
     homothresh = 0.9
     constraint = True
@@ -26,7 +26,7 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 3
-    model_path = "./res/trianed_models_th_mix_100_fc3/"
+    model_path = "./res/trianed_models_crd_decoy/"
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001

@@ -272,6 +272,7 @@ def wandb_config(wandb, model, optimizer, scheduler, dataloader):
         wandb.config.model = type(model).__name__
         wandb.config.dataset = type(dataloader.dataset).__name__
         wandb.config.wd = CFG.wd
+        wandb.config.model_path = CFG.model_path
 
 def zero_except_udiagonal(D):
     """Zero all values except the diagonal and its neighbors"""

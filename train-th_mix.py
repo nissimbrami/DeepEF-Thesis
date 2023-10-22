@@ -144,6 +144,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
     Training function for the model.
     
     """
+    model.train()
     epoch_train_loss = []
     ephoch_val_loss = []
     model.train()
@@ -284,7 +285,6 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         N (int): The number of iterations for the iterative optimization
         epoch (int): The current epoch
     """
-    model.train()
     # setup half precision training
     scaler = torch.cuda.amp.GradScaler()
     for epoch in (range(EPOCH,CFG.num_epochs+EPOCH)):  # loop over the dataset multiple times
@@ -334,7 +334,7 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd ):
    
     # lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1
     lossg = torch.log(part_dx_native_norm+1)
-    lossd = (torch.log((Ejf+1) / (Exd+1) +1)) + (torch.log((Ekf+1) / (Ecd+1) +1))
+    lossd = (torch.log((Ejf+1) / (Exd+1) +1)) + (torch.log((Ejf+1) / (Ecd+1) +1))
     lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     
     return lossd+lossg+lossc , lossd, lossg, lossc

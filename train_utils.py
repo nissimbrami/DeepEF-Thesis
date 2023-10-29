@@ -1,14 +1,9 @@
 import torch
-<<<<<<< HEAD
-=======
 import torch.nn.functional as F
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
 import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
-<<<<<<< HEAD
-=======
 from tqdm import tqdm
 import gc
 from model.model_cfg import CFG
@@ -36,7 +31,6 @@ AA_MAP = {
     'W': 18,
     'Y': 19
 }
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
 
 def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
     """
@@ -73,14 +67,9 @@ def load_checkpoint(path,model,optimizer,device):
     # print(f"Epoch: {dict['epoch']},loss: {dict['loss']},valid_loss: {dict['valid_loss']}")
     model.load_state_dict(dict['model_state_dict'])
     optimizer.load_state_dict(dict['optimizer_state_dict'])
-<<<<<<< HEAD
-    
-def validation_plots(Exd,Exn,seq_len,type):
-=======
     return model,optimizer,dict['epoch'],dict['loss'],dict['valid_loss']
     
 def validation_plots(Exd,Exn,seq_len,type,epoch):
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
     """
     Plot the validation data
     inputs:
@@ -89,12 +78,9 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
         seq_len (int) : sequence length
         type (str) : type of the plot
     """
-<<<<<<< HEAD
-=======
     # create the directory if not exist
     os.makedirs(CFG.results_path+'plots', exist_ok=True)
     plot_dir = CFG.results_path+'plots'
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
     # Plot the validation data
     fig, ax = plt.subplots()
     ax.set_title(f'Validation data for {type},number of sequences: {len(Exd)}')
@@ -106,11 +92,7 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
     ax.legend()
 
     #plt.show()
-<<<<<<< HEAD
-    plt.savefig(f'./plots/E_len_{type}.png')
-=======
     plt.savefig(f'{plot_dir}/E_len_{type}.png')
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
     
     plt.close()
     
@@ -127,18 +109,6 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
     ax.legend()
 
     #plt.show()
-<<<<<<< HEAD
-    plt.savefig(f'./plots/Edelta_len_{type}.png')
-    
-    plt.close()
-
-
-def print_parameters(model):
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            print(name, param.data)
-
-=======
     plt.savefig(f'{plot_dir}/epoch-{epoch}-Edelta_len_{type}.png')
     
     plt.close()
@@ -321,4 +291,3 @@ def get_one_hot(seq):
   for i,a in enumerate(seq):
     seq_one_hot[i][AA_MAP[a]] = 1
   return seq_one_hot
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d

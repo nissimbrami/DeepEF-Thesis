@@ -5,11 +5,6 @@ from model.model_cfg import CFG
 import gc
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-<<<<<<< HEAD
-import constants as C
-
-
-=======
 import numpy as np
 import constants as C
 
@@ -122,7 +117,6 @@ class SidChainDS(Dataset):
         crd_coords = torch.cat((crd_coords, CB.unsqueeze(1)), dim=1)
         return crd_coords
     
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
 class PEFDataset(Dataset):
     '''
     Deep energy function dataset.
@@ -280,11 +274,7 @@ class PEFDataset(Dataset):
             if (self.train_type is not None) and (not self.train_type in id):
                 continue
 
-<<<<<<< HEAD
-            # TODO: add mask check and inference
-=======
             
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
             # scale = 1e-2
             # Mnat = nativemask
             # M = msk & Mnat
@@ -339,39 +329,6 @@ def fetch_dataloader(data_dir, params):
     Returns:
         data: (dict) contains the DataLoader object for each type in types
     """
-<<<<<<< HEAD
-    # Get the filenames from the train folder
-    file_names = os.listdir(data_dir)
-    if params.debug:
-        file_names = file_names[:CFG.debug_size]
-    # Split the data into train, validation and test set
-    X_train, X_rem, y_train, y_rem = train_test_split(file_names, file_names, train_size=CFG.split_train,
-                                                      random_state=CFG.seed)
-    # Now since we want the valid and test size to be equal (10% each of overall data). 
-    # we have to define valid_size=0.5 (that is 50% of remaining data)
-    X_valid, X_test, y_valid, y_test = train_test_split(X_rem, y_rem, test_size=0.5)
-    # Now we have the data split in training, validation and test set
-    train_loader = DataLoader(PEFDataset(X_train, datapath=data_dir, constraint=params.constraint),
-                              batch_size=params.batch_size, shuffle=True,
-                              num_workers=params.num_workers,
-                              pin_memory=params.cuda)
-    valid_loader = DataLoader(PEFDataset(X_valid, datapath=data_dir, constraint=params.constraint),
-                              batch_size=params.batch_size, shuffle=True,
-                              num_workers=params.num_workers,
-                              pin_memory=params.cuda)
-
-    test_loader = DataLoader(PEFDataset(X_test, datapath=data_dir, constraint=params.constraint),
-                             batch_size=params.batch_size, shuffle=True,
-                             num_workers=params.num_workers,
-                             pin_memory=params.cuda)
-    return train_loader, valid_loader, test_loader
-
-
-# TODO: clean dataset from homology threshold
-
-class DataLoaderParams:
-    def __init__(self, batch_size, num_workers, cuda, constraint, debug=False):
-=======
     # Sidechainnet dataset
     if params.dataset == 'scn':
         train_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='train', debug=params.debug), batch_size=params.batch_size, shuffle=True,
@@ -424,14 +381,10 @@ def fetch_inference_loader(data_dir, params):
 
 class params:
     def __init__(self,batch_size,num_workers,cuda,constraint, dataset,debug=False):
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cuda = cuda
         self.debug = debug
         self.constraint = constraint
-<<<<<<< HEAD
-=======
         self.dataset = dataset
         
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d

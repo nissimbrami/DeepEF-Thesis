@@ -274,94 +274,6 @@ class ProteinEnergyNet(nn.Module):
 
 class PEM(torch.nn.Module):
     """Protein energy model"""
-<<<<<<< HEAD
-
-    def __init__(self, dim_in, dim_h, dim_out, layers, model_type, gaussian_coef, heads=8):
-        super().__init__()
-
-        if model_type == 'GCN':
-            self.graph_model = [GCN(dim_in, dim_h, dim_out) for i in range(layers)]
-        elif model_type == 'GAT':
-            self.graph_model = [GAT(dim_in, dim_h, dim_out) for i in range(layers)]
-
-        else:
-            raise ValueError('Model type not supported')
-        self.gaussian_coef = gaussian_coef
-        self.layers = torch.nn.ModuleList(self.graph_model)
-        # First fully connected layer
-        self.fcs1 = nn.Linear(36, 64)
-        self.fcs2 = nn.Linear(64, 36)
-        self.bn1 = nn.BatchNorm1d(36)
-        self.bn2 = nn.BatchNorm1d(36)
-        # First fully connected layer
-        self.fc1 = nn.Linear(36, 64)
-        # Second fully connected layer that outputs our 10 labels
-        self.fc2 = nn.Linear(64, 1)
-
-    def forward(self, x_decoy, emb_decoy, x_native, emb_native, edge_index):
-        x_decoy = self.get_graph(x_decoy, emb_decoy)  # gettting the graph N,16+emb_size(20)
-        identity = x_decoy  # identity for the residual connection
-        x = x_decoy
-        x = self.fcs1(x)  # N,36->N,64
-        x = F.relu(x)
-        x = self.fcs2(x)  # N,64->N,36
-        x = self.bn1(x)
-        for layer in self.layers:
-            h1, x = layer(x, edge_index)
-            x = x + identity
-
-        x = self.bn2(x)
-        x = self.fc1(x)  # N,36->N,64
-        x = F.relu(x)
-        x_decoy = self.fc2(x)  # N,64->N,1
-
-        x_native = self.get_graph(x_native, emb_native)
-        identity = x_native
-        x = x_native
-        x = self.fcs1(x)
-        x = F.relu(x)
-        x = self.fcs2(x)
-        x = self.bn1(x)
-        for layer in self.layers:
-            h1, x = layer(x, edge_index)
-            x = x + identity
-
-        x = self.bn2(x)
-        x = self.fc1(x)
-        x = F.relu(x)
-        x_native = self.fc2(x)
-
-        return torch.cat((self.get_energy(x_decoy).unsqueeze(0), self.get_energy(x_native).unsqueeze(0)), dim=0)
-
-    def get_graph(self, x, emb):
-        """Get graph representation of protein"""
-        D = self.get_dist_matrix(x)  # N,N,16
-        D = torch.relu(torch.exp(self.gaussian_coef * D ** 2))
-
-        D = D.sum(dim=1)  # N,16
-        D = F.normalize(D, p=2, dim=0)
-        Fh = torch.cat([emb, D], dim=1)  # N,16+emb_size
-
-        return Fh
-
-    def get_dist_matrix(self, Xd):
-        """
-      Return the node distence matrix
-      Args:
-          Xd (tensor):X embeded [n_nodes ,num_atoms=4,new_cords_size]
-      Returns:
-          tensor : [n_nodes,n_nodes ,atom_dist=16] tensor
-      """
-        n_residue, n_atoms, coords_size = Xd.shape
-        Xd = Xd.reshape(n_residue * n_atoms, coords_size)
-        D = torch.cdist(Xd, Xd, p=2)
-        D = D.reshape(n_residue, n_atoms, n_residue, n_atoms)
-        D = torch.swapaxes(D, 1, 2)
-        D = D.reshape(n_residue, n_residue, n_atoms * n_atoms)
-        return D
-
-    def get_energy(self, Fh):
-=======
   
     def __init__(self, layers, gaussian_coef):
         super().__init__()
@@ -585,7 +497,6 @@ class PEMSM(torch.nn.Module):
   
   
   def get_energy(self,Fh):
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
         """
         Calculates the energy of the protein
         Inputs:
@@ -595,46 +506,6 @@ class PEMSM(torch.nn.Module):
         """
         E = torch.sum(Fh ** 2, dim=(0, 1))
         return E
-<<<<<<< HEAD
-
-
-class GAT(torch.nn.Module):
-    """Graph Attention Network"""
-
-    def __init__(self, dim_in, dim_h, dim_out, heads=8):
-        super().__init__()
-        self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
-        self.gat2 = GATv2Conv(dim_h * heads, dim_out, heads=1)
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.005, weight_decay=5e-4)
-
-    def forward(self, x, edge_index):
-        h = F.dropout(x, p=0.6, training=self.training)
-        h = self.gat1(x, edge_index)
-        h = F.elu(h)
-        h = F.dropout(h, p=0.6, training=self.training)
-        h = self.gat2(h, edge_index)
-        return h, F.log_softmax(h, dim=1)
-
-
-class GCN(torch.nn.Module):
-    """Graph Convolutional Network"""
-
-    def __init__(self, dim_in, dim_h, dim_out):
-        super().__init__()
-        self.gcn1 = GCNConv(dim_in, dim_h)
-        self.gcn2 = GCNConv(dim_h, dim_out)
-        self.optimizer = torch.optim.Adam(self.parameters(),
-                                          lr=0.01,
-                                          weight_decay=5e-4)
-
-    def forward(self, x, edge_index):
-        h = F.dropout(x, p=0.5, training=self.training)
-        h = self.gcn1(h, edge_index)
-        h = torch.relu(h)
-        h = F.dropout(h, p=0.5, training=self.training)
-        h = self.gcn2(h, edge_index)
-        return h, F.log_softmax(h, dim=1)
-=======
   
   def get_edge_index(self,x):
         seq_len = x.shape[0]
@@ -683,4 +554,3 @@ class GCN(torch.nn.Module):
     h = self.gcn2(h, edge_index)
     h = self.bn(h)
     return h, F.log_softmax(h, dim=1)
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d

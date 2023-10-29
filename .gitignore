@@ -1,5 +1,5 @@
 /data/*
-/experiments/.ipyn*
+/experiments/
 /*/__pycache__/*
 *.pt
 trianed_models/*
@@ -7,4 +7,12 @@ trianed_models_log_fix/*
 trianed_models_no_const_log_fix/*
 trianed_models_no_const/*
 *.out
+.DS_Store
+*.csv
 *.pyc
+*.png
+experiments/plots/*
+experiments/.ipynb_checkpoints
+*.sh
+wandb/*
+

@@ -1,22 +1,3 @@
-<<<<<<< HEAD
-import torch
-from tqdm import tqdm
-import numpy as np
-import os
-
-def main():
-# Move emmbedings to data2:
-# '''copy emmbeding from data to data2'''
-    emb_path = "./data/esm2_t12_35M_UR50D/"
-    emb_new_path = "./data/data2/"
-    file_names = os.listdir(emb_new_path)
-    for i in tqdm(np.arange(0,len(file_names),1)):
-        file = torch.load(emb_path+"emb_"+str(i)+".pt")
-        torch.save(file,emb_new_path+str(i)+'/'+"emb_esm.pt")
-
-if __name__ == '__main__':
-    main()
-=======
 #@title Import dependencies. { display-mode: "form" }
 # Load ProtT5 in half-precision (more specifically: the encoder-part of ProtT5-XL-U50) 
 # import requests
@@ -24,7 +5,7 @@ from transformers import T5Tokenizer, T5EncoderModel
 import torch
 import re
 import os
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')#"mps" if torch.backends.mps.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print("Using device: {}".format(device))
 
 #@title Load encoder-part of ProtT5 in half-precision. { display-mode: "form" }
@@ -82,7 +63,6 @@ def print_files_in_directory(directory,mutation=False):
                 
 
 # Provide the directory path here
-directory_path = './data/casp12_data_30/'
+directory_path = './data/casp12_data_100/'
 
-print_files_in_directory(directory_path,mutation=True)
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
+print_files_in_directory(directory_path,mutation=False)

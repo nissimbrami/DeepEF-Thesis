@@ -37,6 +37,7 @@ class CFG:
     num_epochs = 50
     seq_len = 600
     SM = False # score matching loss
+    gradient_penalty = True
     # defalut parameters
     torch_default_dtype = torch.float32
     precision = torch.float32

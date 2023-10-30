@@ -126,10 +126,6 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             # update the progress bar
             if index % 1000 == 999:
                 print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}, n_skips: {n_skips}")
-                validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
-            #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
-            # if not CFG.debug:
-            #     wandb.log({"epoch": epoch,"val_lossg": lossg,"val_lossd": lossd,"val_loss": loss,"val_lossc": lossc,"val_Ejn": Eju.item(),"val_Ekn": Eku.item(),"val_Ejd": Ejf.item(),"val_Ekd": Ekf.item(),"val_Ed": Exd.item(),"val_Edelta": (Exd-Ejf).item(),"val_sequence_len": len(seq[0])})
             
     
     validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
@@ -288,11 +284,10 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
     # setup half precision training
     scaler = torch.cuda.amp.GradScaler()
     for epoch in (range(EPOCH,CFG.num_epochs+EPOCH)):  # loop over the dataset multiple times
-
-        
+        # Clean the GPU cache    
         torch.cuda.empty_cache()
         gc.collect()
-        model.train()
+        # Train one epoch
         model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss, scheduler,scaler)
         
         

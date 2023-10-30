@@ -128,12 +128,6 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}, n_skips: {n_skips}")
                 validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
             
-    
-    validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
-    df = pd.DataFrame({'id':ids_list,'Exd':Exd_list,'Exn':Exn_list,'seq_len':seq_len,'lossg':lossg_list,'lossd':lossd_list})
-    df.to_csv(f'./res/results/epoch_{epoch}-validation_{val_type}.csv')
-    print(f"Finished Validation {val_type} epoch {epoch}")
-            
     return valid_loss/len(dataloader),valid_lossd/len(dataloader),valid_lossg/len(dataloader),valid_lossc/len(dataloader)
 
 def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None,scaler=None):

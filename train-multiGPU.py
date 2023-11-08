@@ -21,6 +21,9 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # Set wandb
 if not CFG.debug:
     wandb.init(project="Thermodynamic+decoy")
+if CFG.debug:
+   CFG.model_path = "./res/debug/"
+   CFG.results_path = './res/results-debug/'
 
 
 
@@ -115,6 +118,21 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 # calculate the loss   
                 loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd, with_grad = False)
                 
+            # Add gradient penalty
+            if CFG.gradient_penalty:
+                # zero the parameter gradients
+                optimizer.zero_grad()
+                torch.cuda.empty_cache()
+                gc.collect( )
+                # half precision training
+                with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+                    # calculate the energy for the wild type
+                    Xjf.requires_grad = True
+                    Ejf = model(Xjf)[0]
+                    lossg = gradient_penalty(Xjf, Ejf)
+                    
+                loss += lossg # add the gradient penalty to the loss
+            
             valid_loss += loss.item() 
             valid_lossd += lossd.item()
             valid_lossg += lossg.item()
@@ -266,7 +284,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3)})
             # Log metrics
             if not CFG.debug:
-                wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": len(seq[0]),"Exd":Exd.item(),"Eku":Eku.item(),"Ekf":Ekf.item(),"Eju": Eju.item(), "Ejf":Ejf.item()})
+                wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": len(seq[0]),
+                           "Exd":Exd.item(),"Eku":Eku.item(),"Ekf":Ekf.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item()})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -405,8 +424,6 @@ def main():
     # amino_inference_loader = fetch_inference_loader(data_dir=CFG.inference_path, params=d_params)
     # Build the model
     print('***Build the model***')
-    # m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
-    #                          h = CFG.h,device=CFG.device)
     model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     model.name = "PEM-With LLM embedding"
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)

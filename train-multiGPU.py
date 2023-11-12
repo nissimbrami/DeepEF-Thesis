@@ -237,8 +237,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # to create scaled gradients
             scaler.scale(loss).backward()
 
-            # # Clip gradients to a maximum norm of max_grad_norm to prevent exploding gradients
-            # clip_grad_norm(model.parameters(), CFG.max_grad_norm)
+            # Clip gradients to a maximum norm of max_grad_norm to prevent exploding gradients
+            clip_grad_norm(model.parameters(), CFG.max_grad_norm)
             
             # Unscales gradients and calls
             # or skips optimizer.step()

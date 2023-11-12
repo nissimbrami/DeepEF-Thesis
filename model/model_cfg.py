@@ -26,7 +26,7 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 3
-    model_path = "./res/trianed_models_noclip100/"
+    model_path = "./res/trianed_models_10clip100/"
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001
@@ -39,7 +39,7 @@ class CFG:
     SM = False # score matching loss
     gradient_penalty = True
     decoy_threshold = 10
-    max_grad_norm = 1.0
+    max_grad_norm = 10.0
     # defalut parameters
     torch_default_dtype = torch.float32
     precision = torch.float32

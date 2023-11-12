@@ -237,8 +237,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # to create scaled gradients
             scaler.scale(loss).backward()
 
-            # Clip gradients to a maximum norm of max_grad_norm to prevent exploding gradients
-            clip_grad_norm(model.parameters(), CFG.max_grad_norm)
+            # # Clip gradients to a maximum norm of max_grad_norm to prevent exploding gradients
+            # clip_grad_norm(model.parameters(), CFG.max_grad_norm)
             
             # Unscales gradients and calls
             # or skips optimizer.step()
@@ -375,7 +375,7 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, with_grad = True,decoy_thr
         lossc (tensor): The loss of the model due to the energy softplus function for the native and mutant structure(unfolded and folded)
     """
     lossg = gradient_penalty(X_native, Ejf) if with_grad else torch.tensor(0.0).to(Ejf.device)
-    lossd =loss_decoy(Ejf, Exd,decoy_threshold = decoy_threshold) + loss_decoy(Ejf, Ecd,decoy_threshold = decoy_threshold)
+    lossd = loss_decoy(Ejf, Exd,decoy_threshold = decoy_threshold) + loss_decoy(Ejf, Ecd,decoy_threshold = decoy_threshold)
     lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     
     return lossd+lossg+lossc , lossd, lossg, lossc

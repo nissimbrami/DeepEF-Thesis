@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch import optim
 from torch.optim import lr_scheduler
+from torch.nn.utils import clip_grad_norm_ as clip_grad_norm
 from tqdm import tqdm
 import gc
 import time
@@ -45,9 +46,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     n_skips = 0
     model.eval() # cant use eval because of the loss function calculation
     with tqdm(dataloader, unit="batch") as tepoch:
+        # set progress bar description
+        tepoch.set_description(f"Validation: Epoch {epoch}")
         for index, data in (enumerate(tepoch)):
-            # set progress bar description
-            tepoch.set_description(f"Validation: Epoch {epoch}")
             # Clean the GPU cache
             if(device.type == "cuda" or device.type == "mps"):    
                 torch.cuda.empty_cache()
@@ -105,7 +106,6 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb_mut, proT5_mut, mask)
             # get decoy graph
             Xd, Xcd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy)
-            Xjf.requires_grad = True
             # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
             Xjf,Xkf,Xju,Xku,Xd,Xcd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0)    
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd,Xcd),dim=0)
@@ -160,9 +160,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
     running_loss = 0.0
     n_skips = 0
     with tqdm(dataloader, unit="batch") as tepoch:
+        # set progress bar description
+        tepoch.set_description(f"Epoch {epoch}")
         for index, data in enumerate(tepoch):
-            # set progress bar description
-            tepoch.set_description(f"Epoch {epoch}")
             # Clean the GPU cache
             torch.cuda.empty_cache()
             gc.collect()
@@ -237,6 +237,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # to create scaled gradients
             scaler.scale(loss).backward()
 
+            # Clip gradients to a maximum norm of max_grad_norm to prevent exploding gradients
+            clip_grad_norm(model.parameters(), CFG.max_grad_norm)
+            
             # Unscales gradients and calls
             # or skips optimizer.step()
             scaler.step(optimizer)
@@ -352,7 +355,7 @@ def gradient_penalty(X_native, E_native):
     lossg = torch.log(part_dx_native_norm+1)
     return lossg
 
-def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, with_grad = True ):
+def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, with_grad = True,decoy_threshold = CFG.decoy_threshold ):
     """
     The loss function for the model corresponds to 3 main losses:
     1. lossg: the partial derivative of the energy with respect to the native structure
@@ -372,11 +375,17 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, with_grad = True ):
         lossc (tensor): The loss of the model due to the energy softplus function for the native and mutant structure(unfolded and folded)
     """
     lossg = gradient_penalty(X_native, Ejf) if with_grad else torch.tensor(0.0).to(Ejf.device)
-    lossd = (torch.log((Ejf+1) / (Exd+1) +1)) + (torch.log((Ejf+1) / (Ecd+1) +1))
+    lossd =loss_decoy(Ejf, Exd,decoy_threshold = decoy_threshold) + loss_decoy(Ejf, Ecd,decoy_threshold = decoy_threshold)
     lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
+def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
+    """Decoy loss, the energy of the native structure divided by the decoy energy"""
+    if E_decoy-E_native > decoy_threshold:
+        return torch.tensor(0.0).to(E_native.device)
+    return torch.log((E_native+1) / (E_decoy+1) +1)
+
 def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     """Energy softplus,
     As we know the energy diffrence between an unfolded protein and folded protein is positive.

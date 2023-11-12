@@ -33,12 +33,8 @@ class SidChainDS(Dataset):
     def __getitem__(self, index):
         
         item_path = self.data_dir[index]
-        decoy_index = np.random.randint(len(self.data_dir))
-        # make sure the decoy is not the same as the item
-        while decoy_index == index:
-            decoy_index = np.random.randint(len(self.data_dir))
         
-        decoy_path = self.data_dir[decoy_index]
+        decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]
         while decoy_path == item_path:
             decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]
         # load data

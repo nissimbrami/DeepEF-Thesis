@@ -383,8 +383,8 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, with_grad = True,decoy_thr
   
 def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
     """Decoy loss, the energy of the native structure divided by the decoy energy"""
-    if E_decoy-E_native > decoy_threshold:
-        return torch.tensor(0.0).to(E_native.device)
+    # if E_decoy-E_native > decoy_threshold:
+    #     return torch.tensor(0.0).to(E_native.device)
     return torch.log((E_native+1) / (E_decoy+1) +1)
 
 def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
@@ -394,10 +394,10 @@ def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     softplus = lambda x: torch.log(torch.exp(beta*x)+1)/beta
     
     lossd1 = softplus(Ekf-Eku)
-    lossd1 =  torch.where(lossd1 < 0.05, torch.tensor(0.0).to(lossd1.device),torch.where(lossd1 > 10.0, lossd1/2.0, lossd1))
+    # lossd1 =  torch.where(lossd1 < 0.05, torch.tensor(0.0).to(lossd1.device),torch.where(lossd1 > 10.0, lossd1/2.0, lossd1))
     
     lossd2 = softplus(Ejf-Eju)
-    lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.where(lossd2 > 10.0, lossd2/2.0, lossd2))
+    # lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.where(lossd2 > 10.0, lossd2/2.0, lossd2))
     return lossd1+lossd2
 
 
@@ -443,7 +443,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 1
+    epoch = 0
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

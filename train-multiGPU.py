@@ -391,13 +391,13 @@ def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     """Energy softplus,
     As we know the energy diffrence between an unfolded protein and folded protein is positive.
     Therefore we will add it to the loss as lossd"""
-    softplus = torch.nn.Softplus(beta=beta)
+    softplus = lambda x: torch.log(torch.exp(beta*x)+1)/beta
     
     lossd1 = softplus(Ekf-Eku)
-    lossd1 =  torch.where(lossd1 < 0.05, torch.tensor(0.0).to(lossd1.device), torch.min(torch.tensor(10.0).to(lossd1.device), lossd1))
+    lossd1 =  torch.where(lossd1 < 0.05, torch.tensor(0.0).to(lossd1.device),torch.where(lossd1 > 10.0, lossd1/2.0, lossd1))
     
     lossd2 = softplus(Ejf-Eju)
-    lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.min(torch.tensor(10.0).to(lossd2.device), lossd2))
+    lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.where(lossd2 > 10.0, lossd2/2.0, lossd2))
     return lossd1+lossd2
 
 
@@ -414,7 +414,7 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     "train and test the model"
     valid_loss = 100
     if epoch > 0:
-        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
+        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch}_final_model.pt", model, optimizer,CFG.device)
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
     #load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
@@ -443,7 +443,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 0
+    epoch = 1
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

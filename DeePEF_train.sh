@@ -8,7 +8,7 @@
 #SBATCH --partition rtx6000                        ### specify partition name where to run a job. main: all nodes; gtx1080: 1080 gpu card nodes; rtx2080: 2080 nodes; teslap100: p100 nodes; titanrtx: titan nodes
 #SBATCH --time 4-10:30:00                       ### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
 #SBATCH --job-name DeePEF_themodynamic                       ### name of the job
-#SBATCH --output DeePEF_themodynamic3.out                     ### output log for running job - %J for job number
+#SBATCH --output DeePEF_themodynamic4.out                     ### output log for running job - %J for job number
 #SBATCH --gpus=1                                ### number of GPUs, allocating more than 1 requires IT team's permission
 #SBATCH --qos=keasar  
 

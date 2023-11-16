@@ -387,7 +387,8 @@ class PEM(torch.nn.Module):
         Returns:
             Energy [batch_size] tensor
         """
-        E = torch.sum(Fh**2,dim=(1,2))
+        # E = torch.sum(Fh**2,dim=(1,2))
+        E = torch.sum(Fh,dim=(1,2))
         return E
   
     def get_edge_index(self,x):

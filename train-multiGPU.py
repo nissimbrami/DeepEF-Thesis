@@ -128,8 +128,8 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                     # calculate the energy for the wild type
                     Xjf.requires_grad = True
-                    Ejf = model(Xjf)[0]
-                    lossg = gradient_penalty(Xjf, Ejf)
+                    Ejf_grad = model(Xjf)[0]
+                    lossg = gradient_penalty(Xjf, Ejf_grad)
                     
                 loss += lossg # add the gradient penalty to the loss
             
@@ -159,6 +159,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
     model.train()
     running_loss = 0.0
     n_skips = 0
+    ds_length = len(dataloader)
     with tqdm(dataloader, unit="batch") as tepoch:
         # set progress bar description
         tepoch.set_description(f"Epoch {epoch}")
@@ -258,8 +259,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                     # calculate the energy for the wild type
                     Xjf.requires_grad = True
-                    Ejf = model(Xjf)[0]
-                    lossg = gradient_penalty(Xjf, Ejf)
+                    Ejf_grad = model(Xjf)[0]
+                    lossg = gradient_penalty(Xjf, Ejf_grad)
                 # Scales the loss, and calls backward()
                 # to create scaled gradients
                 scaler.scale(lossg).backward()
@@ -279,7 +280,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 print(f"skipped {n_skips}")
                 epoch_train_loss.append(running_loss/1000)
                 if not CFG.debug:
-                    wandb.log({"epoch": epoch,"running_loss": running_loss/1000})
+                    wandb.log({"epoch": epoch,"running_loss": running_loss/1000,"running_lossIndex":ds_length*epoch+index})
                 running_loss = 0.0
 
             torch.cuda.empty_cache()
@@ -289,7 +290,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # Log metrics
             if not CFG.debug:
                 wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": len(seq[0]),
-                           "Exd":Exd.item(),"Eku":Eku.item(),"Ekf":Ekf.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item()})
+                           "Exd":Exd.item(),"Eku":Eku.item(),"Ekf":Ekf.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item(),"step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item()})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -414,7 +415,7 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     "train and test the model"
     valid_loss = 100
     if epoch > 0:
-        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch}_final_model.pt", model, optimizer,CFG.device)
+        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer,CFG.device)
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
     #load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
@@ -443,7 +444,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 0
+    epoch = 3
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

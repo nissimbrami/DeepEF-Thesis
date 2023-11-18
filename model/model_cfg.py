@@ -29,7 +29,7 @@ class CFG:
     model_path = "./res/trianed_models_energyLimit4-sum/"
     gaussian_coef = -0.008*1e1
     #training parameters
-    lr = 0.0001
+    lr = 0.00001
     wd = 0.00001
     batch_size = 1
     num_workers = 2

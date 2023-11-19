@@ -438,7 +438,8 @@ def main():
     print('***Build the model***')
     model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     model.name = "PEM-With LLM embedding"
-    optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
+    # optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
+    optimizer = optim.SGD(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
     # configurate wandb

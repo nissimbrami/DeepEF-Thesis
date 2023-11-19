@@ -416,6 +416,7 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     valid_loss = 100
     if epoch > 0:
         model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer,CFG.device)
+        epoch += 1
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
     #load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)

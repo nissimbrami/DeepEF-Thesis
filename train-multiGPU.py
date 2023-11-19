@@ -415,7 +415,7 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     "train and test the model"
     valid_loss = 100
     if epoch > 0:
-        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer,CFG.device)
+        model,_,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model)
         epoch += 1
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
     #load the best model and check the validation
@@ -442,11 +442,12 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     # configurate wandb
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 3
+    epoch = 2
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

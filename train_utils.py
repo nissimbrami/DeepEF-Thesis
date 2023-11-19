@@ -52,7 +52,7 @@ def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
             'valid_loss': val_loss,
             }, path)
    
-def load_checkpoint(path,model,optimizer,device):
+def load_checkpoint(path,model,optimizer=None,device=CFG.device):
     """
     Load the model check point
     inputs:
@@ -66,7 +66,8 @@ def load_checkpoint(path,model,optimizer,device):
     print(f"Loaded model from {path}")
     # print(f"Epoch: {dict['epoch']},loss: {dict['loss']},valid_loss: {dict['valid_loss']}")
     model.load_state_dict(dict['model_state_dict'])
-    optimizer.load_state_dict(dict['optimizer_state_dict'])
+    if optimizer is not None:
+        optimizer.load_state_dict(dict['optimizer_state_dict'])
     return model,optimizer,dict['epoch'],dict['loss'],dict['valid_loss']
     
 def validation_plots(Exd,Exn,seq_len,type,epoch):

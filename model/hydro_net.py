@@ -347,6 +347,8 @@ class PEM(torch.nn.Module):
         # reshape to [batch_size,n_nodes]
         x = x.reshape(B,N,1)
         # Squeeze the energy between 0 and 1
+        # if self.training:    
+        #     x = torch.sigmoid(x)
         x = torch.sigmoid(x)
         # return energy        
         if (f_type == 'Default'):
@@ -526,7 +528,7 @@ class GAT(torch.nn.Module):
 
   def forward(self, x, edge_index):
     h=x
-    # h = self.dropout(x)
+    h = self.dropout(x)
     h = self.gat1(h, edge_index)
     h = F.elu(h)
     h = self.gat2(h, edge_index)
@@ -544,7 +546,7 @@ class GCN(torch.nn.Module):
     self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
-    # h = self.dropout(x)
+    h = self.dropout(x)
     h=x
     h = self.gcn1(h, edge_index)
     h = torch.relu(h)

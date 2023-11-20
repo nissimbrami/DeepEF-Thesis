@@ -26,7 +26,7 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 3
-    model_path = "./res/trianed_models_energyLimit4-sum/"
+    model_path = "./res/trianed_models_energyLimit4-dropout/"
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001

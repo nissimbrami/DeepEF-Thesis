@@ -438,8 +438,8 @@ def main():
     print('***Build the model***')
     model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     model.name = "PEM-With LLM embedding"
-    # optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
-    optimizer = optim.SGD(model.parameters(), lr=CFG.lr)
+    optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
+    # optimizer = optim.SGD(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
@@ -447,7 +447,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 2
+    epoch = 0
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

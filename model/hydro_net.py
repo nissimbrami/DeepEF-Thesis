@@ -528,7 +528,7 @@ class GAT(torch.nn.Module):
 
   def forward(self, x, edge_index):
     h=x
-    h = self.dropout(x)
+    # h = self.dropout(x)
     h = self.gat1(h, edge_index)
     h = F.elu(h)
     h = self.gat2(h, edge_index)
@@ -546,8 +546,8 @@ class GCN(torch.nn.Module):
     self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
-    h = self.dropout(x)
     h=x
+    # h = self.dropout(x)
     h = self.gcn1(h, edge_index)
     h = torch.relu(h)
     h = self.gcn2(h, edge_index)

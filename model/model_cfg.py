@@ -37,7 +37,7 @@ class CFG:
     num_epochs = 50
     seq_len = 600
     SM = False # score matching loss
-    gradient_penalty = True
+    gradient_penalty = False
     decoy_threshold = 10
     max_grad_norm = 10.0
     clip_grad_norm = False

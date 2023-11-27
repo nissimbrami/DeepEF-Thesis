@@ -120,6 +120,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd, with_grad = False)
                 
             # Add gradient penalty
+            Ejf_grad = torch.tensor(0.0).to(device)
             if CFG.gradient_penalty:
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -251,6 +252,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             scaler.update()
 
             # Add gradient penalty
+            Ejf_grad = torch.tensor(0.0).to(device)
             if CFG.gradient_penalty:
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -353,9 +355,13 @@ def gradient_penalty(X_native, E_native):
     """Implementing the lossg equation:
         The gradient of a wild type structure should be close to zero.
         Therefore we will add it to the loss as lossg"""
-    partial_dx_native = torch.autograd.grad(outputs=E_native, inputs=X_native, grad_outputs=torch.ones_like(E_native), create_graph=True)[0]
-    part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
-    lossg = torch.log(part_dx_native_norm+1)
+    partial_dx_native = torch.autograd.grad(outputs=E_native, inputs=X_native, grad_outputs=torch.ones_like(E_native),create_graph=True, retain_graph=True, only_inputs=True)[0]
+    # part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
+    # lossg = torch.log(part_dx_native_norm+1)
+    # Compute the gradient penalty
+    gradients = partial_dx_native.view(partial_dx_native.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    lossg = torch.log(gradient_penalty+1)
     return lossg
 
 def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, with_grad = True,decoy_threshold = CFG.decoy_threshold ):
@@ -448,7 +454,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 0
+    epoch = 2
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

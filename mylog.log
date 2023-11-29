@@ -1,0 +1,3 @@
+2023-11-28 19:08:44,244 - root - DEBUG - started run
+2023-11-28 19:08:44,245 - root - INFO - debuge mode False
+2023-11-28 19:08:47,145 - root - INFO - Finished loading model - esm2_t12_35M_UR50D

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 import wandb
 from omegaconf import OmegaConf
@@ -14,18 +16,21 @@ def load_config():
 def set_wandb_params(config, protein_name):
     wandb_conf = config.wandb_logger
     if wandb_conf.enabled:
-        wandb.init(project=wandb_conf.project)
-        wandb.config.model_name = config.model.name
-        wandb.config.base_model = config.model.base_model
-
-        wandb.config.optimizer = config.optimizer.name
-        wandb.config.learning_rate = config.optimizer.lr
-
-        wandb.config.freeze_pretrained = config.training.freeze_pretrained
-        wandb.config.pretrained_ckpt_path = config.training.pretrained_ckpt_path
-        wandb.config.batch_size = config.training.single_protein_batch_size
-
-        wandb.run.name = protein_name
+        pretrained_model_name = Path(config.training.pretrained_ckpt_path).stem
+        wandb.init(project=wandb_conf.project,
+                   name=f'{wandb_conf.per_protein_run_prefix}_{protein_name}',
+                   config={
+                       "model_name": config.model.name,
+                       "base_model": config.model.base_model,
+                       "optimizer": config.optimizer.name,
+                       "learning_rate": config.optimizer.lr,
+                       "freeze_pretrained": config.training.freeze_pretrained,
+                       "pretrained_ckpt": pretrained_model_name,
+                       "batch_size": config.training.single_protein_batch_size,
+                       "train_split": config.training.train_size
+                   },
+                   tags=[protein_name, pretrained_model_name]
+                   )
 
 
 def get_wt_data(batch, wt_index):

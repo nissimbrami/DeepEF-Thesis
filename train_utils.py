@@ -1,14 +1,9 @@
 import torch
-<<<<<<< HEAD
-=======
 import torch.nn.functional as F
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
 import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
-<<<<<<< HEAD
-=======
 from tqdm import tqdm
 import gc
 from model.model_cfg import CFG
@@ -36,7 +31,6 @@ AA_MAP = {
     'W': 18,
     'Y': 19
 }
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
 
 def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
     """
@@ -58,7 +52,7 @@ def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
             'valid_loss': val_loss,
             }, path)
    
-def load_checkpoint(path,model,optimizer,device):
+def load_checkpoint(path,model,optimizer=None,device=CFG.device):
     """
     Load the model check point
     inputs:
@@ -72,15 +66,11 @@ def load_checkpoint(path,model,optimizer,device):
     print(f"Loaded model from {path}")
     # print(f"Epoch: {dict['epoch']},loss: {dict['loss']},valid_loss: {dict['valid_loss']}")
     model.load_state_dict(dict['model_state_dict'])
-    optimizer.load_state_dict(dict['optimizer_state_dict'])
-<<<<<<< HEAD
-    
-def validation_plots(Exd,Exn,seq_len,type):
-=======
+    if optimizer is not None:
+        optimizer.load_state_dict(dict['optimizer_state_dict'])
     return model,optimizer,dict['epoch'],dict['loss'],dict['valid_loss']
     
 def validation_plots(Exd,Exn,seq_len,type,epoch):
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
     """
     Plot the validation data
     inputs:
@@ -89,12 +79,9 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
         seq_len (int) : sequence length
         type (str) : type of the plot
     """
-<<<<<<< HEAD
-=======
     # create the directory if not exist
     os.makedirs(CFG.results_path+'plots', exist_ok=True)
     plot_dir = CFG.results_path+'plots'
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
     # Plot the validation data
     fig, ax = plt.subplots()
     ax.set_title(f'Validation data for {type},number of sequences: {len(Exd)}')
@@ -106,11 +93,7 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
     ax.legend()
 
     #plt.show()
-<<<<<<< HEAD
-    plt.savefig(f'./plots/E_len_{type}.png')
-=======
     plt.savefig(f'{plot_dir}/E_len_{type}.png')
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
     
     plt.close()
     
@@ -127,18 +110,6 @@ def validation_plots(Exd,Exn,seq_len,type,epoch):
     ax.legend()
 
     #plt.show()
-<<<<<<< HEAD
-    plt.savefig(f'./plots/Edelta_len_{type}.png')
-    
-    plt.close()
-
-
-def print_parameters(model):
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            print(name, param.data)
-
-=======
     plt.savefig(f'{plot_dir}/epoch-{epoch}-Edelta_len_{type}.png')
     
     plt.close()
@@ -321,4 +292,31 @@ def get_one_hot(seq):
   for i,a in enumerate(seq):
     seq_one_hot[i][AA_MAP[a]] = 1
   return seq_one_hot
->>>>>>> 8270719b017330fbfaaf0f1214c19b0a413c436d
+
+def add_cb(crd_coords):
+        """
+        Add the Cbeta atom to the coordinates
+        Args:
+            crd_coords (tensor): tensor of shape [n_residues,3,3]
+
+        Returns:
+            crd_coords: tensor shape [n_residues,4,3]
+        """
+        # Get the coordinates of the backbone atoms
+        N, CA, C = crd_coords[:, 0], crd_coords[:, 1], crd_coords[:, 2]
+        # CB = CA + c1*(N-CA) + c2*(C-CA) + c3* (N-CA)x(C-CA)
+        CAmN = N - CA
+        # CAmN = CAmN / torch.sqrt(CAmN ** 2).sum(dim=2, keepdim=True)
+        CAmC = C - CA
+        # CAmC = CAmC / torch.sqrt(CAmC ** 2).sum(dim=2, keepdim=True)
+        ANxAC = torch.cross(CAmN, CAmC, dim=1)
+
+        A = torch.cat((CAmN.reshape(-1, 1), CAmC.reshape(-1, 1), ANxAC.reshape(-1, 1)), dim=1)
+        c = torch.tensor([0.5507, 0.5354, -0.5691]) / 100  # torch.tensor([1.1930, 1.2106, -2.7906]) #
+        b = (A @ c).reshape(-1,3)
+        CB = CA - b
+      
+        # Add Cbeta coordinates to existing coordinates array
+        crd_coords = torch.cat((crd_coords, CB.unsqueeze(1)), dim=1)
+        return crd_coords
+    

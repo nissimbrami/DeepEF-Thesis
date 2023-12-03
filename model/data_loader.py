@@ -33,8 +33,8 @@ class SidChainDS(Dataset):
     def __getitem__(self, index):
         
         item_path = self.data_dir[index]
+        
         decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]
-        # make sure the decoy is not the same as the item
         while decoy_path == item_path:
             decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]
         # load data
@@ -136,7 +136,9 @@ class PEFDataset(Dataset):
            * Large languege model embeddings
            * hand selected features
     '''
-    def __init__(self,file_df ,datapath=CFG.data_path,constraint = True,homothresh=CFG.homothresh,type='train',train_type = 'AlphaFold'):
+
+    def __init__(self, file_df, datapath=CFG.data_path, constraint=True, homothresh=CFG.homothresh, type='train',
+                 train_type='RoseTTAFold'):
         """_summary_
         Data set for the Deep energy function dataset.
         Args:
@@ -153,21 +155,20 @@ class PEFDataset(Dataset):
         # remove the files with homology greater than homothresh
         if type == 'train' and constraint:
             self.check_data_constraint()
-        
 
     def __len__(self):
         return len(self.filenames)
 
     def __getitem__(self, index):
-        
+
         index_path = os.path.join(self.datapath, self.filenames[index])
-       # Sequence of the protein
+        # Sequence of the protein
         seq = torch.load(os.path.join(index_path, 'seq.pt'))
-        seq_decoy = seq[:,torch.randperm(seq.shape[1])]
-        id = torch.load(os.path.join(index_path, 'ids.pt')) # string id
-       # 3D coordinates of the protein
+        seq_decoy = seq[:, torch.randperm(seq.shape[1])]
+        id = torch.load(os.path.join(index_path, 'ids.pt'))  # string id
+        # 3D coordinates of the protein
         coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt'))
-        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt'))   
+        coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt'))
         coordsC = torch.load(os.path.join(index_path, 'CoordC.pt'))
         coordsN = torch.load(os.path.join(index_path, 'CoordN.pt'))
         # 3D coordinates of the protein native
@@ -176,31 +177,34 @@ class PEFDataset(Dataset):
         coordsC_native = torch.load(os.path.join(index_path, 'CoordCNative.pt'))
         coordsN_native = torch.load(os.path.join(index_path, 'CoordNNative.pt'))
         # Check glycine value
-        glyIndices = torch.where(coordsBeta_native[:,0] > 5e4)[0]
+        glyIndices = torch.where(coordsBeta_native[:, 0] > 5e4)[0]
         if torch.any(glyIndices):
-            coordsBeta_native[glyIndices,:] = self.getCB(coordsN_native[glyIndices,:], coordsAlpha_native[glyIndices,:], coordsC_native[glyIndices,:])
-         # Check glycine value decoy
+            coordsBeta_native[glyIndices, :] = self.get_c_beta(coordsN_native[glyIndices, :],
+                                                          coordsAlpha_native[glyIndices, :],
+                                                          coordsC_native[glyIndices, :])
+        # Check glycine value decoy
         glyIndices = torch.where(coordsBeta[:, 0] > 5e4)[0]
-        if torch.any(glyIndices):    
-            coordsBeta[glyIndices,:] = self.getCB(coordsN[glyIndices,:], coordsAlpha[glyIndices,:], coordsC[glyIndices,:])
+        if torch.any(glyIndices):
+            coordsBeta[glyIndices, :] = self.get_c_beta(coordsN[glyIndices, :], coordsAlpha[glyIndices, :],
+                                                   coordsC[glyIndices, :])
         # Masks
         mask = torch.load(os.path.join(index_path, 'mask.pt'))
         nativemask = torch.load(os.path.join(index_path, 'nativemask.pt'))
         # Embeddings
-        n_nodes= coordsAlpha.shape[0]
+        n_nodes = coordsAlpha.shape[0]
         esm_embed = torch.stack(torch.load(os.path.join(index_path, 'emb_esm.pt')))[0][:10]
-        esm_embed = esm_embed.repeat(n_nodes,1)
+        esm_embed = esm_embed.repeat(n_nodes, 1)
         # Concatenate the coordinates
-        Xd = self.concat_cords(coordsAlpha,coordsBeta, coordsC, coordsN)
-        Xn = self.concat_cords(coordsAlpha_native,coordsBeta_native, coordsC_native, coordsN_native)
-        
-        # Convert nno to angstrom
+        Xd = self.concat_coords(coordsAlpha, coordsBeta, coordsC, coordsN)
+        Xn = self.concat_coords(coordsAlpha_native, coordsBeta_native, coordsC_native, coordsN_native)
+
+        # Convert nano to angstrom
         Xd = Xd * C.NANO_TO_ANGSTROM
         Xn = Xn * C.NANO_TO_ANGSTROM
-          
-        return seq,seq_decoy, id, Xd,Xn, mask, nativemask, esm_embed 
-        
-    def read_protein(self,index):
+
+        return seq, seq_decoy, id, Xd, Xn, mask, nativemask, esm_embed
+
+    def read_protein(self, index):
         """
         Read the protein data from the index path
 
@@ -210,7 +214,7 @@ class PEFDataset(Dataset):
         index_path = os.path.join(self.datapath, self.filenames[index])
         # Sequence of the protein
         seq = torch.load(os.path.join(index_path, 'seq.pt')).to(CFG.device)
-        id = torch.load(os.path.join(index_path, 'ids.pt')) # string id
+        id = torch.load(os.path.join(index_path, 'ids.pt'))  # string id
         # 3D coordinates of the protein
         coordsAlpha = torch.load(os.path.join(index_path, 'CoordAlpha.pt')).to(CFG.device)
         coordsBeta = torch.load(os.path.join(index_path, 'CoordBeta.pt')).to(CFG.device)
@@ -226,18 +230,19 @@ class PEFDataset(Dataset):
         nativemask = torch.load(os.path.join(index_path, 'nativemask.pt')).to(CFG.device)
         # Embeddings
         esm_embed = torch.load(os.path.join(index_path, 'emb_esm.pt'))[0].to(CFG.device)
-        
-        return seq, id, coordsAlpha,coordsBeta, coordsC, coordsN, coordsAlpha_native,coordsBeta_native, coordsC_native, coordsN_native, mask, nativemask, esm_embed
-    
-    def concat_cords(self,coordsAlpha,coordsBeta, coordsC, coordsN):
+
+        return seq, id, coordsAlpha, coordsBeta, coordsC, coordsN, coordsAlpha_native, coordsBeta_native, coordsC_native, coordsN_native, mask, nativemask, esm_embed
+
+    def concat_coords(self, coordsAlpha, coordsBeta, coordsC, coordsN):
         """
         Concatenate the coordinates
         output: X (torch.tensor): concatenated coordinates [N,4,3]
         """
-        coordsAlpha,coordsBeta, coordsC, coordsN = coordsAlpha.unsqueeze(1), coordsBeta.unsqueeze(1), coordsC.unsqueeze(1), coordsN.unsqueeze(1)
-        X = torch.cat((coordsAlpha,coordsBeta, coordsC, coordsN), dim=1)
+        coordsAlpha, coordsBeta, coordsC, coordsN = coordsAlpha.unsqueeze(1), coordsBeta.unsqueeze(
+            1), coordsC.unsqueeze(1), coordsN.unsqueeze(1)
+        X = torch.cat((coordsAlpha, coordsBeta, coordsC, coordsN), dim=1)
         return X
-    
+
     def check_data_constraint(self):
         """
         Check the data constraint and remove the files with homology greater than homothresh.
@@ -247,8 +252,8 @@ class PEFDataset(Dataset):
         print('Checking data constraint...')
         new_filenames = []
         for i in tqdm(range(len(self.filenames))):
-            (seq, id, coordAlpha,coordBeta, coordC, coordN, coordAlphaNative,
-             coordBetaNative, coordCNative, coordNNative, mask, nativemask, embedding)  = self.read_protein(i)
+            (seq, id, coordAlpha, coordBeta, coordC, coordN, coordAlphaNative,
+             coordBetaNative, coordCNative, coordNNative, mask, nativemask, embedding) = self.read_protein(i)
             dt = torch.get_default_dtype()
             coordN = coordN.to(dt)
             coordAlpha = coordAlpha.to(dt)
@@ -263,13 +268,13 @@ class PEFDataset(Dataset):
 
             s = seq.mean(-1)
             if (self.homothresh is not None) and (s.max() > self.homothresh):
-                # print("protein is too homogenuous", id)
+                # print("protein is too homogeneous", id)
                 continue
 
             if (self.train_type is not None) and (not self.train_type in id):
                 continue
 
-            # TODO: add mask check and inference
+            
             # scale = 1e-2
             # Mnat = nativemask
             # M = msk & Mnat
@@ -284,15 +289,16 @@ class PEFDataset(Dataset):
             #     # print("id problem", id)
             #     idx = (idx + 1) % self.__len__()
             #     continue
- 
+
             new_filenames.append(self.filenames[i])
-            
+
             torch.cuda.empty_cache()
             gc.collect()
-        
+
         self.filenames = new_filenames
 
-    def getCB(self,N, CA, C):
+    @staticmethod
+    def get_c_beta(N, CA, C):
         # CB = CA + c1*(N-CA) + c2*(C-CA) + c3* (N-CA)x(C-CA)
         dt = torch.get_default_dtype()
         N = N.to(dt)
@@ -307,11 +313,12 @@ class PEFDataset(Dataset):
 
         A = torch.cat((CAmN.reshape(-1, 1), CAmC.reshape(-1, 1), ANxAC.reshape(-1, 1)), dim=1)
         c = torch.tensor([0.5507, 0.5354, -0.5691]) / 100  # torch.tensor([1.1930, 1.2106, -2.7906]) #
-        b = (A @ c).reshape(-1,3)
+        b = (A @ c).reshape(-1, 3)
         CB = CA - b
 
-        return CB  
-        
+        return CB
+
+
 def fetch_dataloader(data_dir, params):
     """
     Fetches the DataLoader object for each type in types from data_dir.
@@ -322,36 +329,62 @@ def fetch_dataloader(data_dir, params):
     Returns:
         data: (dict) contains the DataLoader object for each type in types
     """
-    # Get the filenames from the train folder
-    file_names = os.listdir(data_dir)
-    if params.debug:
-        file_names = file_names[:CFG.debuge_size]
-    # Split the data into train, validation and test set
-    X_train, X_rem, y_train, y_rem = train_test_split(file_names,file_names, train_size=CFG.split_train,
-                                                      random_state=CFG.seed)
-    # Now since we want the valid and test size to be equal (10% each of overall data). 
-    # we have to define valid_size=0.5 (that is 50% of remaining data)
-    X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5)
-    # Now we have the data split in training, validation and test set
-    train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
-                                        num_workers=params.num_workers,
-                                        pin_memory=params.cuda)
-    valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
-                                        num_workers=params.num_workers,
-                                        pin_memory=params.cuda)
+    # Sidechainnet dataset
+    if params.dataset == 'scn':
+        train_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='train', debug=params.debug), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
+        valid_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='valid', debug=params.debug), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
 
-    test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
-                                        num_workers=params.num_workers,
-                                        pin_memory=params.cuda)
+        test_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='test', debug=params.debug), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
+    else:
+        # Get the filenames from the train folder
+        file_names = os.listdir(data_dir)
+        if params.debug:
+            file_names = file_names[:CFG.debug_size]
+        # Split the data into train, validation and test set
+        X_train, X_rem, y_train, y_rem = train_test_split(file_names,file_names, train_size=CFG.split_train_size,
+                                                        random_state=CFG.seed)
+        # Now since we want the valid and test size to be equal (10% each of overall data). 
+        # we have to define valid_size=0.5 (that is 50% of remaining data)
+        X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5)
+        # Now we have the data split in training, validation and test set
+        train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
+        valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
+
+        test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
+                                            num_workers=params.num_workers,
+                                            pin_memory=params.cuda)
     return train_loader, valid_loader, test_loader
 
-#TODO: clean dataset from  homology threshold
+def fetch_inference_loader(data_dir, params):
+    """
+    Fetches the DataLoader object for each type in types from data_dir.
+    Args:
+        data_dir (str): inferece data directory
+        params (params class): hyperparameters
+    """
+    inf_file_names = os.listdir(data_dir)
+    amino_inference_loader = DataLoader(PEFDataset(inf_file_names,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
+                                        num_workers=params.num_workers,
+                                        pin_memory=params.cuda)
+    return amino_inference_loader
+
 
 class params:
-    def __init__(self,batch_size,num_workers,cuda,constraint,debug=False):
+    def __init__(self,batch_size,num_workers,cuda,constraint, dataset,debug=False):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cuda = cuda
         self.debug = debug
         self.constraint = constraint
+        self.dataset = dataset
         

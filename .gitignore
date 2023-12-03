@@ -1,5 +1,5 @@
 /data/*
-/experiments/.ipyn*
+/experiments/
 /*/__pycache__/*
 *.pt
 trianed_models/*
@@ -7,6 +7,15 @@ trianed_models_log_fix/*
 trianed_models_no_const_log_fix/*
 trianed_models_no_const/*
 *.out
+.DS_Store
+*.csv
 *.pyc
+<<<<<<< HEAD
 res/*
+=======
+*.png
+experiments/plots/*
+experiments/.ipynb_checkpoints
+*.sh
+>>>>>>> 715964071456497696c39251fc06cd18f059c969
 wandb/*

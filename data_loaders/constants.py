@@ -1,0 +1,5 @@
+COORDS = 'coords_tensor.pt'
+DELTA_G = 'deltaG.pt'
+MASKS = 'mask_tensor.pt'
+ONE_HOT = 'one_hot_encodings.pt'
+PROTT5_EMBEDDINGS = 'prott5_embeddings'

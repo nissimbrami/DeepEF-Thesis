@@ -52,7 +52,7 @@ def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
             'valid_loss': val_loss,
             }, path)
    
-def load_checkpoint(path,model,optimizer,device):
+def load_checkpoint(path,model,optimizer=None,device=CFG.device):
     """
     Load the model check point
     inputs:
@@ -66,7 +66,8 @@ def load_checkpoint(path,model,optimizer,device):
     print(f"Loaded model from {path}")
     # print(f"Epoch: {dict['epoch']},loss: {dict['loss']},valid_loss: {dict['valid_loss']}")
     model.load_state_dict(dict['model_state_dict'])
-    optimizer.load_state_dict(dict['optimizer_state_dict'])
+    if optimizer is not None:
+        optimizer.load_state_dict(dict['optimizer_state_dict'])
     return model,optimizer,dict['epoch'],dict['loss'],dict['valid_loss']
     
 def validation_plots(Exd,Exn,seq_len,type,epoch):
@@ -291,3 +292,31 @@ def get_one_hot(seq):
   for i,a in enumerate(seq):
     seq_one_hot[i][AA_MAP[a]] = 1
   return seq_one_hot
+
+def add_cb(crd_coords):
+        """
+        Add the Cbeta atom to the coordinates
+        Args:
+            crd_coords (tensor): tensor of shape [n_residues,3,3]
+
+        Returns:
+            crd_coords: tensor shape [n_residues,4,3]
+        """
+        # Get the coordinates of the backbone atoms
+        N, CA, C = crd_coords[:, 0], crd_coords[:, 1], crd_coords[:, 2]
+        # CB = CA + c1*(N-CA) + c2*(C-CA) + c3* (N-CA)x(C-CA)
+        CAmN = N - CA
+        # CAmN = CAmN / torch.sqrt(CAmN ** 2).sum(dim=2, keepdim=True)
+        CAmC = C - CA
+        # CAmC = CAmC / torch.sqrt(CAmC ** 2).sum(dim=2, keepdim=True)
+        ANxAC = torch.cross(CAmN, CAmC, dim=1)
+
+        A = torch.cat((CAmN.reshape(-1, 1), CAmC.reshape(-1, 1), ANxAC.reshape(-1, 1)), dim=1)
+        c = torch.tensor([0.5507, 0.5354, -0.5691]) / 100  # torch.tensor([1.1930, 1.2106, -2.7906]) #
+        b = (A @ c).reshape(-1,3)
+        CB = CA - b
+      
+        # Add Cbeta coordinates to existing coordinates array
+        crd_coords = torch.cat((crd_coords, CB.unsqueeze(1)), dim=1)
+        return crd_coords
+    

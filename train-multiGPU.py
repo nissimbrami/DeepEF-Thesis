@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch import optim
 from torch.optim import lr_scheduler
+from torch.nn.utils import clip_grad_norm_ as clip_grad_norm
 from tqdm import tqdm
 import gc
 import time
@@ -18,9 +19,13 @@ import wandb
 
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
+torch.autograd.set_detect_anomaly(True)
 # Set wandb
 if not CFG.debug:
     wandb.init(project="Thermodynamic+decoy")
+if CFG.debug:
+   CFG.model_path = "./res/debug/"
+   CFG.results_path = './res/results-debug/'
 
 
 
@@ -42,9 +47,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     n_skips = 0
     model.eval() # cant use eval because of the loss function calculation
     with tqdm(dataloader, unit="batch") as tepoch:
+        # set progress bar description
+        tepoch.set_description(f"Validation: Epoch {epoch}")
         for index, data in (enumerate(tepoch)):
-            # set progress bar description
-            tepoch.set_description(f"Validation: Epoch {epoch}")
             # Clean the GPU cache
             if(device.type == "cuda" or device.type == "mps"):    
                 torch.cuda.empty_cache()
@@ -102,7 +107,6 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb_mut, proT5_mut, mask)
             # get decoy graph
             Xd, Xcd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy)
-            Xjf.requires_grad = True
             # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
             Xjf,Xkf,Xju,Xku,Xd,Xcd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0)    
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd,Xcd),dim=0)
@@ -113,8 +117,24 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 E = model(X)
                 Ejf, Ekf, Eju, Eku, Exd, Ecd = E[0], E[1], E[2], E[3], E[4], E[5]
                 # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd)
+                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd, with_grad = False)
                 
+            # Add gradient penalty
+            Ejf_grad = torch.tensor(0.0).to(device)
+            if CFG.gradient_penalty:
+                # zero the parameter gradients
+                optimizer.zero_grad()
+                torch.cuda.empty_cache()
+                gc.collect( )
+                # half precision training
+                with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+                    # calculate the energy for the wild type
+                    Xjf.requires_grad = True
+                    Ejf_grad = model(Xjf)[0]
+                    lossg = gradient_penalty(Xjf, Ejf_grad)
+                    
+                loss += lossg # add the gradient penalty to the loss
+            
             valid_loss += loss.item() 
             valid_lossd += lossd.item()
             valid_lossg += lossg.item()
@@ -127,15 +147,6 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             if index % 1000 == 999:
                 print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}, n_skips: {n_skips}")
                 validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
-            #tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(valid_loss/(index + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"Exn":round(Exn.item(),3),"Exd":round(Exd.item(),3)})
-            # if not CFG.debug:
-            #     wandb.log({"epoch": epoch,"val_lossg": lossg,"val_lossd": lossd,"val_loss": loss,"val_lossc": lossc,"val_Ejn": Eju.item(),"val_Ekn": Eku.item(),"val_Ejd": Ejf.item(),"val_Ekd": Ekf.item(),"val_Ed": Exd.item(),"val_Edelta": (Exd-Ejf).item(),"val_sequence_len": len(seq[0])})
-            
-    
-    validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
-    df = pd.DataFrame({'id':ids_list,'Exd':Exd_list,'Exn':Exn_list,'seq_len':seq_len,'lossg':lossg_list,'lossd':lossd_list})
-    df.to_csv(f'./res/results/epoch_{epoch}-validation_{val_type}.csv')
-    print(f"Finished Validation {val_type} epoch {epoch}")
             
     return valid_loss/len(dataloader),valid_lossd/len(dataloader),valid_lossg/len(dataloader),valid_lossc/len(dataloader)
 
@@ -150,10 +161,11 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
     model.train()
     running_loss = 0.0
     n_skips = 0
+    ds_length = len(dataloader)
     with tqdm(dataloader, unit="batch") as tepoch:
+        # set progress bar description
+        tepoch.set_description(f"Epoch {epoch}")
         for index, data in enumerate(tepoch):
-            # set progress bar description
-            tepoch.set_description(f"Epoch {epoch}")
             # Clean the GPU cache
             torch.cuda.empty_cache()
             gc.collect()
@@ -211,7 +223,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             Xju,Xku = get_unfolded_graph(Xju, emb, proT5_emb, mask), get_unfolded_graph(Xku, emb_mut, proT5_mut, mask)
             # get decoy graph
             Xd, Xcd = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy)
-            Xjf.requires_grad = True
+            # Xjf.requires_grad = True
             # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
             Xjf,Xkf,Xju,Xku,Xd,Xcd = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0)    
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd,Xcd),dim=0)
@@ -222,12 +234,16 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 E = model(X)
                 Ejf, Ekf, Eju, Eku, Exd, Ecd = E[0], E[1], E[2], E[3], E[4], E[5]
                 # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd)
+                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd, with_grad = False)
             
             # Scales the loss, and calls backward()
             # to create scaled gradients
             scaler.scale(loss).backward()
 
+            # Clip gradients to a maximum norm of max_grad_norm to prevent exploding gradients
+            if CFG.clip_grad_norm:
+                clip_grad_norm(model.parameters(), CFG.max_grad_norm)
+            
             # Unscales gradients and calls
             # or skips optimizer.step()
             scaler.step(optimizer)
@@ -235,6 +251,31 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # Updates the scale for next iteration
             scaler.update()
 
+            # Add gradient penalty
+            Ejf_grad = torch.tensor(0.0).to(device)
+            if CFG.gradient_penalty:
+                # zero the parameter gradients
+                optimizer.zero_grad()
+                torch.cuda.empty_cache()
+                gc.collect( )
+                # half precision training
+                with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+                    # calculate the energy for the wild type
+                    Xjf.requires_grad = True
+                    Ejf_grad = model(Xjf)[0]
+                    lossg = gradient_penalty(Xjf, Ejf_grad)
+                # Scales the loss, and calls backward()
+                # to create scaled gradients
+                scaler.scale(lossg).backward()
+
+                # Unscales gradients and calls
+                # or skips optimizer.step()
+                scaler.step(optimizer)
+
+                # Updates the scale for next iteration
+                scaler.update()
+                loss += lossg # add the gradient penalty to the loss
+                
             # print statistics
             running_loss += loss.item()
             if index % 1000 == 999 :    # print every 1000 mini-batches
@@ -242,16 +283,17 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 print(f"skipped {n_skips}")
                 epoch_train_loss.append(running_loss/1000)
                 if not CFG.debug:
-                    wandb.log({"epoch": epoch,"running_loss": running_loss/1000})
+                    wandb.log({"epoch": epoch,"running_loss": running_loss/1000,"running_lossIndex":ds_length*epoch+index})
                 running_loss = 0.0
 
             torch.cuda.empty_cache()
             gc.collect()
             # update the progress bar
-            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3)})
+            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"lossc":round(lossc.item(),3),"sequence_len": len(seq[0])})
             # Log metrics
             if not CFG.debug:
-                wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": len(seq[0]),"Exd":Exd.item(),"Eku":Eku.item(),"Ekf":Ekf.item(),"Eju": Eju.item(), "Ejf":Ejf.item()})
+                wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": len(seq[0]),
+                           "Exd":Exd.item(),"Eku":Eku.item(),"Ekf":Ekf.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item(),"step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item()})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -309,7 +351,20 @@ def preform_energy_optimization(X_decoy,partial_dx_decoy):
     """
     return 0
 
-def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd ):
+def gradient_penalty(X_native, E_native):
+    """Implementing the lossg equation:
+        The gradient of a wild type structure should be close to zero.
+        Therefore we will add it to the loss as lossg"""
+    partial_dx_native = torch.autograd.grad(outputs=E_native, inputs=X_native, grad_outputs=torch.ones_like(E_native),create_graph=True, retain_graph=True, only_inputs=True)[0]
+    # part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
+    # lossg = torch.log(part_dx_native_norm+1)
+    # Compute the gradient penalty
+    gradients = partial_dx_native.view(partial_dx_native.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    lossg = torch.log(gradient_penalty+1)
+    return lossg
+
+def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, with_grad = True,decoy_threshold = CFG.decoy_threshold ):
     """
     The loss function for the model corresponds to 3 main losses:
     1. lossg: the partial derivative of the energy with respect to the native structure
@@ -328,28 +383,29 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd ):
         lossg (tensor): The loss of the model due to the partial derivative of the energy with respect to the native structure
         lossc (tensor): The loss of the model due to the energy softplus function for the native and mutant structure(unfolded and folded)
     """
-    # print('***Start criterion function***')
-    partial_dx_native = torch.autograd.grad(outputs=Ejf, inputs=X_native, grad_outputs=torch.ones_like(Ejf), create_graph=True)[0]
-    part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
-   
-    # lossg = 2/(1+torch.exp(-part_dx_native_norm)) -1
-    lossg = torch.log(part_dx_native_norm+1)
-    lossd = (torch.log((Ejf+1) / (Exd+1) +1)) + (torch.log((Ejf+1) / (Ecd+1) +1))
+    lossg = gradient_penalty(X_native, Ejf) if with_grad else torch.tensor(0.0).to(Ejf.device)
+    lossd = loss_decoy(Ejf, Exd,decoy_threshold = decoy_threshold) + loss_decoy(Ejf, Ecd,decoy_threshold = decoy_threshold)
     lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
+def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
+    """Decoy loss, the energy of the native structure divided by the decoy energy"""
+    # if E_decoy-E_native > decoy_threshold:
+    #     return torch.tensor(0.0).to(E_native.device)
+    return torch.log((E_native+1) / (E_decoy+1) +1)
+
 def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     """Energy softplus,
     As we know the energy diffrence between an unfolded protein and folded protein is positive.
     Therefore we will add it to the loss as lossd"""
-    softplus = torch.nn.Softplus(beta=beta)
+    softplus = lambda x: torch.log(torch.exp(beta*x)+1)/beta
     
     lossd1 = softplus(Ekf-Eku)
-    lossd1 =  torch.where(lossd1 < 0.05, torch.tensor(0.0).to(lossd1.device), torch.min(torch.tensor(10.0).to(lossd1.device), lossd1))
+    # lossd1 =  torch.where(lossd1 < 0.05, torch.tensor(0.0).to(lossd1.device),torch.where(lossd1 > 10.0, lossd1/2.0, lossd1))
     
     lossd2 = softplus(Ejf-Eju)
-    lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.min(torch.tensor(10.0).to(lossd2.device), lossd2))
+    # lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.where(lossd2 > 10.0, lossd2/2.0, lossd2))
     return lossd1+lossd2
 
 
@@ -366,7 +422,8 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     "train and test the model"
     valid_loss = 100
     if epoch > 0:
-        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
+        model,_,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model)
+        epoch += 1
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
     #load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
@@ -386,18 +443,18 @@ def main():
     # amino_inference_loader = fetch_inference_loader(data_dir=CFG.inference_path, params=d_params)
     # Build the model
     print('***Build the model***')
-    # m_params = model_params(embedding_size = CFG.embedding_size,filters = CFG.filters, layers = CFG.num_layers,
-    #                          h = CFG.h,device=CFG.device)
     model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     model.name = "PEM-With LLM embedding"
-    optimizer = optim.Adam(model.parameters(), lr=CFG.lr, weight_decay=CFG.wd)
+    optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
+    # optimizer = optim.SGD(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     # configurate wandb
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 0
+    epoch = 10
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

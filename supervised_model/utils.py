@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import torch
@@ -10,7 +11,11 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
 def load_config():
-    return OmegaConf.load('configs/config.yaml')
+    file = 'configs/config.yaml'
+    if os.path.exists(file):
+        return OmegaConf.load(file)
+    else:
+        return OmegaConf.load(os.path.join('supervised_model', file))
 
 
 def set_wandb_params(config, protein_name):

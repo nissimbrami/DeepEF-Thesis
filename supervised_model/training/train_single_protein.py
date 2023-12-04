@@ -146,32 +146,34 @@ def set_training_false_on_feature_extractor(model):
 
 
 def train_single_protein(protein_name, model, optimizer, mutations_data, num_epochs):
-    set_wandb_params(config, protein_name)
-    single_protein_dataset = ProteinMutationDataset(mutations_data)
-    train_set, test_set, val_set = create_train_test_split(single_protein_dataset)
-    best_test_loss = float('inf')
-    if config.training.freeze_pretrained:
-        set_training_false_on_feature_extractor(model)
-    for epoch in tqdm(range(num_epochs), desc="Epochs"):
-        train_data_loader = DataLoader(train_set, batch_size=config.training.single_protein_batch_size, shuffle=True,
-                                       collate_fn=custom_collate_fn)
-        test_data_loader = DataLoader(test_set, batch_size=config.training.single_protein_batch_size, shuffle=False,
-                                      collate_fn=custom_collate_fn)
-        model, optimizer = accelerator.prepare(model, optimizer)
-        train_data_loader, test_data_loader = accelerator.prepare(train_data_loader, test_data_loader)
-        train_losses = train_epoch(model, criterion, optimizer, train_data_loader, epoch)
-        test_losses = evaluate_single_protein(model, criterion, test_data_loader, epoch)
+    run = set_wandb_params(config, protein_name)
+    with run:
+        single_protein_dataset = ProteinMutationDataset(mutations_data)
+        train_set, test_set, val_set = create_train_test_split(single_protein_dataset)
+        best_test_loss = float('inf')
+        if config.training.freeze_pretrained:
+            set_training_false_on_feature_extractor(model)
+        for epoch in tqdm(range(num_epochs), desc="Epochs"):
+            train_data_loader = DataLoader(train_set, batch_size=config.training.single_protein_batch_size, shuffle=True,
+                                           collate_fn=custom_collate_fn)
+            test_data_loader = DataLoader(test_set, batch_size=config.training.single_protein_batch_size, shuffle=False,
+                                          collate_fn=custom_collate_fn)
+            model, optimizer = accelerator.prepare(model, optimizer)
+            train_data_loader, test_data_loader = accelerator.prepare(train_data_loader, test_data_loader)
+            train_losses = train_epoch(model, criterion, optimizer, train_data_loader, epoch)
+            test_losses = evaluate_single_protein(model, criterion, test_data_loader, epoch)
 
-        unified_epoch_losses = {"train": train_losses, "val": test_losses}
-        log_loss_dict(unified_epoch_losses)
+            unified_epoch_losses = {"train": train_losses, "val": test_losses}
+            log_loss_dict(unified_epoch_losses)
 
-        curr_test_loss = test_losses['total_loss']
-        if curr_test_loss < best_test_loss:
-            print(f'curr_loss = {curr_test_loss}')
-            best_test_loss = curr_test_loss
-            model_path = Path(config.training.trained_ckpt_path) / config.model.name / protein_name / 'best_model.pth'
-            os.makedirs(str(model_path.parent), exist_ok=True)
-            save_best_model(model, str(model_path))
+            curr_test_loss = test_losses['total_loss']
+            if curr_test_loss < best_test_loss:
+                print(f'curr_loss = {curr_test_loss}')
+                best_test_loss = curr_test_loss
+                model_path = Path(config.training.trained_ckpt_path) / config.model.name / protein_name / 'best_model.pth'
+                os.makedirs(str(model_path.parent), exist_ok=True)
+                save_best_model(model, str(model_path))
+        run.detach()
 
 
 def train_all_single_proteins(model, optimizer, data_loader):

@@ -6,7 +6,7 @@ general:
 
 wandb_logger:
   enabled: true
-  project: BernieExperiments
+  project: "Supervised-Naive-V1"
   per_protein_run_prefix: first_run
 
 

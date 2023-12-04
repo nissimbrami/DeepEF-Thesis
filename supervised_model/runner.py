@@ -9,7 +9,7 @@ from data_loaders.utils import load_checkpoint
 from model.hydro_net import PEM
 from model.model_cfg import CFG
 from supervised_model.training.train_single_protein import train_all_single_proteins
-from supervised_model.utils import load_config, set_wandb_params
+from supervised_model.utils import load_config
 from supervised_model.vaildation.validation import evaluate_mutations
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -32,7 +32,7 @@ def run_model_with_supervised_data(root_data_dir, mode='evaluation'):
         ...
     elif mode == 'train_single_proteins':
         model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
-        model = load_checkpoint(model, device, CFG.model_path)
+        model = load_checkpoint(model, device, config.training.pretrained_ckpt_path)
         optimizer = optim.Adam(model.parameters(), lr=config.optimizer.lr)
         data_loader = DataLoader(protein_dataset, batch_size=1, shuffle=False)
         train_all_single_proteins(model, optimizer, data_loader)

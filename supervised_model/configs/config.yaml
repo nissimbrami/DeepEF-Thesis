@@ -5,8 +5,9 @@ general:
   - criteria: criteria
 
 wandb_logger:
-  - enabled: true
-  - project: BernieExperiments
+  enabled: true
+  project: "Supervised-Naive-V1"
+  per_protein_run_prefix: first_run
 
 
 model:
@@ -22,9 +23,9 @@ optimizer:
   lr: 0.0001
 
 training:
-  split_size: 0.2
+  train_size: 0.8
   single_protein_batch_size: 32
   num_epochs: 20
   freeze_pretrained: true
-  pretrained_ckpt_path: "../model_outputs/trianed_models_th_mix_100/"
+  pretrained_ckpt_path: "../model_outputs/trianed_models_energyLimit-inst_norm/"
   trained_ckpt_path: '../model_outputs/supervised/'

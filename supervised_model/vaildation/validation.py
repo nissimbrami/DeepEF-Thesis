@@ -43,13 +43,13 @@ def run_naive_thermodynamics_model(model, batch, mini_batch=256):
     return energy_out_df
 
 
-def evaluate_mutations(model, data_loader, root_dir):
+def evaluate_mutations(model, data_loader, root_dir, ckpt_path):
     model.eval()
-    mutation_output_dir = Path(root_dir) / 'mutation_outputs' / Path(CFG.model_path).stem
+    mutation_output_dir = Path(root_dir) / 'mutation_outputs' / ckpt_path
     os.makedirs(mutation_output_dir, exist_ok=True)
     with torch.no_grad():
         for i, batch in tqdm(enumerate(data_loader), total=len(data_loader)):
             batch = normalize_batch(batch)
-            energy_out_df = run_naive_thermodynamics_model(model, batch)
+            energy_out_df = run_naive_thermodynamics_model(model, batch, mini_batch=32)
             out_file = mutation_output_dir / f"{batch['name'][0]}.csv"
             energy_out_df.to_csv(out_file, index=False)

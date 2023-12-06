@@ -5,6 +5,7 @@ import torch
 import wandb
 from omegaconf import OmegaConf
 
+from constants import NANO_TO_ANGSTROM
 from train_utils import get_graph, get_unfolded_graph
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -50,6 +51,7 @@ def get_wt_data(batch, wt_index):
 
 def normalize_batch(batch):
     batch['one_hot'] = batch['one_hot'][:, :, :, :-1]
+    batch['coords'] = batch['coords'] * NANO_TO_ANGSTROM
     # ['coords'] = batch['coords'][:, :, [0, 2, 1, 3], :]
     # batch['masks'] = batch['masks'].to(torch.int) ^ 1  # Xor to reverse current output
 

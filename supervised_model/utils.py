@@ -1,31 +1,43 @@
+import os
+from pathlib import Path
+
 import torch
 import wandb
 from omegaconf import OmegaConf
 
+from constants import NANO_TO_ANGSTROM
 from train_utils import get_graph, get_unfolded_graph
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
 def load_config():
-    return OmegaConf.load('configs/config.yaml')
+    file = 'configs/config.yaml'
+    if os.path.exists(file):
+        return OmegaConf.load(file)
+    else:
+        return OmegaConf.load(os.path.join('supervised_model', file))
 
 
 def set_wandb_params(config, protein_name):
     wandb_conf = config.wandb_logger
     if wandb_conf.enabled:
-        wandb.init(project=wandb_conf.project)
-        wandb.config.model_name = config.model.name
-        wandb.config.base_model = config.model.base_model
-
-        wandb.config.optimizer = config.optimizer.name
-        wandb.config.learning_rate = config.optimizer.lr
-
-        wandb.config.freeze_pretrained = config.training.freeze_pretrained
-        wandb.config.pretrained_ckpt_path = config.training.pretrained_ckpt_path
-        wandb.config.batch_size = config.training.single_protein_batch_size
-
-        wandb.run.name = protein_name
+        pretrained_model_name = Path(config.training.pretrained_ckpt_path).stem
+        run = wandb.init(project=wandb_conf.project,
+                         name=f'{wandb_conf.per_protein_run_prefix}_{protein_name}',
+                         config={
+                             "model_name": config.model.name,
+                             "base_model": config.model.base_model,
+                             "optimizer": config.optimizer.name,
+                             "learning_rate": config.optimizer.lr,
+                             "freeze_pretrained": config.training.freeze_pretrained,
+                             "pretrained_ckpt": pretrained_model_name,
+                             "batch_size": config.training.single_protein_batch_size,
+                             "train_split": config.training.train_size
+                         },
+                         tags=[protein_name, pretrained_model_name]
+                         )
+        return run
 
 
 def get_wt_data(batch, wt_index):
@@ -39,6 +51,7 @@ def get_wt_data(batch, wt_index):
 
 def normalize_batch(batch):
     batch['one_hot'] = batch['one_hot'][:, :, :, :-1]
+    batch['coords'] = batch['coords'] * NANO_TO_ANGSTROM
     # ['coords'] = batch['coords'][:, :, [0, 2, 1, 3], :]
     # batch['masks'] = batch['masks'].to(torch.int) ^ 1  # Xor to reverse current output
 

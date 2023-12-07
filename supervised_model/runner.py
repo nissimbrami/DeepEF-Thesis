@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 import torch
@@ -16,6 +17,15 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 config = load_config()
 
+parser = argparse.ArgumentParser(description="Run model with supervised data.")
+parser.add_argument("root_data_dir", type=str, nargs="?", default="../data/Processed_K50_dG_datasets",
+                    help="Path to the root data directory.")
+parser.add_argument("--mode", type=str, default="evaluation",
+                    choices=["train_dataset", "train_single_proteins", "evaluation"],
+                    help="Mode for running the model (default: evaluation).")
+
+args = parser.parse_args()
+
 
 def run_model_with_supervised_data(root_data_dir, mode='evaluation'):
     tensor_root_dir = Path(root_data_dir) / 'training_data'
@@ -23,9 +33,9 @@ def run_model_with_supervised_data(root_data_dir, mode='evaluation'):
     protein_dataset = AllProteinValidationDataset(tensor_root_dir, mutations_root_dir)
     if mode == 'evaluation':
         model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
-        model = load_checkpoint(model, device, CFG.model_path)
+        model = load_checkpoint(model, device, config.training.pretrained_ckpt_path)
         data_loader = DataLoader(protein_dataset, batch_size=1, shuffle=False)
-        evaluate_mutations(model, data_loader, root_data_dir)
+        evaluate_mutations(model, data_loader, root_data_dir, config.training.pretrained_ckpt_path)
     elif mode == 'train_dataset':
         model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
         model = load_checkpoint(model, device, CFG.model_path)
@@ -39,6 +49,6 @@ def run_model_with_supervised_data(root_data_dir, mode='evaluation'):
 
 
 if __name__ == '__main__':
-    run_model_with_supervised_data(r'../data/Processed_K50_dG_datasets',
-                                   mode='train_single_proteins'
-                                   )
+    args = parser.parse_args()
+
+    run_model_with_supervised_data(args.root_data_dir, mode=args.mode)

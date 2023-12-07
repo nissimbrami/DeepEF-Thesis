@@ -10,7 +10,7 @@ from supervised_model.utils import load_config
 # COL_MUT_FOLDED = 2
 # COL_MUT_UNFOLDED = 3
 
-config = OmegaConf.load('configs/config.yaml')
+config = load_config()
 
 COL_FOLDED = 0
 COL_UNFOLDED = 1

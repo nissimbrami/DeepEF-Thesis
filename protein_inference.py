@@ -19,6 +19,7 @@ import wandb
 import constants as C
 from transformers import T5Tokenizer, T5EncoderModel
 import re
+from Bio.PDB import PDBParser
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 DATA_DIR = glob.glob('./data/casp12_data_100/train/*')
@@ -196,6 +197,9 @@ def inference_protein():
     # get the model input
     print(f'Getting the model input of the protein {item_path.split("/")[-1]}')
     X = get_model_input(data)
+    X_msc = torch.load("./data/MegaScale/folded_A01N.pt")
+    # replace embeddings 
+    X[0,4:-7,-1044:-20] = X_msc[0,:,-1044:-20]
     # load the model
     print(f'Load the model')
     model = get_model()
@@ -206,6 +210,47 @@ def inference_protein():
         E = model(X)
     print_statistics(E)
     return E
+
+def get_coords(pdb_file_path, protein_name):
+    pdb_parser = PDBParser(QUIET=True)
+    structure = pdb_parser.get_structure(protein_name, pdb_file_path)
+    out_data = dict(dict())
+    sequence_dict = dict()
+    for model in structure:
+        for chain in model:
+            for residue in chain:
+                residue_id = residue.id[1] - 1
+                atom_data_dict = {atom_type: [] for atom_type in atom_types}
+                if 'CA' in residue:
+                    for atom in residue:
+                        # Check if the atom type is in the list of atom types to save
+                        if atom.get_name() in atom_types:
+                            # Get the coordinates of the atom
+                            coord = atom.get_coord()
+                            # Add the coordinates to the corresponding atom type list in the data dictionary
+                            atom_data_dict[atom.get_name()] = torch.from_numpy(coord)
+                    if 'C' not in residue:
+                        atom_data_dict['C'] = MISSING_COORD
+                    if 'N' not in residue:
+                        atom_data_dict['N'] = MISSING_COORD
+                    if 'CB' not in residue and residue.get_resname() == 'GLY':
+                        try:
+                            atom_data_dict['CB'] = torch.from_numpy(residue['2HA'].get_coord())
+                        except KeyError:
+                            atom_data_dict['CB'] = torch.from_numpy(residue['HA2'].get_coord())
+                        # atom_data_dict['CB'] = MISSING_COORD
+                    # store the atoms foreach residue id, id is stored for mask later
+                    sequence_dict[residue_id] = atom_data_dict
+    return torch.stack([torch.stack(list(v.values())) for v in sequence_dict.values()])
+
+
+def compar_coords(pdb_file1,pdb_file2):
+    # compare the coordinates of the pdb files
+    protein_name = 'A01N'
+    coords1 = get_coords(pdb_file1,protein_name)
+    coords2 = get_coords(pdb_file2,protein_name)
+    print ("finished coords")
     
 if __name__ == "__main__":
-    inference_protein()
+    # inference_protein()
+    compar_coords("./data/MegaScale/1A0N-AlphaFold.pdb","./data/MegaScale/1A0N-databank.pdb")

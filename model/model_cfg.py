@@ -13,7 +13,7 @@ class CFG:
     inference_path = './data/inference_data'
     results_path = './res/results-emb/'
     seed = 42
-    debug = False
+    debug = True
     # Train data parameters
     homothresh = 0.9
     constraint = True
@@ -26,7 +26,7 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 3
-    model_path = "./res/trianed_models_energyLimit-inst_norm/"
+    model_path = "./res/trianed_models_energyLimit-inst_normGP/"
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001
@@ -37,7 +37,7 @@ class CFG:
     num_epochs = 50
     seq_len = 600
     SM = False # score matching loss
-    gradient_penalty = False
+    gradient_penalty = True
     decoy_threshold = 10
     max_grad_norm = 10.0
     clip_grad_norm = False

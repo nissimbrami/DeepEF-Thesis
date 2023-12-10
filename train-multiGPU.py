@@ -146,7 +146,6 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             # update the progress bar
             if index % 1000 == 999:
                 print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}, n_skips: {n_skips}")
-                validation_plots(Exd_list,Exn_list,seq_len,val_type,epoch)
             
     return valid_loss/len(dataloader),valid_lossd/len(dataloader),valid_lossg/len(dataloader),valid_lossc/len(dataloader)
 

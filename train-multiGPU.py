@@ -354,12 +354,14 @@ def gradient_penalty(X_native, E_native):
     """Implementing the lossg equation:
         The gradient of a wild type structure should be close to zero.
         Therefore we will add it to the loss as lossg"""
-    partial_dx_native = torch.autograd.grad(outputs=E_native, inputs=X_native, grad_outputs=torch.ones_like(E_native),create_graph=True, retain_graph=True, only_inputs=True, is_grads_batched=True)[0]
+    partial_dx_native = torch.autograd.grad(outputs=E_native, inputs=X_native,
+                                            grad_outputs=torch.ones_like(E_native),
+                                            create_graph=True, retain_graph=True)[0]
     # part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
     # lossg = torch.log(part_dx_native_norm+1)
     # Compute the gradient penalty
-    gradients = partial_dx_native.view(partial_dx_native.size(0), -1)
-    gradient_penalty = (gradients.norm(2, dim=1) ** 2).mean()
+    gradients = partial_dx_native#.view(partial_dx_native.size(0))
+    gradient_penalty = (gradients.norm(2, dim=0) ** 2).mean()
     lossg = torch.log(gradient_penalty+1)
     return lossg
 

@@ -9,7 +9,7 @@ class CFG:
         cuda = True
     else:
         cuda = False
-    debug = True
+    debug = False
     if debug:    
         data_path = './data/casp12_data_30/'
     else: 

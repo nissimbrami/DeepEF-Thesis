@@ -295,8 +295,8 @@ class PEM(torch.nn.Module):
         # Batch normalization
         # self.bn1  = nn.BatchNorm1d(36)
         # self.bn2  = nn.BatchNorm1d(72)
-        self.inst_norm1 = nn.InstanceNorm1d(36)
-        self.inst_norm2 = nn.InstanceNorm1d(72)
+        self.inst_norm1 = nn.InstanceNorm1d(36,affine=True)
+        self.inst_norm2 = nn.InstanceNorm1d(72,affine=True)
         # Fc layers for the final output
         self.fc1 = nn.Linear(1096, 128)
         self.fc2 = nn.Linear(128, 1)
@@ -535,7 +535,7 @@ class GAT(torch.nn.Module):
     self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
     self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
     # self.bn  = BatchNorm(dim_out)
-    self.inst_norm = nn.InstanceNorm1d(dim_out)
+    self.inst_norm = nn.InstanceNorm1d(dim_out,affine=True)
     self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
@@ -558,7 +558,7 @@ class GCN(torch.nn.Module):
     super().__init__()
     self.gcn1 = GCNConv(dim_in, dim_h)
     self.gcn2 = GCNConv(dim_h, dim_out)
-    self.inst_norm = nn.InstanceNorm1d(dim_out)
+    self.inst_norm = nn.InstanceNorm1d(dim_out,affine=True)
     self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):

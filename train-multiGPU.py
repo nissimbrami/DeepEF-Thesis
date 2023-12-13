@@ -19,7 +19,7 @@ import wandb
 
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
-torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
 # Set wandb
 if not CFG.debug:
     wandb.init(project="Thermodynamic+decoy")
@@ -455,7 +455,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 0
+    epoch = 1
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

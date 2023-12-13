@@ -295,8 +295,8 @@ class PEM(torch.nn.Module):
         # Batch normalization
         # self.bn1  = nn.BatchNorm1d(36)
         # self.bn2  = nn.BatchNorm1d(72)
-        self.inst_norm1 = nn.InstanceNorm1d(36)
-        self.inst_norm2 = nn.InstanceNorm1d(72)
+        self.inst_norm1 = nn.InstanceNorm1d(36,affine=True)
+        self.inst_norm2 = nn.InstanceNorm1d(72,affine=True)
         # Fc layers for the final output
         self.fc1 = nn.Linear(1096, 128)
         self.fc2 = nn.Linear(128, 1)
@@ -337,7 +337,10 @@ class PEM(torch.nn.Module):
         x2 = self.forward_gat(x_gat,edge_index_gat) # B*N,36->N,36
         # concat features
         x = torch.cat((x1,x2),dim=-1) # B*N,36+36->B*N,72
+        # swap axis to use insrance norm
+        x = x.transpose(0,1)
         x = self.inst_norm2(x)
+        x = x.transpose(0,1)
         # Add LLM features
         x = torch.cat((x,x_emb_features),dim=-1) # B*N,72+1024->B*N,1096
         # fc layers
@@ -364,7 +367,10 @@ class PEM(torch.nn.Module):
         x = self.fc1_gat(x) # N,36->N,64
         x = F.relu(x)
         x = self.fc2_gat(x) # N,64->N,36
+        # swap axis to use insrance norm
+        x = x.transpose(0,1)
         x = self.inst_norm1(x)
+        x = x.transpose(0,1)
         for gat_layer in self.GAT_layers:
             h1,z = gat_layer(x, edge_index_gat) 
             x = h1 + identity
@@ -376,7 +382,10 @@ class PEM(torch.nn.Module):
         x = self.fc1_gcn(x) # N,36->N,64
         x = F.relu(x)
         x = self.fc2_gcn(x) # N,64->N,36
+        # swap axis to use insrance norm
+        x = x.transpose(0,1)
         x = self.inst_norm1(x)
+        x = x.transpose(0,1)
         identity = x # identity for the residual connection
         for gcn_layer in self.GCN_layers:
             h1,z = gcn_layer(x, edge_index_gcn) 
@@ -526,7 +535,7 @@ class GAT(torch.nn.Module):
     self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
     self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
     # self.bn  = BatchNorm(dim_out)
-    self.inst_norm = nn.InstanceNorm1d(dim_out)
+    self.inst_norm = nn.InstanceNorm1d(dim_out,affine=True)
     self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
@@ -535,7 +544,11 @@ class GAT(torch.nn.Module):
     h = self.gat1(h, edge_index)
     h = F.elu(h)
     h = self.gat2(h, edge_index)
+    # swap axis to use insrance norm
+    h = h.transpose(0,1)
     h = self.inst_norm(h)
+    h = h.transpose(0,1)
+    
     return h, F.log_softmax(h, dim=1)
 
 
@@ -545,7 +558,7 @@ class GCN(torch.nn.Module):
     super().__init__()
     self.gcn1 = GCNConv(dim_in, dim_h)
     self.gcn2 = GCNConv(dim_h, dim_out)
-    self.inst_norm = nn.InstanceNorm1d(dim_out)
+    self.inst_norm = nn.InstanceNorm1d(dim_out,affine=True)
     self.dropout = nn.Dropout(0.2)
 
   def forward(self, x, edge_index):
@@ -554,5 +567,8 @@ class GCN(torch.nn.Module):
     h = self.gcn1(h, edge_index)
     h = torch.relu(h)
     h = self.gcn2(h, edge_index)
+    # swap axis to use insrance norm
+    h = h.transpose(0,1)
     h = self.inst_norm(h)
+    h = h.transpose(0,1)
     return h, F.log_softmax(h, dim=1)

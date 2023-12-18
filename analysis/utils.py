@@ -16,16 +16,35 @@ def aggregate_mutation_results(experiment_data, inference_data):
     aggregated_df['inferred_dG'] = aggregated_df['unfolded_energies'] - aggregated_df['folded_energies']
 
     wt = aggregated_df[aggregated_df['mut_type'] == 'wt'].iloc[0]
-    aggregated_df['inferred_ddG'] = wt['inferred_dG'] - aggregated_df['inferred_dG']
+    aggregated_df['inferred_ddG'] = aggregated_df['inferred_dG'] - wt['inferred_dG'] 
+    aggregated_df['ddG'] = aggregated_df['deltaG'] - wt['deltaG']
 
     mutation_df = aggregated_df['mut_type'].str.split(':', expand=True).apply(lambda x: pd.Series(list(x)))
     aggregated_df[[f'mutation_{i}' for i in range(mutation_df.shape[1])]] = mutation_df
     aggregated_df = aggregated_df[aggregated_df['mutation_1'].isna()] if 'mutation_1' in aggregated_df.columns else aggregated_df
 
-    aggregated_df = aggregated_df[aggregated_df['mutation_0'] != 'wt']
+    # aggregated_df = aggregated_df[aggregated_df['mutation_0'] != 'wt']
 
-    return aggregated_df
+    # remove muratation_0 rows that contain 1 between two letters
+    # Remove rows where '1' is between two letters in the 'text' column
+    pattern = r'(?<=[a-zA-Z])1(?=[a-zA-Z])'
+    aggregated_df = remove_rows_with_pattern(aggregated_df, "mutation_0", pattern)
+    # normelize inffered _ddG and deltaG row with mean 0 and std 1
+    aggregated_df['inferred_dG'] = (aggregated_df['inferred_dG'] - aggregated_df['inferred_dG'].mean()) / aggregated_df['inferred_dG'].std()
+    aggregated_df['deltaG'] = (aggregated_df['deltaG'] - aggregated_df['deltaG'].mean()) / aggregated_df['deltaG'].std()
+    
+    # add sperman and pearson correlation to inferred_dG and experiment_dG
+    # Calculate Pearson correlation and Spearman correlation
+    pearson_corr_dg = aggregated_df[['inferred_dG','deltaG']].corr(method='pearson')
+    spearman_corr_dg = aggregated_df[['inferred_dG','deltaG']].corr(method='spearman')
+    corr_dict = {"Pearson_dG": pearson_corr_dg['inferred_dG'].loc['deltaG'],"Spearman_dG": spearman_corr_dg['inferred_dG'].loc['deltaG']}
+    return aggregated_df, corr_dict
 
+# Function to remove rows where '1' is between two letters in a specific column
+def remove_rows_with_pattern(df, column_name, pattern):
+    mask = df[column_name].str.contains(pattern)
+    df_filtered = df[~mask]
+    return df_filtered
 
 def get_exp_dg(metric):
     if metric == 'dG':
@@ -131,6 +150,32 @@ def plot_dg_per_mutation(protein_name, df, metric='dG'):
     plt.xlabel("Original")
     plt.ylabel("Mutated amino acid")
     plt.title(f"{print_metric(metric)} per mutation per position for {protein_name}")
+    fig = plt.gcf()
+    # if CFG.debug:
+    #     plt.show()
+    return fig
+
+def plot_dg_per_mutation_diff(protein_name, df, metric='dG'):
+    plt.clf()
+    df.loc[:, 'from_aa'] = df['mutation_0'].str[0:-1]
+    df.loc[:, 'to_aa'] = df['mutation_0'].str[-1]
+
+    # aa_to_aa_agg_df = df.groupby(['from_aa', 'to_aa']).mean()
+    # pos_agg_df = df.groupby('mutation_position').mean()
+
+    aa_to_aa_df = df.pivot_table(index='from_aa', columns='to_aa', values=f'inferred_{metric}').T[
+        df['from_aa'].drop_duplicates().to_list()]
+    aa_to_aa_df_exp = df.pivot_table(index='from_aa', columns='to_aa', values=f'deltaG').T[
+        df['from_aa'].drop_duplicates().to_list()]
+    
+    aa_to_aa_df = aa_to_aa_df - aa_to_aa_df_exp
+    
+    plt.figure(figsize=(10, 6))  # Adjust the figure size as needed
+    sns.heatmap(aa_to_aa_df, cmap='coolwarm', fmt="", cbar=True, cbar_kws={'label': f'{metric} diff'}, mask=aa_to_aa_df.isnull(),
+                xticklabels=True, yticklabels=True)
+    plt.xlabel("Original")
+    plt.ylabel("Mutated amino acid")
+    plt.title(f"{print_metric(metric)} per mutation per position diffrence from experemantal {protein_name}")
     fig = plt.gcf()
     # if CFG.debug:
     #     plt.show()

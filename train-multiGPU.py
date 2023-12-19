@@ -403,12 +403,12 @@ def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     
     folded_threshold = 2 # the ratio between the energy of the folded and unfolded protein should be greater than 2
     softplus = lambda x: torch.log(torch.exp(beta*x)+1)/beta
-    if (Ekf*folded_threshold > Eku and Eku > Ekf):
+    if (Ekf*folded_threshold < Eku and Eku > Ekf):
         lossd1 = torch.tensor(0.0).to(Ekf.device)
     else:
         lossd1 = softplus(Ekf-Eku)
         
-    if (Ejf*folded_threshold > Eju and Eju > Ejf):
+    if (Ejf*folded_threshold < Eju and Eju > Ejf):
         lossd2 = torch.tensor(0.0).to(Ejf.device)
     else:
         lossd2 = softplus(Ejf-Eju)

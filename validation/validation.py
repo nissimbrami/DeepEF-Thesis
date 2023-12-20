@@ -40,7 +40,6 @@ def run_thermodynamics_model(model, batch, mini_batch=256):
     unfolded_energies_list = []
     wt_index = [i for i, x in enumerate(batch['mutations']) if 'wt' in x][0]
     coords, mask, _, _ = get_wt_data(batch, wt_index)
-    coords = coords*NANO_TO_ANGSTROM
     one_hot = batch['one_hot'].to(device)
     prott5_embedding = batch['prott5'].to(device)
     for i in range(0, batch['prott5'].size(1), mini_batch):

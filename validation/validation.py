@@ -28,6 +28,7 @@ def get_wt_data(batch, wt_index):
 
 def normalize_batch(batch):
     batch['one_hot'] = batch['one_hot'][:, :, :, :-1]
+    batch['coords'] = batch['coords'] * NANO_TO_ANGSTROM
     # batch['coords'] = batch['coords'][:, :, [0, 2, 1, 3], :]
     # batch['masks'] = batch['masks'].to(torch.int) ^ 1  # Xor to reverse current output
 
@@ -39,16 +40,17 @@ def run_thermodynamics_model(model, batch, mini_batch=256):
     unfolded_energies_list = []
     wt_index = [i for i, x in enumerate(batch['mutations']) if 'wt' in x][0]
     coords, mask, _, _ = get_wt_data(batch, wt_index)
+    coords = coords*NANO_TO_ANGSTROM
     one_hot = batch['one_hot'].to(device)
     prott5_embedding = batch['prott5'].to(device)
     for i in range(0, batch['prott5'].size(1), mini_batch):
         one_hot_minibatch = one_hot[0, i: i + mini_batch]
         prott5_embedding_minibatch = prott5_embedding[0, i: i + mini_batch]
         folded_graph_minibatch = torch.stack(
-            [get_graph(coords*NANO_TO_ANGSTROM, one_hot_minibatch[i], prott5_embedding_minibatch[i], mask) for i in
+            [get_graph(coords, one_hot_minibatch[i], prott5_embedding_minibatch[i], mask) for i in
              range(prott5_embedding_minibatch.size(0))])
         unfolded_graph_minibatch = torch.stack(
-            [get_unfolded_graph(coords*NANO_TO_ANGSTROM, one_hot_minibatch[i], prott5_embedding_minibatch[i], mask) for i in
+            [get_unfolded_graph(coords, one_hot_minibatch[i], prott5_embedding_minibatch[i], mask) for i in
              range(prott5_embedding_minibatch.size(0))])
         folded_energies = model(folded_graph_minibatch).cpu().numpy()
         unfolded_energies = model(unfolded_graph_minibatch).cpu().numpy()

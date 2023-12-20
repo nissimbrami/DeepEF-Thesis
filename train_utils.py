@@ -200,7 +200,7 @@ def get_graph(x, one_hot, emb, mask):
     # get bonded features
     Fb = get_bonded_features(D) # N,32
     # sum over the atoms,
-    D = D.sum(dim=1) #N,16
+    D = D.sum(dim=2) #N,16
     D = F.normalize(D,p=2,dim=0)
     Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
     
@@ -219,7 +219,7 @@ def get_unfolded_graph(x, one_hot, emb, mask):
     # get bonded features
     Fb = get_bonded_features(D) # N,32
     # sum over the atoms
-    D = D.sum(dim=1) #N,16
+    D = D.sum(dim=2) #N,16
     D = F.normalize(D,p=2,dim=0)
     Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
     

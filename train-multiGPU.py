@@ -392,8 +392,8 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, with_grad = True,decoy_thr
   
 def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
     """Decoy loss, the energy of the native structure divided by the decoy energy"""
-    # if E_decoy-E_native > decoy_threshold:
-    #     return torch.tensor(0.0).to(E_native.device)
+    if E_native * decoy_threshold < E_decoy:
+        return torch.tensor(0.0).to(E_native.device)
     return torch.log((E_native+1) / (E_decoy+1) +1)
 
 def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
@@ -403,12 +403,12 @@ def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     
     folded_threshold = 2 # the ratio between the energy of the folded and unfolded protein should be greater than 2
     softplus = lambda x: torch.log(torch.exp(beta*x)+1)/beta
-    if (Ekf*folded_threshold < Eku and Eku > Ekf):
+    if (Ekf * folded_threshold < Eku and Eku > Ekf):
         lossd1 = torch.tensor(0.0).to(Ekf.device)
     else:
         lossd1 = softplus(Ekf-Eku)
         
-    if (Ejf*folded_threshold < Eju and Eju > Ejf):
+    if (Ejf * folded_threshold < Eju and Eju > Ejf):
         lossd2 = torch.tensor(0.0).to(Ejf.device)
     else:
         lossd2 = softplus(Ejf-Eju)
@@ -453,10 +453,8 @@ def main():
     model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     model.name = "PEM-With LLM embedding"
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
-    # optimizer = optim.SGD(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
-    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     # configurate wandb
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training

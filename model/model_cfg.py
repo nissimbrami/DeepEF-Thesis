@@ -31,6 +31,7 @@ class CFG:
     num_layers = 3
     # model_path =  "./res/trianed_models_energyLimit-inst_normGP/"
     model_path = "./res/trianed_models-deltaGlimit/" 
+    # model_path = "./res/trianed_models-deltaGNdecoylimit/"
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001

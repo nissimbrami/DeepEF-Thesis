@@ -22,7 +22,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 limit deltaG and decoy')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 limit deltaG no decoy')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -404,12 +404,12 @@ def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     folded_threshold = 2 # the ratio between the energy of the folded and unfolded protein should be greater than 2
     softplus = lambda x: torch.log(torch.exp(beta*x)+1)/beta
     if (Ekf * folded_threshold < Eku and Eku > Ekf):
-        lossd1 = softplus(-Ekf) + softplus(Eku)
+        lossd1 = softplus(-Ekf) + torch.log(Eku+1)
     else:
         lossd1 = softplus(Ekf-Eku)
         
     if (Ejf * folded_threshold < Eju and Eju > Ejf):
-        lossd2 = softplus(-Ejf) + softplus(Eju)
+        lossd2 = softplus(-Ejf) + torch.log(Eju+1)
     else:
         lossd2 = softplus(Ejf-Eju)
     # lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.where(lossd2 > 10.0, lossd2/2.0, lossd2))

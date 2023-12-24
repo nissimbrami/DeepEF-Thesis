@@ -37,7 +37,10 @@ def aggregate_mutation_results(experiment_data, inference_data):
     # Calculate Pearson correlation and Spearman correlation
     pearson_corr_dg = aggregated_df[['inferred_dG','deltaG']].corr(method='pearson')
     spearman_corr_dg = aggregated_df[['inferred_dG','deltaG']].corr(method='spearman')
-    corr_dict = {"Pearson_dG": pearson_corr_dg['inferred_dG'].loc['deltaG'],"Spearman_dG": spearman_corr_dg['inferred_dG'].loc['deltaG']}
+    pearson_corr_dg_energy = aggregated_df[['folded_energies','deltaG']].corr(method='pearson')
+    spearman_corr_dg_energy = aggregated_df[['folded_energies','deltaG']].corr(method='spearman')
+    corr_dict = {"Pearson_dG": pearson_corr_dg['inferred_dG'].loc['deltaG'],"Spearman_dG": spearman_corr_dg['inferred_dG'].loc['deltaG'],
+                 "Pearson_dG_energy": pearson_corr_dg_energy['folded_energies'].loc['deltaG'],"Spearman_dG_energy": spearman_corr_dg_energy['folded_energies'].loc['deltaG']}
     return aggregated_df, corr_dict
 
 # Function to remove rows where '1' is between two letters in a specific column

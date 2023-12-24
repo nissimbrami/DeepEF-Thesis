@@ -19,7 +19,7 @@ def get_plots(model_name, protein_name, df, metric='dG'):
 def run_analysis():
     model = Path(CFG.model_path).stem
     print(f'taking model {model}')
-    df_correlation = pd.DataFrame(columns=['Protein', 'Pearson_dG', 'Spearman_dG'])
+    df_correlation = pd.DataFrame(columns=['Protein', 'Pearson_dG', 'Spearman_dG','Pearson_dG_energy', 'Spearman_dG_energy'])
     experiment_outputs = './data/Processed_K50_dG_datasets/mutation_datasets'
     inference_outputs = './data/Processed_K50_dG_datasets/mutation_outputs' +'/'+model+'/*'
     for inference_data in glob.glob(str(inference_outputs)):

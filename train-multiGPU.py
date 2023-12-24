@@ -392,8 +392,8 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, with_grad = True,decoy_thr
   
 def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
     """Decoy loss, the energy of the native structure divided by the decoy energy"""
-    if E_native * decoy_threshold < E_decoy:
-        return torch.tensor(0.0).to(E_native.device)
+    # if E_native * decoy_threshold < E_decoy:
+    #     return torch.tensor(0.0).to(E_native.device)
     return torch.log((E_native+1) / (E_decoy+1) +1)
 
 def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
@@ -404,12 +404,12 @@ def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     folded_threshold = 2 # the ratio between the energy of the folded and unfolded protein should be greater than 2
     softplus = lambda x: torch.log(torch.exp(beta*x)+1)/beta
     if (Ekf * folded_threshold < Eku and Eku > Ekf):
-        lossd1 = softplus(-Ekf)
+        lossd1 = softplus(-Ekf) + softplus(Eku)
     else:
         lossd1 = softplus(Ekf-Eku)
         
     if (Ejf * folded_threshold < Eju and Eju > Ejf):
-        lossd2 = softplus(-Ejf)
+        lossd2 = softplus(-Ejf) + softplus(Eju)
     else:
         lossd2 = softplus(Ejf-Eju)
     # lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.where(lossd2 > 10.0, lossd2/2.0, lossd2))

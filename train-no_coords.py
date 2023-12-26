@@ -242,9 +242,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                 # calculate the energy for the folded unfolded and decoy structure
                 E = model(X)
-                Ejf, Ekf, Exd = E[0], E[1], E[2]
+                Ejf, Ekf, Exd, Eju, Eku, Ecd, Exdu = E[0], E[1], E[2], 0, 0, 0, 0
                 # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, 0, 0, Exd, Xjf, 0, 0, with_grad = False)
+                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd, Exdu, with_grad = False)
             
             # Scales the loss, and calls backward()
             # to create scaled gradients

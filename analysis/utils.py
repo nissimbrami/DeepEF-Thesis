@@ -32,12 +32,29 @@ def aggregate_mutation_results(experiment_data, inference_data):
     # normelize inffered _ddG and deltaG row with mean 0 and std 1
     aggregated_df['inferred_dG'] = (aggregated_df['inferred_dG'] - aggregated_df['inferred_dG'].mean()) / aggregated_df['inferred_dG'].std()
     aggregated_df['deltaG'] = (aggregated_df['deltaG'] - aggregated_df['deltaG'].mean()) / aggregated_df['deltaG'].std()
+    # normelize unfolded_energies and folded_energies row with mean 0 and std 1
+    aggregated_df['norm_folded_energies'] = (aggregated_df['folded_energies'] - aggregated_df['folded_energies'].mean()) / aggregated_df['folded_energies'].std()
+    aggregated_df['norm_unfolded_energies'] = (aggregated_df['unfolded_energies'] - aggregated_df['unfolded_energies'].mean()) / aggregated_df['unfolded_energies'].std()
+    # get norm foldeded_energies and norm_unfolded_energies diffrence
+    aggregated_df['norm_avg'] = (aggregated_df['norm_unfolded_energies'] + aggregated_df['norm_folded_energies'])/2
     
     # add sperman and pearson correlation to inferred_dG and experiment_dG
     # Calculate Pearson correlation and Spearman correlation
     pearson_corr_dg = aggregated_df[['inferred_dG','deltaG']].corr(method='pearson')
     spearman_corr_dg = aggregated_df[['inferred_dG','deltaG']].corr(method='spearman')
-    corr_dict = {"Pearson_dG": pearson_corr_dg['inferred_dG'].loc['deltaG'],"Spearman_dG": spearman_corr_dg['inferred_dG'].loc['deltaG']}
+    pearson_corr_dg_energy = aggregated_df[['folded_energies','deltaG']].corr(method='pearson')
+    spearman_corr_dg_energy = aggregated_df[['folded_energies','deltaG']].corr(method='spearman')
+    pearson_corr_dg_unEnergy = aggregated_df[['unfolded_energies','deltaG']].corr(method='pearson')
+    spearman_corr_dg_unEnergy = aggregated_df[['unfolded_energies','deltaG']].corr(method='spearman')
+    pearson_corr_unEnergy_energy = aggregated_df[['unfolded_energies','folded_energies']].corr(method='pearson')
+    spearman_corr_unEnergy_energy = aggregated_df[['unfolded_energies','folded_energies']].corr(method='spearman')
+    pearson_corr_avg = aggregated_df[['norm_avg','deltaG']].corr(method='pearson')
+    spearman_corr_avg = aggregated_df[['norm_avg','deltaG']].corr(method='spearman')
+    corr_dict = {"Pearson_dG": pearson_corr_dg['inferred_dG'].loc['deltaG'],"Spearman_dG": spearman_corr_dg['inferred_dG'].loc['deltaG'],
+                 "Pearson_dG_energy": pearson_corr_dg_energy['folded_energies'].loc['deltaG'],"Spearman_dG_energy": spearman_corr_dg_energy['folded_energies'].loc['deltaG'],
+                 "Pearson_dG_unEnergy": pearson_corr_dg_unEnergy['unfolded_energies'].loc['deltaG'],"Spearman_dG_unEnergy": spearman_corr_dg_unEnergy['unfolded_energies'].loc['deltaG'],
+                 "Pearson_unEnergy_energy": pearson_corr_unEnergy_energy['unfolded_energies'].loc['folded_energies'],"Spearman_unEnergy_energy": spearman_corr_unEnergy_energy['unfolded_energies'].loc['folded_energies'],
+                 "Pearson_norm_avg": pearson_corr_avg['norm_avg'].loc['deltaG'],"Spearman_norm_avg": spearman_corr_avg['norm_avg'].loc['deltaG']}
     return aggregated_df, corr_dict
 
 # Function to remove rows where '1' is between two letters in a specific column

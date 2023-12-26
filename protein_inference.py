@@ -252,5 +252,5 @@ def compar_coords(pdb_file1,pdb_file2):
     print ("finished coords")
     
 if __name__ == "__main__":
-    # inference_protein()
-    compar_coords("./data/MegaScale/1A0N-AlphaFold.pdb","./data/MegaScale/1A0N-databank.pdb")
+    inference_protein()
+    # compar_coords("./data/MegaScale/1A0N-AlphaFold.pdb","./data/MegaScale/1A0N-databank.pdb")

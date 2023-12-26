@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import numpy as np
 import constants as C
+import pandas as pd
 
 
 class SidChainDS(Dataset):
@@ -29,7 +30,15 @@ class SidChainDS(Dataset):
             self.data_dir = [os.path.join(data_path+set_type, f) for f in os.listdir(data_path+set_type) if os.path.isdir(os.path.join(data_path+set_type, f))]   
         if(debug):
             self.data_dir = self.data_dir[:CFG.debug_size]
-            
+        # remove the mega-scale proteins
+        self.remove_megascale_proteins()
+    
+    def remove_megascale_proteins(self):
+        """remove the proteins from the mega-scale dataset"""
+        mega_scale = pd.read_csv('./data/megascale_proteins.csv')
+        mega_scale_ids = mega_scale['protein_name'].to_list()
+        self.data_dir = [f for f in self.data_dir if not any(f_ms in f for f_ms in mega_scale_ids)]     
+   
     def __getitem__(self, index):
         
         item_path = self.data_dir[index]

@@ -29,7 +29,10 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 3
-    model_path = "./res/trianed_models_energyLimit-inst_normGP/"
+    # model_path = "./res/trianed_models-deltaGNdecoylimit/"
+    # model_path = "./res/trianed_models-newDecoys/"
+    model_path = "./res/trianed_models-nocoords/"
+    
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001
@@ -41,7 +44,7 @@ class CFG:
     seq_len = 600
     SM = False # score matching loss
     gradient_penalty = True
-    decoy_threshold = 10
+    decoy_threshold = 20
     max_grad_norm = 10.0
     clip_grad_norm = False
     # defalut parameters

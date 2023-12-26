@@ -292,11 +292,9 @@ class PEM(torch.nn.Module):
         # Fully connected layers - GAT
         self.fc1_gat = nn.Linear(36, 64) # 36 = 16(dist) + 20(one-hot)
         self.fc2_gat = nn.Linear(64, gat_dim_in)
-        # Batch normalization
-        # self.bn1  = nn.BatchNorm1d(36)
-        # self.bn2  = nn.BatchNorm1d(72)
-        self.inst_norm1 = nn.InstanceNorm1d(36,affine=True)
-        self.inst_norm2 = nn.InstanceNorm1d(72,affine=True)
+        # normalization layers
+        self.inst_norm1 = Normalization_layer(36,affine=True)
+        self.inst_norm2 = Normalization_layer(72,affine=True)
         # Fc layers for the final output
         self.fc1 = nn.Linear(1096, 128)
         self.fc2 = nn.Linear(128, 1)
@@ -308,8 +306,12 @@ class PEM(torch.nn.Module):
         self.non_bonded_index = 48
         self.llm_index = -1044
         
-    
+        # batch and node size
+        self.B = 0
+        self.N = 0
         
+        
+    
     def forward(self,x,f_type = 'Default'):
         """
                 Forward function
@@ -326,8 +328,8 @@ class PEM(torch.nn.Module):
         # Get the edge index
         edge_index_gcn,edge_index_gat = self.get_edge_index(x)
         # reshape x to [batch_size*n_nodes,1096]
-        B,N,_ = x.shape
-        x = x.reshape(B*N,-1)
+        self.B,self.N,_ = x.shape
+        x = x.reshape(self.B * self.N,-1)
         # split features to 2 graphs, bonded and non-bonded
         x_gcn = torch.cat((x[:,:self.bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
         x_gat = torch.cat((x[:,self.bonded_index:self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,36
@@ -337,10 +339,10 @@ class PEM(torch.nn.Module):
         x2 = self.forward_gat(x_gat,edge_index_gat) # B*N,36->N,36
         # concat features
         x = torch.cat((x1,x2),dim=-1) # B*N,36+36->B*N,72
-        # swap axis to use insrance norm
-        x = x.transpose(0,1)
+        # reshape to use insrance norm
+        x = x.reshape(self.B, self.N,-1)
         x = self.inst_norm2(x)
-        x = x.transpose(0,1)
+        x = x.reshape(self.B * self.N,-1)
         # Add LLM features
         x = torch.cat((x,x_emb_features),dim=-1) # B*N,72+1024->B*N,1096
         # fc layers
@@ -350,7 +352,7 @@ class PEM(torch.nn.Module):
         # x = F.relu(x)
         # x = self.fc3(x) # B*N,64->B*N,1
         # reshape to [batch_size,n_nodes]
-        x = x.reshape(B,N,1)
+        x = x.reshape(self.B,self.N,1)
         # Squeeze the energy between 0 and 1
         # if self.training:    
         #     x = torch.sigmoid(x)
@@ -368,11 +370,11 @@ class PEM(torch.nn.Module):
         x = F.relu(x)
         x = self.fc2_gat(x) # N,64->N,36
         # swap axis to use insrance norm
-        x = x.transpose(0,1)
+        x = x.reshape(self.B, self.N,-1)
         x = self.inst_norm1(x)
-        x = x.transpose(0,1)
+        x = x.reshape(self.B * self.N,-1)
         for gat_layer in self.GAT_layers:
-            h1,z = gat_layer(x, edge_index_gat) 
+            h1,z = gat_layer(x, edge_index_gat,self.B,self.N) 
             x = h1 + identity
 
         return x
@@ -383,12 +385,12 @@ class PEM(torch.nn.Module):
         x = F.relu(x)
         x = self.fc2_gcn(x) # N,64->N,36
         # swap axis to use insrance norm
-        x = x.transpose(0,1)
+        x = x.reshape(self.B, self.N,-1)
         x = self.inst_norm1(x)
-        x = x.transpose(0,1)
+        x = x.reshape(self.B * self.N,-1)
         identity = x # identity for the residual connection
         for gcn_layer in self.GCN_layers:
-            h1,z = gcn_layer(x, edge_index_gcn) 
+            h1,z = gcn_layer(x, edge_index_gcn,self.B,self.N) 
             x = h1 + identity
         return x
   
@@ -535,19 +537,19 @@ class GAT(torch.nn.Module):
     self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
     self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
     # self.bn  = BatchNorm(dim_out)
-    self.inst_norm = nn.InstanceNorm1d(dim_out,affine=True)
+    self.inst_norm = Normalization_layer(dim_out,affine=True)
     self.dropout = nn.Dropout(0.2)
 
-  def forward(self, x, edge_index):
+  def forward(self, x, edge_index, B, N):
     h=x
     h = self.dropout(x)
     h = self.gat1(h, edge_index)
     h = F.elu(h)
     h = self.gat2(h, edge_index)
     # swap axis to use insrance norm
-    h = h.transpose(0,1)
+    h = h.reshape(B,N,-1)
     h = self.inst_norm(h)
-    h = h.transpose(0,1)
+    h = h.reshape(B*N,-1)
     
     return h, F.log_softmax(h, dim=1)
 
@@ -558,17 +560,33 @@ class GCN(torch.nn.Module):
     super().__init__()
     self.gcn1 = GCNConv(dim_in, dim_h)
     self.gcn2 = GCNConv(dim_h, dim_out)
-    self.inst_norm = nn.InstanceNorm1d(dim_out,affine=True)
+    self.inst_norm = Normalization_layer(dim_out,affine=True)
     self.dropout = nn.Dropout(0.2)
 
-  def forward(self, x, edge_index):
+  def forward(self, x, edge_index, B, N):
     h=x
     h = self.dropout(x)
     h = self.gcn1(h, edge_index)
     h = torch.relu(h)
     h = self.gcn2(h, edge_index)
     # swap axis to use insrance norm
-    h = h.transpose(0,1)
+    h = h.reshape(B,N,-1)
     h = self.inst_norm(h)
-    h = h.transpose(0,1)
+    h = h.reshape(B*N,-1)
     return h, F.log_softmax(h, dim=1)
+
+class Normalization_layer(torch.nn.Module):
+    """Normalization layer"""
+    def __init__(self, dim_in,affine):
+        super().__init__()
+        self.inst_norm = nn.InstanceNorm1d(dim_in,affine=affine)
+    def forward(self, x):
+        """forward function for the graph model
+        Args:
+            x (tensor): [batch_size ,n_nodes, dim_in]
+        """
+        # swap axis to use insrance norm
+        x = x.transpose(1,2)
+        x = self.inst_norm(x)
+        x = x.transpose(1,2)
+        return x

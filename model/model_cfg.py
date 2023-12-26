@@ -9,7 +9,7 @@ class CFG:
         cuda = True
     else:
         cuda = False
-    debug = False
+    debug = True
     if debug:    
         data_path = './data/casp12_data_30/'
     else: 
@@ -29,10 +29,10 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 3
-    # model_path =  "./res/trianed_models_energyLimit-inst_normGP/"
-    # model_path = "./res/trianed_models-deltaGlimit/" 
     # model_path = "./res/trianed_models-deltaGNdecoylimit/"
-    model_path = "./res/trianed_models-newDecoys/"
+    # model_path = "./res/trianed_models-newDecoys/"
+    model_path = "./res/trianed_models-nocoords/"
+    
     gaussian_coef = -0.008*1e1
     #training parameters
     lr = 0.0001

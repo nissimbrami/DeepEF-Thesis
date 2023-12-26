@@ -22,7 +22,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 new decoys')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 no coords')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -60,6 +60,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
                 proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy = data
             
+            # zero coordinates to check if the energy can be valueted only by the sequence
+            crd_backbone = torch.zeros_like(crd_backbone)
+            crd_decoy = torch.zeros_like(crd_decoy)
             # wild type and mutant type
             Xjf = crd_backbone.to(device) # wilde type structure folded
             Xkf = torch.clone(Xjf).to(device) # mutant structure folded
@@ -174,6 +177,10 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             optimizer.zero_grad()
             id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
                 proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy = data
+            # zero coordinates to check if the energy can be valueted only by the sequence
+            crd_backbone = torch.zeros_like(crd_backbone)
+            crd_decoy = torch.zeros_like(crd_decoy)
+            
             
             # wild type and mutant type
             Xjf = crd_backbone.to(device) # wilde type structure folded
@@ -200,7 +207,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # create decoy sequence
             seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
             
-            if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
+            if seq_decoy.shape[1] > CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
                 n_skips += 1
                 continue
             #emb = torch.cat((esm_embed,seq),dim=2)
@@ -228,15 +235,16 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # Xjf.requires_grad = True
             # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
             Xjf,Xkf,Xju,Xku,Xd,Xcd,Xdu = Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0), Xdu.unsqueeze(0)
-            X = torch.cat((Xjf,Xkf,Xju,Xku,Xd,Xcd,Xdu),dim=0)
+            X = torch.cat((Xjf,Xkf,Xd),dim=0)
+            
             
             # half precision training
             with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                 # calculate the energy for the folded unfolded and decoy structure
                 E = model(X)
-                Ejf, Ekf, Eju, Eku, Exd, Ecd, Exdu = E[0], E[1], E[2], E[3], E[4], E[5], E[6]
+                Ejf, Ekf, Exd = E[0], E[1], E[2]
                 # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd, Exdu, with_grad = False)
+                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, 0, 0, Exd, Xjf, 0, 0, with_grad = False)
             
             # Scales the loss, and calls backward()
             # to create scaled gradients
@@ -404,13 +412,8 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
     """
     loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
     
-    return loss_decoy(Ejf, Exd)+loss_decoy(Ejf, Ecd)+loss_decoy(Exdu, Exd)+loss_decoy(Eju, Ecd)
+    return loss_decoy(Ejf, Exd) 
 
-# def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
-#     """Decoy loss, the energy of the native structure divided by the decoy energy"""
-#     # if E_native * decoy_threshold < E_decoy:
-#     #     return torch.tensor(0.0).to(E_native.device)
-#     return torch.log((E_native+1) / (E_decoy+1) +1)
 
 def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     """Energy softplus,
@@ -419,16 +422,12 @@ def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
     
     folded_threshold = 2 # the ratio between the energy of the folded and unfolded protein should be greater than 2
     softplus = lambda x: torch.log(torch.exp(beta*x)+1)/beta
-    if (Ekf * folded_threshold < Eku and Eku > Ekf):
-        lossc1 = softplus(-Ekf) 
-    else:
-        lossc1 = softplus(Ekf-Eku)
-        
-    if (Ejf * folded_threshold < Eju and Eju > Ejf):
-        lossc2 = softplus(-Ejf) 
-    else:
-        lossc2 = softplus(Ejf-Eju)
-    # lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.where(lossd2 > 10.0, lossd2/2.0, lossd2))
+   
+    lossc1 = softplus(-Ekf) 
+   
+    lossc2 = softplus(-Ejf) 
+
+
     return lossc1+lossc2
 
 

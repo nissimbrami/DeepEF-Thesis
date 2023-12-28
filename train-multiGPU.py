@@ -113,13 +113,14 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             Xjf,Xkf,Xju,Xku,Xd,Xcd,Xdu= Xjf.unsqueeze(0),Xkf.unsqueeze(0),Xju.unsqueeze(0),Xku.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0), Xdu.unsqueeze(0)  
             X = torch.cat((Xjf,Xkf,Xju,Xku,Xd,Xcd,Xdu),dim=0)
             
-             # half precision validation
-            with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
-                # calculate the energy for the folded unfolded and decoy structure
-                E = model(X)
-                Ejf, Ekf, Eju, Eku, Exd, Ecd, Exdu = E[0], E[1], E[2], E[3], E[4], E[5], E[6]
-                # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd, Exdu, with_grad = False)
+            with torch.no_grad():
+                # half precision validation
+                with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+                    # calculate the energy for the folded unfolded and decoy structure
+                    E = model(X)
+                    Ejf, Ekf, Eju, Eku, Exd, Ecd, Exdu = E[0], E[1], E[2], E[3], E[4], E[5], E[6]
+                    # calculate the loss   
+                    loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd, Exdu, with_grad = False)
                 
             # Add gradient penalty
             Ejf_grad = torch.tensor(0.0).to(device)
@@ -445,7 +446,7 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     "train and test the model"
     valid_loss = 100
     if epoch > 0:
-        model,_,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model)
+        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer)
         epoch += 1
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
     #load the best model and check the validation
@@ -475,7 +476,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 0
+    epoch = 3
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

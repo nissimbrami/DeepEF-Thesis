@@ -114,6 +114,27 @@ def plot_experiment_to_inferred_dg(protein_name, df, metric='dG'):
     return fig
 
 
+def plot_experiment_to_folded_energy(protein_name, df, metric='dG'):
+    plt.clf()
+    experimented_metric = df[get_exp_dg(metric)]
+    inferred_metric = df[f'folded_energies']
+
+    y_pred, coef, r_squared, intercept = get_regressor(experimented_metric, inferred_metric)
+
+    plt.scatter(experimented_metric, inferred_metric, label="Data Points")
+    plt.plot(experimented_metric, y_pred, color='red', linewidth=2,
+             label=f"Linear Regression: {coef:.4f}x + {intercept:.4f}, r_squared: {r_squared:.4f}")
+    plt.xlabel(f"Experimented {print_metric(metric)}")
+    plt.ylabel(f"folded_energies")
+    plt.title(f"Scatterplot for {protein_name}")
+    plt.legend()
+    plt.grid(True)
+    fig = plt.gcf()
+    # if CFG.debug:
+    #     plt.show()
+    return fig
+
+
 def plot_violin(protein_name, df, metric='dG'):
     plt.clf()
     df.loc[:, 'from_aa'] = df['mutation_0'].str[0:-1]

@@ -4,13 +4,14 @@ from pathlib import Path
 import pandas as pd
 
 from analysis.utils import aggregate_mutation_results, plot_experiment_to_inferred_dg, plot_diff_hist, \
-    plot_dg_per_mutation, plot_violin, plot_dg_per_mutation_diff
+    plot_dg_per_mutation, plot_violin, plot_dg_per_mutation_diff, plot_experiment_to_folded_energy
 from model.model_cfg import CFG
 
 
 def get_plots(model_name, protein_name, df, metric='dG'):
     for plot_function in [plot_experiment_to_inferred_dg, plot_diff_hist,
-                          plot_dg_per_mutation, plot_violin,plot_dg_per_mutation_diff]:
+                          plot_dg_per_mutation, plot_violin,plot_dg_per_mutation_diff,
+                          plot_experiment_to_folded_energy]:
         plt = plot_function(protein_name, df, metric)
         protein_graph_folder = os.path.join('.', model_name, protein_name)
         os.makedirs(protein_graph_folder, exist_ok=True)

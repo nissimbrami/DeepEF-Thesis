@@ -242,7 +242,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                 # calculate the energy for the folded unfolded and decoy structure
                 E = model(X)
-                Ejf, Ekf, Exd, Eju, Eku, Ecd, Exdu = E[0], E[1], E[2], 0, 0, 0, 0
+                Ejf, Ekf, Exd, Eju, Eku, Ecd, Exdu = E[0], E[1], E[2], torch.tensor(0.0), torch.tensor(0.0), torch.tensor(0.0), torch.tensor(0.0)
                 # calculate the loss   
                 loss ,lossd, lossg,lossc = criterion(Ejf, Ekf, Eju, Eku, Exd, Xjf, Ecd, Exdu, with_grad = False)
             
@@ -444,7 +444,7 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     "train and test the model"
     valid_loss = 100
     if epoch > 0:
-        model,_,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model)
+        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model,optimizer)
         epoch += 1
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
     #load the best model and check the validation

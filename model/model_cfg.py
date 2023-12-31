@@ -30,8 +30,9 @@ class CFG:
     filters = 64
     num_layers = 3
     # model_path = "./res/trianed_models-deltaGNdecoylimit/"
-    model_path = "./res/trianed_models-newDecoys/"
+    # model_path = "./res/trianed_models-newDecoys/"
     # model_path = "./res/trianed_models-nocoords/"
+    model_path = "./res/trianed_models-noLLMemb/"
     
     gaussian_coef = -0.008*1e1
     #training parameters

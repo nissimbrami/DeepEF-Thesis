@@ -22,7 +22,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 no coords')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 no coords and no LLM emb')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -63,6 +63,11 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             # zero coordinates to check if the energy can be valueted only by the sequence
             crd_backbone = torch.zeros_like(crd_backbone)
             crd_decoy = torch.zeros_like(crd_decoy)
+            
+             # zero prot5 embedding
+            proT5_emb = torch.zeros_like(proT5_emb)
+            proT5_mut = torch.zeros_like(proT5_mut)
+            
             # wild type and mutant type
             Xjf = crd_backbone.to(device) # wilde type structure folded
             Xkf = torch.clone(Xjf).to(device) # mutant structure folded
@@ -180,7 +185,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # zero coordinates to check if the energy can be valueted only by the sequence
             crd_backbone = torch.zeros_like(crd_backbone)
             crd_decoy = torch.zeros_like(crd_decoy)
-            
+            # zero prot5 embedding
+            proT5_emb = torch.zeros_like(proT5_emb)
+            proT5_mut = torch.zeros_like(proT5_mut)
             
             # wild type and mutant type
             Xjf = crd_backbone.to(device) # wilde type structure folded
@@ -474,7 +481,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 9
+    epoch = 0
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

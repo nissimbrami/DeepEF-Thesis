@@ -51,8 +51,9 @@ def run_thermodynamics_model(model, batch, mini_batch=256):
         unfolded_graph_minibatch = torch.stack(
             [get_unfolded_graph(coords, one_hot_minibatch[i], prott5_embedding_minibatch[i], mask) for i in
              range(prott5_embedding_minibatch.size(0))])
-        folded_energies = model(folded_graph_minibatch).cpu().numpy()
-        unfolded_energies = model(unfolded_graph_minibatch).cpu().numpy()
+        with torch.no_grad():
+            folded_energies = model(folded_graph_minibatch).cpu().numpy()
+            unfolded_energies = model(unfolded_graph_minibatch).cpu().numpy()
 
         folded_energies_list.append(folded_energies)
         unfolded_energies_list.append(unfolded_energies)

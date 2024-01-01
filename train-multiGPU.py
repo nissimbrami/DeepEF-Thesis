@@ -487,7 +487,5 @@ def print_par(model):
             print (name, param.data)
    
 if __name__ == '__main__':
-    if len(sys.argv)>1:
-        CFG.model_path = sys.argv[1]
-        CFG.SM = False#int(sys.argv[2])
+    CFG.model_path = "./res/trianed_models-newDecoys/"
     main()

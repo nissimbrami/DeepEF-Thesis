@@ -79,13 +79,13 @@ def evaluate_mutations(model, data_loader, root_dir):
             energy_out_df.to_csv(out_file, index=False)
 
 
-def run_validation(root_dir, mode='evaluation'):
+def run_validation(root_dir, mode='evaluation', model_path=CFG.model_path):
     tensor_root_dir = Path(root_dir) / 'training_data'
     mutations_root_dir = Path(root_dir) / 'mutation_datasets'
     protein_dataset = AllProteinValidationDataset(tensor_root_dir, mutations_root_dir)
     if mode == 'evaluation':
         model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
-        model = load_checkpoint(model, device, CFG.model_path)
+        model = load_checkpoint(model, device,model_path)
         data_loader = DataLoader(protein_dataset, batch_size=1, shuffle=False)
         evaluate_mutations(model, data_loader, root_dir)
     elif mode == 'split_single_protein':

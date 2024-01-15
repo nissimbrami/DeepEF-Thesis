@@ -365,7 +365,7 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, Exdu, Eh1, Eh2, with_grad 
         lossg (tensor): The loss of the model due to the partial derivative of the energy with respect to the native structure
         lossc (tensor): The loss of the model due to the energy softplus function for the native and mutant structure(unfolded and folded)
     """
-    lossg = numerical_LG(Eh1, Eh2) if with_grad else torch.tensor(0.0).to(Ejf.device)
+    lossg = numerical_LG(Ejf, Eh1, Eh2) if with_grad else torch.tensor(0.0).to(Ejf.device)
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju)
     lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     
@@ -382,11 +382,16 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
     
     return loss_decoy(Ejf, Exd)+loss_decoy(Ejf, Ecd)+loss_decoy(Exdu, Exd)+loss_decoy(Eju, Ecd)
 
-def numerical_LG(Eh1, Eh2, h = CFG.h):
+def numerical_LG(Ejf, Eh1, Eh2, h = CFG.h):
     """Numerical LG:
     Calculate the lossg in respect to a numerical gradient
     """
-    lossg = (Eh1-Eh2)/(2*h)
+    # first order numerical gradient
+    g1 = torch.abs((Eh1-Eh2)/(2*h)) # the first order numerical gradient should be close to zero
+    # second order numerical gradient
+    g2 = torch.sigmoid(-1 * (Eh1- 2*Ejf + Eh2)/(h**2)) # the second order numerical gradient should be positive
+    # add sigmoid to the gradient
+    lossg = g1+g2
     return lossg
 
 def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):

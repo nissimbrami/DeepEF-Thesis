@@ -452,7 +452,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 3
+    epoch = 0
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

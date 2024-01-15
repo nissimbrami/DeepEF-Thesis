@@ -487,5 +487,7 @@ def print_par(model):
             print (name, param.data)
    
 if __name__ == '__main__':
-    CFG.model_path = "./res/trianed_models-newDecoys/"
+    if not CFG.debug:
+        CFG.model_path = "./res/trianed_models-newDecoys/"
+        CFG.results_path = './res/results-emb/'
     main()

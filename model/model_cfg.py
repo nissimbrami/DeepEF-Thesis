@@ -24,8 +24,8 @@ class CFG:
     debug_size  = 10
     sigma = 0.1 # for score matching loss
     # Model parameters
-    h = 0.001
-    coords_emb_size = 64
+    h = 0.1
+    coords_emb_size = 48
     embedding_size = 20
     filters = 64
     num_layers = 3

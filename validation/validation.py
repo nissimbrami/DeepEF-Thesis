@@ -26,16 +26,18 @@ def get_wt_data(batch, wt_index):
     return coords.squeeze(0), mask.squeeze(0), wt_one_hot.squeeze(0), wt_prott5_embedding.squeeze(0)
 
 
-def normalize_batch(batch):
+def normalize_batch(batch, LLM_EMB = True):
     batch['one_hot'] = batch['one_hot'][:, :, :, :-1]
     batch['coords'] = batch['coords'] * NANO_TO_ANGSTROM
+    if not LLM_EMB: # zero prot5 embedding
+         batch['prott5'] = torch.zeros_like(batch['prott5'])
     # batch['coords'] = batch['coords'][:, :, [0, 2, 1, 3], :]
     # batch['masks'] = batch['masks'].to(torch.int) ^ 1  # Xor to reverse current output
 
     return batch
 
 
-def run_thermodynamics_model(model, batch, mini_batch=256):
+def run_thermodynamics_model(model, batch, mini_batch=512):
     folded_energies_list = []
     unfolded_energies_list = []
     wt_index = [i for i, x in enumerate(batch['mutations']) if 'wt' in x][0]
@@ -66,14 +68,14 @@ def run_thermodynamics_model(model, batch, mini_batch=256):
     return energy_out_df
 
 
-def evaluate_mutations(model, data_loader, root_dir):
+def evaluate_mutations(model, data_loader, root_dir,model_path = CFG.model_path):
     model.eval()
     # model.train()
-    mutation_output_dir = Path(root_dir) / 'mutation_outputs' / Path(CFG.model_path).stem
+    mutation_output_dir = Path(root_dir) / 'mutation_outputs' / Path(model_path).stem
     os.makedirs(mutation_output_dir, exist_ok=True)
     with torch.no_grad():
         for i, batch in tqdm(enumerate(data_loader), total=len(data_loader)):
-            batch = normalize_batch(batch)
+            batch = normalize_batch(batch, False)
             energy_out_df = run_thermodynamics_model(model, batch)
             out_file = mutation_output_dir / f"{batch['name'][0]}.csv"
             energy_out_df.to_csv(out_file, index=False)
@@ -87,7 +89,7 @@ def run_validation(root_dir, mode='evaluation', model_path=CFG.model_path):
         model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
         model = load_checkpoint(model, device,model_path)
         data_loader = DataLoader(protein_dataset, batch_size=1, shuffle=False)
-        evaluate_mutations(model, data_loader, root_dir)
+        evaluate_mutations(model, data_loader, root_dir,model_path)
     elif mode == 'split_single_protein':
         pass
     elif mode == 'split_whole_set':

@@ -320,3 +320,15 @@ def add_cb(crd_coords):
         crd_coords = torch.cat((crd_coords, CB.unsqueeze(1)), dim=1)
         return crd_coords
     
+def Add_random_step(X, h = CFG.h):
+    """Add random step to the coordinates
+    Args:
+        X (tensor): tensor of coordinats of shape [n_residues,4,3]
+        corrds_index (int): number of coordinates to add
+        h (float): step size
+    """
+    # Add random step to the coordinates
+    v = torch.randn(X.shape).to(X.device)
+    X1 = X + h * v
+    X2 = X - h * v
+    return X1, X2

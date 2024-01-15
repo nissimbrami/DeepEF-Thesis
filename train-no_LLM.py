@@ -495,5 +495,7 @@ def print_par(model):
             print (name, param.data)
    
 if __name__ == '__main__':
-    CFG.model_path = "./res/trianed_models-noLLMemb/"
+    if not debug:
+        CFG.model_path = "./res/trianed_models-noLLMemb/"
+        CFG.results_path = './res/results-noLLMemb/'
     main()

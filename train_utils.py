@@ -262,7 +262,7 @@ def add_gaussian_noise(X_native,sigma):
     X_decoy = X_native + noise
     return X_decoy
 
-def wandb_config(wandb, model, optimizer, scheduler, dataloader):
+def wandb_config(wandb, model, optimizer, scheduler, dataloader,model_path = CFG.model_path):
     """wandb_config """
     if not CFG.debug:
         wandb.config.learning_rate = optimizer.param_groups[0]['lr']
@@ -273,7 +273,7 @@ def wandb_config(wandb, model, optimizer, scheduler, dataloader):
         wandb.config.model = type(model).__name__
         wandb.config.dataset = type(dataloader.dataset).__name__
         wandb.config.wd = CFG.wd
-        wandb.config.model_path = CFG.model_path
+        wandb.config.model_path = model_path
 
 def zero_except_udiagonal(D):
     """Zero all values except the diagonal and its neighbors"""

@@ -22,7 +22,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 nomerical lossg')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 nlg no llm')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -454,7 +454,7 @@ def main():
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
     # configurate wandb
-    wandb_config(wandb, model, optimizer, scheduler, train_loader)
+    wandb_config(wandb, model, optimizer, scheduler, train_loader,CFG.model_path )
     # Run training
     print('***Start training***')
     epoch = 0
@@ -469,6 +469,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:    
-        CFG.model_path = "./res/trianed_models-numerical_LG/" # nomerical lossg 
-        CFG.results_path = './res/results-numerical_LG/'
+        CFG.model_path = "./res/trianed_models-n_LG_noLLM/" # nomerical lossg 
+        CFG.results_path = './res/results-n_LG_noLLM/'
     main()

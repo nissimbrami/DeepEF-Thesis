@@ -12,7 +12,7 @@ import pandas as pd
 
 class SidChainDS(Dataset):
     """Protein dataset."""
-    def __init__(self, data_path ,set_type,debug):
+    def __init__(self, data_path ,set_type,debug, LLM_EMB=True):
         """
             Initialize the dataset
         Args:
@@ -20,6 +20,7 @@ class SidChainDS(Dataset):
             set_type (str): 'train','test' or 'valid'
         """
         self.data_path = data_path
+        self.LLM_EMB = LLM_EMB
         self.set_type = set_type
         self.data_dir = []
         if(set_type == 'valid'):
@@ -60,7 +61,6 @@ class SidChainDS(Dataset):
         seq_one_hot = torch.load(item_path + '/seq_one_hot.pt')
         seq = torch.load(item_path + '/seq.pt')
         seq_decoy = torch.load(decoy_path + '/seq.pt')
-        proT5_emb = torch.load(item_path + '/proT5_emb.pt')
         # proT5_emb = torch.zeros((len(seq),1024)) # for testing
         ang = torch.tensor(torch.load(item_path + '/ang.pt'))
         ang_backbone = torch.clone(ang)[:,:3] #angles for the backbone phi, psi, omega
@@ -72,10 +72,15 @@ class SidChainDS(Dataset):
         crd_decoy = crd_decoy * C.NANO_TO_ANGSTROM 
         
         # ProT5 embedding for protein mutation
-        proT5_mut = torch.load(item_path + '/proT5_emb_mut.pt')
         seq_mut =  torch.load(item_path + '/seq_mut.pt')
         # proT5_mut = torch.zeros((len(seq),1024)) # for testing
         # seq_mut = seq # for testing
+        if self.LLM_EMB:
+            proT5_mut = torch.load(item_path + '/proT5_emb_mut.pt')
+            proT5_emb = torch.load(item_path + '/proT5_emb.pt')
+        else:
+            proT5_emb = torch.zeros((len(seq),1024))
+            proT5_mut = torch.zeros((len(seq),1024))
         
         return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, \
             ang, proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_decoy, seq_decoy
@@ -340,14 +345,14 @@ def fetch_dataloader(data_dir, params):
     """
     # Sidechainnet dataset
     if params.dataset == 'scn':
-        train_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='train', debug=params.debug), batch_size=params.batch_size, shuffle=True,
+        train_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='train', debug=params.debug, LLM_EMB = params.LLM_EMB), batch_size=params.batch_size, shuffle=True,
                                             num_workers=params.num_workers,
                                             pin_memory=params.cuda)
-        valid_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='valid', debug=params.debug), batch_size=params.batch_size, shuffle=True,
+        valid_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='valid', debug=params.debug, LLM_EMB = params.LLM_EMB), batch_size=params.batch_size, shuffle=True,
                                             num_workers=params.num_workers,
                                             pin_memory=params.cuda)
 
-        test_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='test', debug=params.debug), batch_size=params.batch_size, shuffle=True,
+        test_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='test', debug=params.debug, LLM_EMB = params.LLM_EMB), batch_size=params.batch_size, shuffle=True,
                                             num_workers=params.num_workers,
                                             pin_memory=params.cuda)
     else:
@@ -389,11 +394,12 @@ def fetch_inference_loader(data_dir, params):
 
 
 class params:
-    def __init__(self,batch_size,num_workers,cuda,constraint, dataset,debug=False):
+    def __init__(self,batch_size,num_workers,cuda,constraint, dataset,debug=False,LLM_EMB=True):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cuda = cuda
         self.debug = debug
         self.constraint = constraint
         self.dataset = dataset
+        self.LLM_EMB =LLM_EMB
         

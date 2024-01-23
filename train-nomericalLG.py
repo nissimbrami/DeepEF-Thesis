@@ -22,7 +22,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 10 nomerical lossg')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 negative loss')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'

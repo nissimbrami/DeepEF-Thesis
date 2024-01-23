@@ -22,7 +22,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 nlg no llm')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 negative loss no llm')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -378,7 +378,8 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
     - the energy of a folded decoy is greater than the energy of an unfolded decoy (Exdu<Exd)
     - the energy of a decoy structure is greater than the energy of the unfolded native structure (Eju<Ecd)
     """
-    loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
+    # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
+    loss_decoy = lambda x,y: x - y
     
     return loss_decoy(Ejf, Exd)+loss_decoy(Ejf, Ecd)+loss_decoy(Exdu, Exd)+loss_decoy(Eju, Ecd)
 
@@ -389,9 +390,9 @@ def numerical_LG(Ejf, Eh1, Eh2, h = CFG.h):
     # first order numerical gradient
     g1 = torch.abs((Eh1-Eh2)/(2*h)) # the first order numerical gradient should be close to zero
     # second order numerical gradient
-    g2 = torch.sigmoid(-1 * (Eh1- 2*Ejf + Eh2)/(h**2)) # the second order numerical gradient should be positive
-    # add sigmoid to the gradient
-    lossg = g1+g2
+    # g2 = torch.sigmoid(-1 * (Eh1- 2*Ejf + Eh2)/(h**2)) # the second order numerical gradient should be positive
+    g2 = (Eh1- 2*Ejf + Eh2)/(h**2) # the second order numerical gradient should be positive
+    lossg = g1-g2
     return lossg
 
 def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):

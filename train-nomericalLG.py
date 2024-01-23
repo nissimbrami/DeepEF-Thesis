@@ -378,7 +378,8 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
     - the energy of a folded decoy is greater than the energy of an unfolded decoy (Exdu<Exd)
     - the energy of a decoy structure is greater than the energy of the unfolded native structure (Eju<Ecd)
     """
-    loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
+    # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
+    loss_decoy = lambda x,y: x - y
     
     return loss_decoy(Ejf, Exd)+loss_decoy(Ejf, Ecd)+loss_decoy(Exdu, Exd)+loss_decoy(Eju, Ecd)
 
@@ -389,9 +390,10 @@ def numerical_LG(Ejf, Eh1, Eh2, h = CFG.h):
     # first order numerical gradient
     g1 = torch.abs((Eh1-Eh2)/(2*h)) # the first order numerical gradient should be close to zero
     # second order numerical gradient
-    g2 = torch.sigmoid(-1 * (Eh1- 2*Ejf + Eh2)/(h**2)) # the second order numerical gradient should be positive
+    # g2 = torch.sigmoid(-1 * (Eh1- 2*Ejf + Eh2)/(h**2)) # the second order numerical gradient should be positive
+    g2 = (Eh1- 2*Ejf + Eh2)/(h**2)
     # add sigmoid to the gradient
-    lossg = g1+g2
+    lossg = g1-g2 
     return lossg
 
 def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
@@ -457,7 +459,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader)
     # Run training
     print('***Start training***')
-    epoch = 10
+    epoch = 0
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

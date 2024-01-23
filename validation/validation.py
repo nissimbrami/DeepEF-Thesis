@@ -75,7 +75,7 @@ def evaluate_mutations(model, data_loader, root_dir,model_path = CFG.model_path)
     os.makedirs(mutation_output_dir, exist_ok=True)
     with torch.no_grad():
         for i, batch in tqdm(enumerate(data_loader), total=len(data_loader)):
-            batch = normalize_batch(batch, False)
+            batch = normalize_batch(batch, True)
             energy_out_df = run_thermodynamics_model(model, batch)
             out_file = mutation_output_dir / f"{batch['name'][0]}.csv"
             energy_out_df.to_csv(out_file, index=False)

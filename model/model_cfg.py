@@ -48,7 +48,7 @@ class CFG:
     gradient_penalty = True
     decoy_threshold = 20
     max_grad_norm = 10.0
-    clip_grad_norm = False
+    clip_grad_norm = True
     # defalut parameters
     torch_default_dtype = torch.float32
     precision = torch.float32

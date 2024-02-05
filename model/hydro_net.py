@@ -579,14 +579,18 @@ class Normalization_layer(torch.nn.Module):
     """Normalization layer"""
     def __init__(self, dim_in,affine):
         super().__init__()
-        self.inst_norm = nn.InstanceNorm1d(dim_in,affine=affine)
+        # self.inst_norm = nn.InstanceNorm1d(dim_in,affine=affine)
+        self.layer_norm = nn.LayerNorm(dim_in, elementwise_affine=affine)
     def forward(self, x):
         """forward function for the graph model
         Args:
             x (tensor): [batch_size ,n_nodes, dim_in]
         """
-        # swap axis to use insrance norm
-        x = x.transpose(1,2)
-        x = self.inst_norm(x)
-        x = x.transpose(1,2)
+        # # swap axis to use insrance norm
+        # x = x.transpose(1,2)
+        # x = self.inst_norm(x)
+        # x = x.transpose(1,2)
+        
+        # use layer norm
+        x = self.layer_norm(x)
         return x

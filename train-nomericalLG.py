@@ -388,7 +388,7 @@ def numerical_LG(Ejf, Eh1, Eh2, h = CFG.h):
     Calculate the lossg in respect to a numerical gradient
     """
     # first order numerical gradient
-    g1 = torch.abs((Eh1-Eh2)/(2*h)) # the first order numerical gradient should be close to zero
+    g1 = ((Eh1-Eh2)/(2*h))**2 # the first order numerical gradient should be close to zero
     # second order numerical gradient
     # g2 = torch.sigmoid(-1 * (Eh1- 2*Ejf + Eh2)/(h**2)) # the second order numerical gradient should be positive
     g2 = (Eh1- 2*Ejf + Eh2)/(h**2)

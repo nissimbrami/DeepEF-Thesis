@@ -377,12 +377,12 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
     - the energy of a decoy structure is greater than the energy of the wild-type structure (Ejf<Ecd)
     - the energy of a folded decoy is greater than the energy of an unfolded decoy (Exdu<Exd)
     - the energy of a decoy structure is greater than the energy of the unfolded native structure (Eju<Ecd)
-    - the energy of a wild-type unfolded structure is greater than the energy of the unfolded decoy (Eju<Exdu)
+    - the energy of a wild-type unfolded structure is greater than the energy of the folded wilde-type (Ejf<Eju)
     """
     # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
     loss_decoy = lambda x,y: x - y
     
-    return loss_decoy(Ejf, Exd)+loss_decoy(Ejf, Ecd)+loss_decoy(Exdu, Exd)+loss_decoy(Eju, Ecd) + loss_decoy(Eju, Exdu)
+    return loss_decoy(Ejf, Exd)+loss_decoy(Ejf, Ecd)+loss_decoy(Exdu, Exd)+loss_decoy(Eju, Ecd) + loss_decoy(Ejf, Eju)
 
 def numerical_LG(Ejf, Eh1, Eh2, h = CFG.h):
     """Numerical LG:
@@ -473,6 +473,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:    
-        CFG.model_path = "./res/trianed_models-numerical_LG/" # nomerical lossg 
-        CFG.results_path = './res/results-numerical_LG/'
+        CFG.model_path = "./res/trianed_models-numerical_LGC/" # nomerical lossg 
+        CFG.results_path = './res/results-numerical_LGC/'
     main()

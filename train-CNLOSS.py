@@ -391,6 +391,7 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, Exdu, with_grad = True ):
     lossg = gradient_penalty(X_native, Ejf) if with_grad else torch.tensor(0.0).to(Ejf.device)
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
+    lossc = torch.tensor(0.0).to(Ejf.device)
     
     
     return lossd+lossg+lossc , lossd, lossg, lossc

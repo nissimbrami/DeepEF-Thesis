@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 MSE grad')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 MSE grad with contrastive loss')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -390,7 +390,8 @@ def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, Exdu, with_grad = True ):
     """
     lossg = gradient_penalty(X_native, Ejf) if with_grad else torch.tensor(0.0).to(Ejf.device)
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju)
-    lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
+    # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
+    
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
@@ -400,10 +401,12 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
     - the energy of a decoy structure is greater than the energy of the wild-type structure (Ejf<Ecd)
     - the energy of a folded decoy is greater than the energy of an unfolded decoy (Exdu<Exd)
     - the energy of a decoy structure is greater than the energy of the unfolded native structure (Eju<Ecd)
+    - the energy of a wild-type unfolded structure is greater than the energy of the folded wilde-type (Ejf<Eju)
     """
-    loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
+    # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
+    loss_decoy = lambda x,y: x - y
     
-    return loss_decoy(Ejf, Exd)+loss_decoy(Ejf, Ecd)+loss_decoy(Exdu, Exd)+loss_decoy(Eju, Ecd)
+    return loss_decoy(Ejf, Exd) + loss_decoy(Ejf, Ecd) + loss_decoy(Exdu, Exd) + loss_decoy(Eju, Ecd) + loss_decoy(Ejf, Eju)
 
 # def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
 #     """Decoy loss, the energy of the native structure divided by the decoy energy"""
@@ -486,6 +489,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = "./res/trianed_models-MSEgrad/"
+        CFG.model_path = "./res/trianed_models-MSEgradContrastiveLoss/"
         CFG.results_path = './res/results-emb/'
     main()

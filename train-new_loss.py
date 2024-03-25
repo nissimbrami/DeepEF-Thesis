@@ -364,14 +364,8 @@ def gradient_penalty(X_native, E_native):
     partial_dx_native = torch.autograd.grad(outputs=E_native, inputs=X_native,
                                             grad_outputs=torch.ones_like(E_native),
                                             create_graph=True, retain_graph=True)[0]
-    # part_dx_native_norm = 0.5*torch.norm(partial_dx_native,p=2)**2
-    # lossg = torch.log(part_dx_native_norm+1)
-    # Compute the gradient penalty
-    gradients = partial_dx_native#.view(partial_dx_native.size(0))
-    # L2 norm
-    gradient_penalty = gradients.norm(2)
-    # lossg = torch.log(gradient_penalty+1)
-    lossg = gradient_penalty
+    # Use mse loss
+    lossg = torch.mean(partial_dx_native**2)
     return lossg
 
 def criterion(Ejf, Ekf, Eju, Eku, Exd, X_native, Ecd, Exdu, with_grad = True ):

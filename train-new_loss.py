@@ -19,12 +19,12 @@ import wandb
 
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
-torch.autograd.set_detect_anomaly(True)
-CFG.debug = True
+# torch.autograd.set_detect_anomaly(True)
+# CFG.debug = True
 CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 contrastive loss')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 MSE grad')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'

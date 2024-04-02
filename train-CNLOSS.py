@@ -404,44 +404,11 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
     - the energy of a decoy structure is greater than the energy of the unfolded native structure (Eju<Ecd)
     - the energy of a wild-type unfolded structure is greater than the energy of the folded wilde-type (Ejf<Eju)
     """
-    # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
-    loss_decoy = lambda x,y: x - y
+    loss_decoy = lambda x,y: torch.log((x+1e-5) / (y+1e-5))
+    # loss_decoy = lambda x,y: x - y
     
     return loss_decoy(Ejf, Exd) + loss_decoy(Ejf, Ecd) + loss_decoy(Exdu, Exd) + loss_decoy(Eju, Ecd) + loss_decoy(Ejf, Eju)
 
-# def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
-#     """Decoy loss, the energy of the native structure divided by the decoy energy"""
-#     # if E_native * decoy_threshold < E_decoy:
-#     #     return torch.tensor(0.0).to(E_native.device)
-#     return torch.log((E_native+1) / (E_decoy+1) +1)
-
-def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
-    """Energy softplus,
-    As we know the energy diffrence between an unfolded protein and folded protein is positive.
-    Therefore we will add it to the loss as lossc"""
-    
-    folded_threshold = 2 # the ratio between the energy of the folded and unfolded protein should be greater than 2
-    softplus = lambda x: torch.log(torch.exp(beta*x)+1)/beta
-    if (Ekf * folded_threshold < Eku and Eku > Ekf):
-        lossc1 = softplus(-Ekf) 
-    else:
-        lossc1 = softplus(Ekf-Eku)
-        
-    if (Ejf * folded_threshold < Eju and Eju > Ejf):
-        lossc2 = softplus(-Ejf) 
-    else:
-        lossc2 = softplus(Ejf-Eju)
-    # lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.where(lossd2 > 10.0, lossd2/2.0, lossd2))
-    return lossc1+lossc2
-
-
-def relu_energy(Ejf, Ekf, Eju, Eku, offset = 5):
-    """calculate the energy diffrence between an unfolded protein and folded protein is positive.
-    log(min(max(diff+offset,0),6)+1)
-    """
-    htanh = torch.nn.Hardtanh(min_val=0, max_val=10)
-    lossd = lambda x: torch.log(htanh(x+offset)+1)
-    return lossd(Ekf-Eku)+lossd(Ejf-Eju)
 
     
 def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch,scheduler):

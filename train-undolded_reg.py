@@ -369,7 +369,7 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True ):
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     # Use mse loss for Eju 
-    lossc = torch.mean((Eju)**2)
+    lossc = torch.mean((Eju)**2) + torch.mean((Ejf)**2)
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
@@ -459,6 +459,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = "./res/trianed_models-unfolded_reg/"
+        CFG.model_path = "./res/trianed_models-reg/"
         CFG.results_path = './res/results-emb/'
     main()

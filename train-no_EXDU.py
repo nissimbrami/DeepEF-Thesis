@@ -369,7 +369,7 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True ):
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     # Use mse loss for Eju 
-    lossc = torch.mean((Eju)**2)
+    lossc = torch.mean((Eju)**2) + torch.mean((Ejf)**2)
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
@@ -444,7 +444,7 @@ def main():
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
     # configurate wandb
-    wandb_config(wandb, model, optimizer, scheduler, train_loader)
+    wandb_config(wandb, model, optimizer, scheduler, train_loader,CFG.model_path)
     # Run training
     print('***Start training***')
     epoch = 0

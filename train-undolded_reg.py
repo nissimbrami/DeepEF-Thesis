@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 6 log energy and unfolde reg')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 16 log energy and unfolde reg')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -447,7 +447,7 @@ def main():
     wandb_config(wandb, model, optimizer, scheduler, train_loader, CFG.model_path)
     # Run training
     print('***Start training***')
-    epoch = 6
+    epoch = 16
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 no exdu')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 no exdu no regularization')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -383,7 +383,7 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
     # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
     loss_decoy = lambda x,y: x - y
     
-    return loss_decoy(Ejf, Exd)+loss_decoy(Ejf, Ecd)+loss_decoy(Eju, Ecd)
+    return loss_decoy(Ejf, Exd) + loss_decoy(Ejf, Ecd) + loss_decoy(Eju, Ecd)+ loss_decoy(Ejf, Eju)
 
 # def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
 #     """Decoy loss, the energy of the native structure divided by the decoy energy"""
@@ -459,6 +459,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = "./res/trianed_models-no_exdu/"
+        CFG.model_path = "./res/trianed_models-no_exdu_noreg/"
         CFG.results_path = './res/results-emb/'
     main()

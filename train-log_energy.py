@@ -369,7 +369,7 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True ):
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     # Use softplus loss for regularization 
-    lossc = -Ejf 
+    lossc = -Ejf
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
@@ -383,7 +383,7 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
     # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
     loss_decoy = lambda x,y: x - y
     
-    return loss_decoy(Ejf, Exd)+loss_decoy(Ejf, Ecd)+loss_decoy(Exdu, Exd)+loss_decoy(Eju, Ecd)
+    return loss_decoy(Ejf, Exd)+loss_decoy(Ejf, Ecd)+loss_decoy(Exdu, Exd)+loss_decoy(Eju, Ecd) + loss_decoy(Ejf, Eju)
 
 # def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
 #     """Decoy loss, the energy of the native structure divided by the decoy energy"""

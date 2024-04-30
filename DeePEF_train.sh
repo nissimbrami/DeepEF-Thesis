@@ -25,4 +25,4 @@ nvidia-smi
 
 module load anaconda ### load anaconda module
 source activate esm2_env ### activating Conda environment, environment must be configured before running the job
-python train-new_loss.py ### execute python script – replace with your own command
+python train-log_energy.py ### execute python script – replace with your own command

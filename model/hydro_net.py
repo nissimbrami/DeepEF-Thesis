@@ -300,6 +300,9 @@ class PEM(torch.nn.Module):
         self.fc2 = nn.Linear(128, 1)
         # self.fc3 = nn.Linear(64, 1)
         
+        # energy epsilon
+        self.energy_epsilon = 1
+        
         # embedding indexes
         self.one_hot_index = -20
         self.bonded_index = 32
@@ -403,7 +406,7 @@ class PEM(torch.nn.Module):
             Energy [batch_size] tensor
         """
         # E = torch.sum(Fh**2,dim=(1,2))
-        E = torch.log(torch.sum(Fh,dim=(1,2)) + 1e-6)
+        E = torch.log(torch.sum(Fh,dim=(1,2)) + self.energy_epsilon)
         return E
   
     def get_edge_index(self,x):

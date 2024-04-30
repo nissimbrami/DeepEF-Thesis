@@ -357,9 +357,7 @@ class PEM(torch.nn.Module):
         # reshape to [batch_size,n_nodes]
         x = x.reshape(self.B,self.N,1)
         # Squeeze the energy between 0 and 1
-        # if self.training:    
-        #     x = torch.sigmoid(x)
-        x = torch.sigmoid(x)
+        x = torch.sigmoid(x) # B,N,1
         # return energy        
         if (f_type == 'Default'):
             return self.get_energy(x)

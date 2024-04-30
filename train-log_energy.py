@@ -369,7 +369,7 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True ):
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     # Use softplus loss for regularization 
-    lossc = torch.log(torch.exp(-Ejf)+1) 
+    lossc = -Ejf 
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   

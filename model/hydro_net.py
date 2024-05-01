@@ -529,7 +529,8 @@ class PEMSM(torch.nn.Module):
         edge_index_gcn = torch.tensor([[i,i+1] for i in range(seq_len-1)]).t().contiguous().to(CFG.device)
         
         return edge_index_gcn,edge_index_gat
-    
+   
+     
 class GAT(torch.nn.Module):
   
   """Graph Attention Network"""

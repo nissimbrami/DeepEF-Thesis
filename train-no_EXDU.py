@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 no exdu 1.6 energy epsilon')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 no exdu 1.6 energy epsilon unfold zero')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -369,7 +369,7 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True ):
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     # lossc will be the regularizition term for the folded energy
-    lossc = -Ejf
+    lossc = torch.mean(Eju**2)
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
@@ -383,7 +383,7 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
     # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
     loss_decoy = lambda x,y: x - y
     
-    return loss_decoy(Ejf, Exd) + loss_decoy(Ejf, Ecd) + loss_decoy(Eju, Ecd)+ loss_decoy(Ejf, Eju)
+    return loss_decoy(Ejf, Exd) + loss_decoy(Ejf, Ecd) + loss_decoy(Eju, Ecd)+ loss_decoy(Ejf, Eju) + loss_decoy(0, Ejf)
 
 # def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
 #     """Decoy loss, the energy of the native structure divided by the decoy energy"""
@@ -460,6 +460,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = "./res/trianed_models-no_exdu_1.6/"
+        CFG.model_path = "./res/trianed_models-no_exdu_1.6_f0/"
         CFG.results_path = './res/results-emb/'
     main()

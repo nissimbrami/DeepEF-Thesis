@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 smaller DS and no sigmoid')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 and no sigmoid')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -461,6 +461,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = "./res/trianed_models-no_exdu30nosigmoid/"
+        CFG.model_path = "./res/trianed_models-no_exdu_nosigmoid/"
         CFG.results_path = './res/results-emb/'
     main()

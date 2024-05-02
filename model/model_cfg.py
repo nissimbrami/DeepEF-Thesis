@@ -13,7 +13,7 @@ class CFG:
     if debug:    
         data_path = './data/casp12_data_30/'
     else: 
-        data_path = './data/casp12_data_100/' #'./data/data2'
+        data_path = './data/casp12_data_30/' #'./data/data2'
     inference_path = './data/inference_data'
     results_path = './res/results-emb/'
     seed = 42

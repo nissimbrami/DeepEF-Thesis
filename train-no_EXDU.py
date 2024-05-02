@@ -345,7 +345,7 @@ def gradient_penalty(X_native, E_native):
     lossg = torch.mean(partial_dx_native**2)
     return lossg
 
-def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True ):
+def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True , reg_alpha = CFG.reg_alpha):
     """
     The loss function for the model corresponds to 3 main losses:
     1. lossg: the partial derivative of the energy with respect to the native structure
@@ -368,8 +368,10 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True ):
     lossg = gradient_penalty(X_native, Ejf) if with_grad else torch.tensor(0.0).to(Ejf.device)
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
-    # lossc will be the regularizition term for the folded energy
-    lossc = torch.tensor(0.0).to(Ejf.device)
+    # lossc will be regularization term of sum of squered energys 
+    N = torch.tensor(4.0).to(Ejf.device) # number of energies  
+    lossc = (1/N * (Ejf**2 + Eju**2 + Exd**2 + Ecd**2))
+    lossc = reg_alpha * lossc
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
@@ -440,7 +442,7 @@ def main():
     print('***Build the model***')
     model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     model.name = "PEM-With LLM embedding"
-    # model.energy_epsilon = 1e-6
+    model.energy_epsilon = 1e-6
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
@@ -460,6 +462,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = "./res/trianed_models-no_exdu/"
+        CFG.model_path = "./res/trianed_models-no_exdu30reg/"
         CFG.results_path = './res/results-emb/'
     main()

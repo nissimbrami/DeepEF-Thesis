@@ -369,7 +369,7 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True ):
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     # lossc will be the regularizition term for the folded energy
-    lossc = torch.mean(Eju**2)
+    lossc = torch.tensor(0.0).to(Ejf.device)
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
@@ -440,7 +440,7 @@ def main():
     print('***Build the model***')
     model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
     model.name = "PEM-With LLM embedding"
-    model.energy_epsilon = 1e-6
+    # model.energy_epsilon = 1e-6
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)

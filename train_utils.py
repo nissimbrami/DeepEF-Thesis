@@ -202,6 +202,7 @@ def get_graph(x, one_hot, emb, mask):
     # sum over the atoms,
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
+    emb = F.normalize(emb,p=2,dim=0)
     Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
     
     return Fh
@@ -221,6 +222,7 @@ def get_unfolded_graph(x, one_hot, emb, mask):
     # sum over the atoms
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
+    emb = F.normalize(emb,p=2,dim=0)
     Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
     
     return Fh
@@ -332,3 +334,9 @@ def Add_random_step(X, h = CFG.h):
     X1 = X + h * v
     X2 = X - h * v
     return X1, X2
+
+def print_max_gradients(model):
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            max_grad = param.grad.data.abs().max().item()
+            print(f"Max gradient for {name}: {max_grad}")

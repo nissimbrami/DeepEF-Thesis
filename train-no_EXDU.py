@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 no exdu 1.6 energy epsilon unfold zero')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 no exdu gradient clipping')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -460,6 +460,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = "./res/trianed_models-no_exdu_1.6_f0/"
+        CFG.model_path = "./res/trianed_models-no_exdu/"
         CFG.results_path = './res/results-emb/'
     main()

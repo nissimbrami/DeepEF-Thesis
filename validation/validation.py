@@ -31,9 +31,6 @@ def normalize_batch(batch, LLM_EMB = True):
     batch['coords'] = batch['coords'] * NANO_TO_ANGSTROM
     if not LLM_EMB: # zero prot5 embedding
          batch['prott5'] = torch.zeros_like(batch['prott5'])
-    # batch['coords'] = batch['coords'][:, :, [0, 2, 1, 3], :]
-    # batch['masks'] = batch['masks'].to(torch.int) ^ 1  # Xor to reverse current output
-
     return batch
 
 

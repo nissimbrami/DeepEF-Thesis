@@ -15,7 +15,7 @@ from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
 from model.hydro_net import PEM
 from model.model_cfg import CFG
-from train_utils import get_graph, get_unfolded_graph
+from train_utils import get_graph, get_unfolded_graph, load_checkpoint
 import wandb
 from tqdm import tqdm
 
@@ -30,11 +30,12 @@ RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
-FREEZE_LAYERS = False
+FREEZE_LAYERS = True
 MODEL_PATH = './Megascale-fineTuning/models'
 MODEL_NAME = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
 MINI_BATCH_SIZE = 256
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
+TRAINED_MODEL_PATH = './res/trianed_models-no_exdu_nosigmoid/best_model.pt'
 
 # config wandb
 config = {
@@ -57,8 +58,8 @@ config = {
 if not DEBUG:
     wandb.init(project='MegaScaleFineTuning', config=config, name=MODEL_NAME)
 
-if not os.path.exists(MODEL_PATH):
-    os.makedirs(MODEL_PATH)
+if not os.path.exists(os.path.join(MODEL_PATH, MODEL_NAME)):
+    os.makedirs(os.path.join(MODEL_PATH, MODEL_NAME))
 
 
 def wandb_log(log_dict):
@@ -164,7 +165,7 @@ class Trainer():
                     running_loss = 0
                     
                 # save the model
-                torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, f'{self.model_name}/epoch_{epoch}.pt'))
+                torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, MODEL_NAME, f'{epoch}.pt'))
             
             self.validate(epoch)
 
@@ -200,9 +201,9 @@ class Trainer():
 
         all_graph_minibatch = torch.cat([folded_graph_minibatch, unfolded_graph_minibatch], dim=0)
 
-        energy_minibatch = self.model(all_graph_minibatch)
-        folded_energy = energy_minibatch[:prott5_embedding_minibatch.size(0)]
-        unfolded_energy = energy_minibatch[prott5_embedding_minibatch.size(0):]
+        minibatch_energy = self.model(all_graph_minibatch)
+        folded_energy = minibatch_energy[:minibatch_energy.size(0) // 2]
+        unfolded_energy = minibatch_energy[minibatch_energy.size(0) // 2:]
         
         return unfolded_energy - folded_energy
 
@@ -219,7 +220,9 @@ if __name__ == '__main__':
     val_ds = DataLoader(protein_val, batch_size=1, shuffle=False)
     
     # Create the model
-    model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef)
+    model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(DEVICE)
+    model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
+    
     # Train the model
     trainer = Trainer(model, train_ds, val_ds)
     trainer.train(epochs = EPOCHS)

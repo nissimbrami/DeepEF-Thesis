@@ -17,6 +17,7 @@ from model.hydro_net import PEM
 from model.model_cfg import CFG
 from train_utils import get_graph, get_unfolded_graph
 import wandb
+from tqdm import tqdm
 
 # Constants
 COORDS = 'coords_tensor.pt'
@@ -29,7 +30,7 @@ RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
-FREEZE_LAYERS = True
+FREEZE_LAYERS = False
 MODEL_PATH = './Megascale-fineTuning/models'
 MODEL_NAME = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
 MINI_BATCH_SIZE = 256
@@ -146,7 +147,7 @@ class Trainer():
         running_loss = 0
         for epoch in range(epochs):
             self.model.train()
-            for i, batch in enumerate(self.train_ds):
+            for i, batch in enumerate(tqdm(self.train_ds, desc=f'Training Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
                     self.optimizer.zero_grad()
@@ -157,8 +158,8 @@ class Trainer():
                     self.optimizer.step()
                     
                     running_loss += loss.item()
-                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i, 'mini_batch': j})
-                if j % 100 == 0:
+                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i})
+                if i % 100 == 0:
                     wandb_log({'epoch': epoch, 'running_loss': running_loss/100})
                     running_loss = 0
             
@@ -168,7 +169,7 @@ class Trainer():
         self.model.eval()
         val_loss = 0
         with torch.no_grad():
-            for i, batch in enumerate(self.val_ds):
+            for i, batch in enumerate(tqdm(self.val_ds,desc=f'Validation Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
                     output = self.get_deltaG(batch, j)

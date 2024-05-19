@@ -16,10 +16,9 @@ from sklearn.model_selection import train_test_split
 from model.hydro_net import PEM
 from model.model_cfg import CFG
 from train_utils import get_graph, get_unfolded_graph
+import wandb
 
-
-
-
+# Constants
 COORDS = 'coords_tensor.pt'
 DELTA_G = 'deltaG.pt'
 MASKS = 'mask_tensor.pt'
@@ -31,6 +30,39 @@ NANO_TO_ANGSTROM = 0.1
 DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
 FREEZE_LAYERS = True
+MODEL_PATH = './Megascale-fineTuning/models'
+MODEL_NAME = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
+MINI_BATCH_SIZE = 256
+DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
+
+# config wandb
+config = {
+    'coords': COORDS,
+    'delta_g': DELTA_G,
+    'masks': MASKS,
+    'one_hot': ONE_HOT,
+    'prott5_embeddings': PROTT5_EMBEDDINGS,
+    'val_ratio': VAL_RATIO,
+    'random_seed': RANDOM_SEED,
+    'nano_to_angstrom': NANO_TO_ANGSTROM,
+    'debug': DEBUG,
+    'epochs': EPOCHS,
+    'freeze_layers': FREEZE_LAYERS,
+    'model_path': MODEL_PATH,
+    'model_name': MODEL_NAME,
+    'mini_batch_size': MINI_BATCH_SIZE,
+    'device': DEVICE
+}
+if not DEBUG:
+    wandb.init(project='MegaScaleFineTuning', config=config, name=MODEL_NAME)
+
+if not os.path.exists(MODEL_PATH):
+    os.makedirs(MODEL_PATH)
+
+
+def wandb_log(log_dict):
+    if not DEBUG:
+        wandb.log(log_dict)
 
 def normalize_batch(batch, LLM_EMB = True):
     batch['one_hot'] = batch['one_hot'][:, :, :, :-1]
@@ -93,7 +125,7 @@ class AllProteinValidationDataset(Dataset):
 # Trainer class
 
 class Trainer():
-    def __init__(self, model, train_ds, val_ds, device = 'cuda'):
+    def __init__(self, model, train_ds, val_ds, device = DEVICE):
         self.model = model.to(device)
         self.train_ds = train_ds
         self.val_ds = val_ds
@@ -101,7 +133,8 @@ class Trainer():
         self.criterion = nn.MSELoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
         self.model.to(self.device)
-        self.mini_batch_size = 256
+        self.mini_batch_size = MINI_BATCH_SIZE
+        self.model_name = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
 
     def train(self, epochs = 10):
         # Freeze the layers and only train the last layer
@@ -124,11 +157,14 @@ class Trainer():
                     self.optimizer.step()
                     
                     running_loss += loss.item()
-                    
+                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i, 'mini_batch': j})
+                if j % 100 == 0:
+                    wandb_log({'epoch': epoch, 'running_loss': running_loss/100})
+                    running_loss = 0
             
-            self.validate()
+            self.validate(epoch)
 
-    def validate(self):
+    def validate(self, epoch):
         self.model.eval()
         val_loss = 0
         with torch.no_grad():
@@ -141,6 +177,7 @@ class Trainer():
                     val_loss += loss.item()
         val_loss /= len(self.val_ds)
         print(f'Validation Loss: {val_loss}')
+        wandb_log({'val_loss': val_loss,'epoch': epoch})
         self.model.train()
         
     def get_deltaG(self, batch, i):
@@ -166,18 +203,18 @@ class Trainer():
 if __name__ == '__main__':
     tensor_root_dir = r'./data/Processed_K50_dG_datasets/training_data'
     mutations_root_dir = r'./data/Processed_K50_dG_datasets/mutation_datasets'
+    # Load the dataset
     protein_train = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
                                                   mutations_root_dir=mutations_root_dir, train=True)
     protein_val = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
                                                   mutations_root_dir=mutations_root_dir, train=False)
-    # test_protein_by_idx(idx=0)
-
+    # Create the dataloaders
     train_ds = DataLoader(protein_train, batch_size=1, shuffle=False)
     val_ds = DataLoader(protein_val, batch_size=1, shuffle=False)
     
+    # Create the model
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef)
-    
+    # Train the model
     trainer = Trainer(model, train_ds, val_ds)
-    
-    trainer.train(epochs = 50)
+    trainer.train(epochs = EPOCHS)
     

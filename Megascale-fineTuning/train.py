@@ -36,6 +36,7 @@ MODEL_NAME = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
 MINI_BATCH_SIZE = 256
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
 TRAINED_MODEL_PATH = './res/trianed_models-no_exdu_nosigmoid/best_model.pt'
+PRETRAINED = True
 
 # config wandb
 config = {
@@ -53,7 +54,9 @@ config = {
     'model_path': MODEL_PATH,
     'model_name': MODEL_NAME,
     'mini_batch_size': MINI_BATCH_SIZE,
-    'device': DEVICE
+    'device': DEVICE,
+    'trained_model_path': TRAINED_MODEL_PATH,
+    'pretrained': PRETRAINED
 }
 if not DEBUG:
     wandb.init(project='MegaScaleFineTuning', config=config, name=MODEL_NAME)
@@ -85,6 +88,8 @@ class AllProteinValidationDataset(Dataset):
         self.training_protein, self.val_proteins = train_test_split(self.protein_dirs, test_size=VAL_RATIO, random_state=RANDOM_SEED)
         if train:
             self.protein_dirs = self.training_protein
+        else:
+            self.protein_dirs = self.val_proteins
 
     def __len__(self):
         return len(self.protein_dirs)
@@ -145,6 +150,8 @@ class Trainer():
                 param.requires_grad = False
             for param in self.model.fc2.parameters():
                 param.requires_grad = True
+            for param in self.model.fc1.parameters():
+                param.requires_grad = True
         running_loss = 0
         for epoch in range(epochs):
             self.model.train()
@@ -160,7 +167,7 @@ class Trainer():
                     
                     running_loss += loss.item()
                     wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i})
-                if i % 100 == 0:
+                if (i+1) % 100 == 0:
                     wandb_log({'epoch': epoch, 'running_loss': running_loss/100})
                     running_loss = 0
                     
@@ -221,7 +228,8 @@ if __name__ == '__main__':
     
     # Create the model
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(DEVICE)
-    model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
+    if PRETRAINED: 
+        model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
     
     # Train the model
     trainer = Trainer(model, train_ds, val_ds)

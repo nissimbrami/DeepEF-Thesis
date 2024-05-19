@@ -162,6 +162,9 @@ class Trainer():
                 if i % 100 == 0:
                     wandb_log({'epoch': epoch, 'running_loss': running_loss/100})
                     running_loss = 0
+                    
+                # save the model
+                torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, f'{self.model_name}/epoch_{epoch}.pt'))
             
             self.validate(epoch)
 
@@ -194,10 +197,12 @@ class Trainer():
         unfolded_graph_minibatch = torch.stack(
             [get_unfolded_graph(batch['coords'].squeeze(), one_hot_minibatch[i].squeeze(), prott5_embedding_minibatch[i].squeeze(), batch['masks'].squeeze()) for i in
             range(prott5_embedding_minibatch.size(0))])
-      
 
-        folded_energy = self.model(folded_graph_minibatch)
-        unfolded_energy = self.model(unfolded_graph_minibatch)
+        all_graph_minibatch = torch.cat([folded_graph_minibatch, unfolded_graph_minibatch], dim=0)
+
+        energy_minibatch = self.model(all_graph_minibatch)
+        folded_energy = energy_minibatch[:prott5_embedding_minibatch.size(0)]
+        unfolded_energy = energy_minibatch[prott5_embedding_minibatch.size(0):]
         
         return unfolded_energy - folded_energy
 

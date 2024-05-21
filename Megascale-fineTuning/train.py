@@ -30,13 +30,13 @@ RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
-FREEZE_LAYERS = True
+FREEZE_LAYERS = False
 MODEL_PATH = './Megascale-fineTuning/models'
 MODEL_NAME = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
 MINI_BATCH_SIZE = 256
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
 TRAINED_MODEL_PATH = './res/trianed_models-no_exdu_nosigmoid/best_model.pt'
-PRETRAINED = True
+PRETRAINED = False
 
 # config wandb
 config = {
@@ -171,8 +171,8 @@ class Trainer():
                     wandb_log({'epoch': epoch, 'running_loss': running_loss/100})
                     running_loss = 0
                     
-                # save the model
-                torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, MODEL_NAME, f'{epoch}.pt'))
+            # save the model
+            torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, MODEL_NAME, f'{epoch}.pt'))
             
             self.validate(epoch)
 

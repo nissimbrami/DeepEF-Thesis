@@ -62,13 +62,13 @@ def load_checkpoint(path,model,optimizer=None,device=CFG.device):
         device (str) : device to load the model
     """ 
     
-    dict = torch.load(path,map_location=device)
+    model_dict = torch.load(path,map_location=device)
     print(f"Loaded model from {path}")
     # print(f"Epoch: {dict['epoch']},loss: {dict['loss']},valid_loss: {dict['valid_loss']}")
-    model.load_state_dict(dict['model_state_dict'])
+    model.load_state_dict(model_dict['model_state_dict'])
     if optimizer is not None:
-        optimizer.load_state_dict(dict['optimizer_state_dict'])
-    return model,optimizer,dict['epoch'],dict['loss'],dict['valid_loss']
+        optimizer.load_state_dict(model_dict['optimizer_state_dict'])
+    return model,optimizer,model_dict['epoch'],model_dict['loss'],model_dict['valid_loss']
     
 def validation_plots(Exd,Exn,seq_len,type,epoch):
     """

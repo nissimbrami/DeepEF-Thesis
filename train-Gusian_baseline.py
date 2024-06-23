@@ -316,7 +316,7 @@ def  criterion(Ejf, Eg1, Exd, Xjf, Xg1,reg_alpha = CFG.reg_alpha)
     The loss function for the model:
     Preform score matching between the energy of the wild type and the energy of the decoy
     """
-    partial_dx_native = torch.autograd.grad(outputs=Ejf, inputs=X_native,
+    partial_dx_native = torch.autograd.grad(outputs=Ejf, inputs=Xg1,
                                             grad_outputs=torch.ones_like(Ejf),
                                             create_graph=True, retain_graph=True)[0]
 

@@ -19,6 +19,8 @@ from train_utils import get_graph, get_unfolded_graph, load_checkpoint
 import wandb
 from tqdm import tqdm
 
+import pandas as pd
+
 # Constants
 COORDS = 'coords_tensor.pt'
 DELTA_G = 'deltaG.pt'
@@ -214,9 +216,7 @@ class Trainer():
         
         return unfolded_energy - folded_energy
 
-if __name__ == '__main__':
-    tensor_root_dir = r'./data/Processed_K50_dG_datasets/training_data'
-    mutations_root_dir = r'./data/Processed_K50_dG_datasets/mutation_datasets'
+def run_training():
     # Load the dataset
     protein_train = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
                                                   mutations_root_dir=mutations_root_dir, train=True)
@@ -234,4 +234,25 @@ if __name__ == '__main__':
     # Train the model
     trainer = Trainer(model, train_ds, val_ds)
     trainer.train(epochs = EPOCHS)
+
+def get_valid_proteins(val_ds):
+    # create dataframe and append the name of the protein and the mutations
+    df = pd.DataFrame(columns=['name', 'mutations'])
+    for i, batch in enumerate(val_ds):
+        df = df.append({'name': batch['name'][0]}, ignore_index=True)
     
+    df.to_csv('validation_proteins_mutations.csv', index=False)
+    
+    return df
+if __name__ == '__main__':
+    tensor_root_dir = r'./data/Processed_K50_dG_datasets/training_data'
+    mutations_root_dir = r'./data/Processed_K50_dG_datasets/mutation_datasets'
+   
+    # run_training()
+    # Get validation proteins
+    protein_val = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+                                                  mutations_root_dir=mutations_root_dir, train=False)
+    # Create the dataloaders
+    val_ds = DataLoader(protein_val, batch_size=1, shuffle=False)
+    
+    get_valid_proteins(val_ds)

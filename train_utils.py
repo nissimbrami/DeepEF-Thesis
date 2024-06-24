@@ -292,7 +292,8 @@ def get_one_hot(seq):
   """get one hot from sequence"""
   seq_one_hot = torch.zeros((len(seq),20))
   for i,a in enumerate(seq):
-    seq_one_hot[i][AA_MAP[a]] = 1
+    if a in AA_MAP:
+        seq_one_hot[i][AA_MAP[a]] = 1
   return seq_one_hot
 
 def add_cb(crd_coords):

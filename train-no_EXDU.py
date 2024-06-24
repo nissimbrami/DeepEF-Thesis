@@ -461,6 +461,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = "./res/trianed_models-no_exdu_nosigmoid/"
+        CFG.model_path = x
         CFG.results_path = './res/results-emb/'
     main()

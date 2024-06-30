@@ -65,18 +65,23 @@ def test_calculate_delta_g():
 
 def validate_deltaG():
     dataset = benckmark_datasets("Rosetta")
-    df_results = pd.DataFrame(columns=["name","pdb_path", "mut_type", "deltaG"])
+    df_results = pd.DataFrame(columns=["name","pdb_path", "mut_type", "rosetta_wildtype", "rosetta_mutant", "rosseta_deltaG", "deltaG"])
     for i in tqdm(range(len(dataset.dataset))):
         item = dataset.get_item(i)
         pdb_file = item['pdb_path']
-        if (item['mut_type'] != 'wt'):
+        # Check only for mutations
+        if (item['mut_type'] != 'wt' and item['mut_type'][:3] != "ins" and item['mut_type'][:3] != "del"):
             mutations = split_string(item['mut_type'])
             initial_score, final_score, delta_g = calculate_delta_g(pdb_file, mutations)
-            df_results.loc[i] = [item['name'], item['pdb_path'], item['mut_type'], delta_g]
+            df_results.loc[i] = [item['name'], item['pdb_path'], item['mut_type'], initial_score, final_score, delta_g, item['deltaG']]
             if(delta_g != 0):
-                print(f"Protein: {pdb_file}, Initial Score: {initial_score}, Final Score: {final_score}, ΔG: {delta_g}")
+                print(f"Protein: {pdb_file}, Initial Score: {initial_score}, Final Score: {final_score},  RosettaΔΔG: {delta_g}, ΔG: {item['deltaG']}")
    
         df_results.to_csv("./data/Processed_K50_dG_datasets/rosetta_valid.csv", index=False)
+    # Add correlation metrics
+    df_results["pearson"] = df_results["rosetta_deltaG"].corr(df_results["deltaG"], method='pearson')
+    df_results["spearman"] = df_results["rosetta_deltaG"].corr(df_results["deltaG"], method='spearman')
+    df_results.to_csv("./data/Processed_K50_dG_datasets/rosetta_valid.csv", index=False)
 
 if __name__ == "__main__":
     # test_calculate_delta_g()

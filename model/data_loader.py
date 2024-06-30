@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
+import torch.nn.functional as F
 import os
 from model.model_cfg import CFG
 import gc
@@ -21,6 +22,7 @@ class SidChainDS(Dataset):
         """
         self.data_path = data_path
         self.LLM_EMB = LLM_EMB
+        self.pad_data = True
         self.set_type = set_type
         self.data_dir = []
         if(set_type == 'valid'):
@@ -82,9 +84,46 @@ class SidChainDS(Dataset):
             proT5_emb = torch.zeros((len(seq),1024))
             proT5_mut = torch.zeros((len(seq),1024))
         
+        if self.pad_data:
+            data =  self.padding_data((id, crd_backbone, mask, seq_one_hot, seq,ang_backbone,ang, proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_decoy, seq_decoy))
+            return data
+        
         return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, \
             ang, proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_decoy, seq_decoy
 
+    def padding_data(self, data, max_len = CFG.seq_len):
+        """
+        Pad the data to the maximum length
+        Args:
+            data (tensor): data to pad
+            max_len (int): maximum length to pad
+        Returns:
+            tensor: padded data
+        """
+        id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, \
+            ang, proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_decoy, seq_decoy = data
+        pad_len = max_len - crd_backbone.shape[0]
+        crd_backbone = F.pad(crd_backbone,(0,0,0,0,0,pad_len))
+        seq_one_hot = F.pad(seq_one_hot,(0,0,0,pad_len))
+        proT5_emb = F.pad(proT5_emb,(0,0,0,pad_len))
+        proT5_mut = F.pad(proT5_mut,(0,0,0,pad_len))
+        mask = F.pad(mask,(0,pad_len))
+        ang = F.pad(ang,(0,0,0,pad_len))
+        ang_backbone = F.pad(ang_backbone,(0,0,0,pad_len))
+        # decoy padding
+        if crd_decoy.shape[0] > crd_backbone.shape[0]:
+            crd_decoy = crd_decoy[:crd_backbone.shape[0],:,:]
+            mask_decoy = mask[:crd_backbone.shape[0]]
+        elif crd_decoy.shape[0] < crd_backbone.shape[0]:
+            # add zeros to the end of the decoy
+            pad_len = crd_backbone.shape[0] - crd_decoy.shape[0]
+            crd_decoy = F.pad(crd_decoy,(0,0,0,0,0,pad_len))
+            mask_decoy = F.pad(mask_decoy,(0,pad_len))
+
+        
+        return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, \
+            ang, proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_decoy, seq_decoy
+            
     def __len__(self):
         return len(self.data_dir)
 

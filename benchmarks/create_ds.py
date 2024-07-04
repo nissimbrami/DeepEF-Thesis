@@ -37,6 +37,48 @@ def create_rosetta_csv():
         rosetta_df = pd.concat([rosetta_df, protein_df])
     rosetta_df.to_csv("./data/Processed_K50_dG_datasets/rosetta.csv", index=False)    
 
+def creat_foldx_ds():
+    """Create a csv file with foldx data."""
+    pdb_dir = "./data/Processed_K50_dG_datasets/AlphaFold_model_PDBs/"
+    mutation_dir ="./data/Processed_K50_dG_datasets/mutation_datasets/"
+    foldx_df = pd.DataFrame()
+    # Get all data
+    protein_list = os.listdir(mutation_dir)
+    for protein in tqdm(protein_list):
+        # create folder for each protein
+        os.makedirs(f"./data/Processed_K50_dG_datasets/foldx/{protein.replace('.csv','')}", exist_ok=True)
+        mutant_df = pd.DataFrame()
+        protein_df = pd.DataFrame(columns=["name","pdb_path", "mut_type", "deltaG"])
+        protein_mutation = pd.read_csv(mutation_dir + protein )
+        # Check only for mutations
+        protein_mutation["mut_special_type"] = protein_mutation['mut_type'].apply(lambda x: x[:3])
+        filtered_mut = protein_mutation[(protein_mutation['mut_type'] != 'wt') & (protein_mutation['mut_special_type'] != "ins") & (protein_mutation['mut_special_type'] != "del")]
+        if filtered_mut.empty:
+            continue
+        # Add wilde type sequence
+        wt_seq = protein_mutation[protein_mutation['mut_type'] =='wt']['aa_seq'].iloc[0]
+        wt_df = pd.DataFrame({'aa_seq': [wt_seq]}, index=[0])
+        mutant_df['aa_seq'] = filtered_mut['aa_seq']
+       # Concatenate wt_df with mutant_df, ensuring the wild type row is first
+        mutant_df = pd.concat([wt_df, mutant_df]).reset_index(drop=True)
+       
+        # save protein df
+        protein_df["name"] = filtered_mut['name']
+        protein_df["pdb_path"] = pdb_dir + protein.replace(".csv", "")+".pdb"
+        protein_df["mut_type"] = filtered_mut["mut_type"]
+        protein_df["deltaG"] = filtered_mut["deltaG"]
     
-create_rosetta_csv()
+        
+        foldx_df = pd.concat([foldx_df, protein_df])
+        foldx_df.to_csv(f"./data/Processed_K50_dG_datasets/foldx/{protein.replace('.csv','')}/foldx.csv", index=False)
+        #save mutant_df without header and as txt file
+        mutant_df.to_csv(f"./data/Processed_K50_dG_datasets/foldx/{protein.replace('.csv','')}/mutant_file.txt", index=False, header=False, sep=' ')
+
+def main():
+    # create_rosetta_csv()
+    creat_foldx_ds()
+    
+
+if __name__ == "__main__":
+    main()
 

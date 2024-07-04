@@ -22,7 +22,7 @@ class SidChainDS(Dataset):
         """
         self.data_path = data_path
         self.LLM_EMB = LLM_EMB
-        self.pad_data = True
+        self.pad_data = False
         self.set_type = set_type
         self.data_dir = []
         if(set_type == 'valid'):
@@ -80,16 +80,18 @@ class SidChainDS(Dataset):
         if self.LLM_EMB:
             proT5_mut = torch.load(item_path + '/proT5_emb_mut.pt')
             proT5_emb = torch.load(item_path + '/proT5_emb.pt')
+            proT5_cycle = torch.load(item_path + '/proT5_emb_cycle.pt')
         else:
             proT5_emb = torch.zeros((len(seq),1024))
             proT5_mut = torch.zeros((len(seq),1024))
+            proT5_cycle = torch.zeros((len(seq),1024))
         
         if self.pad_data:
             data =  self.padding_data((id, crd_backbone, mask, seq_one_hot, seq,ang_backbone,ang, proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_decoy, seq_decoy))
             return data
         
         return id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, \
-            ang, proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_decoy, seq_decoy
+            ang, proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_decoy, seq_decoy,proT5_cycle
 
     def padding_data(self, data, max_len = CFG.seq_len):
         """

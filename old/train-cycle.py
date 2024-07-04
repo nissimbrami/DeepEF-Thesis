@@ -21,8 +21,8 @@ import wandb
 torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
 CFG.debug = False
-CFG.batch_size = 4
-CFG.num_workers = 0
+CFG.batch_size = 2
+CFG.num_workers = 4
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:

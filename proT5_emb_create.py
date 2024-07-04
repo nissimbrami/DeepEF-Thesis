@@ -5,6 +5,7 @@ from transformers import T5Tokenizer, T5EncoderModel
 import torch
 import re
 import os
+from tqdm import tqdm
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print("Using device: {}".format(device))
 
@@ -37,9 +38,11 @@ def get_emb(sequence_examples):
     emb_0 = embedding_repr.last_hidden_state[0,:seq_len]
     return emb_0
 
-def print_files_in_directory(directory,mutation=False):
+def print_files_in_directory(directory,mutation=False,cycle=False):
     n_saved = 0
-    if mutation:
+    if cycle:
+        emb_file_name = 'proT5_emb_cycle.pt'
+    elif mutation:
         emb_file_name = 'proT5_emb_mut.pt'
     else:
         emb_file_name = 'proT5_emb.pt'
@@ -48,6 +51,10 @@ def print_files_in_directory(directory,mutation=False):
         for file_name in files:
             if (file_name == 'seq.pt'):
                 seq = torch.load(os.path.join(root, file_name))
+                if cycle:
+                    last = seq[-1]
+                    seq = last + seq[:-1]
+                    
                 if mutation:
                     mix_index = torch.randperm(len(seq))[:2] # randomly select 2 positions to swap
                     l1,l2 = seq[mix_index[0]], seq[mix_index[1]] # save the letters at these positions
@@ -65,4 +72,4 @@ def print_files_in_directory(directory,mutation=False):
 # Provide the directory path here
 directory_path = './data/casp12_data_100/'
 
-print_files_in_directory(directory_path,mutation=False)
+print_files_in_directory(directory_path,mutation=False, cycle = True)

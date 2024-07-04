@@ -84,8 +84,8 @@ def run_validation(root_dir, mode='evaluation', model_path=CFG.model_path):
     protein_dataset = AllProteinValidationDataset(tensor_root_dir, mutations_root_dir)
     if mode == 'evaluation':
         model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
-        # model = load_checkpoint(model, device,model_path)
-        model.load_state_dict(torch.load(model_path))
+        model = load_checkpoint(model, device,model_path)
+        # model.load_state_dict(torch.load(model_path))
         data_loader = DataLoader(protein_dataset, batch_size=1, shuffle=False)
         evaluate_mutations(model, data_loader, root_dir,model_path)
     elif mode == 'split_single_protein':

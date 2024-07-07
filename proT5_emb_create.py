@@ -38,10 +38,12 @@ def get_emb(sequence_examples):
     emb_0 = embedding_repr.last_hidden_state[0,:seq_len]
     return emb_0
 
-def print_files_in_directory(directory,mutation=False,cycle=False):
+def print_files_in_directory(directory,mutation=False,cycle1=False,cycle2=False):
     n_saved = 0
-    if cycle:
-        emb_file_name = 'proT5_emb_cycle.pt'
+    if cycle1:
+        emb_file_name = 'proT5_emb_cycle1.pt'
+    elif cycle2:
+        emb_file_name = 'proT5_emb_cycle2.pt'
     elif mutation:
         emb_file_name = 'proT5_emb_mut.pt'
     else:
@@ -51,10 +53,14 @@ def print_files_in_directory(directory,mutation=False,cycle=False):
         for file_name in files:
             if (file_name == 'seq.pt'):
                 seq = torch.load(os.path.join(root, file_name))
-                if cycle:
+                if cycle1:
                     last = seq[-1]
                     seq = last + seq[:-1]
-                    
+                
+                if cycle2:
+                    first = seq[0]
+                    seq = seq[1:] + first
+                   
                 if mutation:
                     mix_index = torch.randperm(len(seq))[:2] # randomly select 2 positions to swap
                     l1,l2 = seq[mix_index[0]], seq[mix_index[1]] # save the letters at these positions
@@ -62,6 +68,7 @@ def print_files_in_directory(directory,mutation=False,cycle=False):
                     seq = seq[:mix_index[0]] + l2 + seq[mix_index[0]+1:]
                     seq = seq[:mix_index[1]] + l1 + seq[mix_index[1]+1:]
                     torch.save(seq,os.path.join(root, "seq_mut.pt"))
+                    
                 proT5_emb = get_emb([seq]).to('cpu')
                 torch.save(proT5_emb, os.path.join(root, emb_file_name))  
                 n_saved += 1
@@ -72,4 +79,5 @@ def print_files_in_directory(directory,mutation=False,cycle=False):
 # Provide the directory path here
 directory_path = './data/casp12_data_100/'
 
-print_files_in_directory(directory_path,mutation=False, cycle = True)
+# print_files_in_directory(directory_path,mutation=False, cycle1 = True)
+print_files_in_directory(directory_path,mutation=False, cycle2 = True)

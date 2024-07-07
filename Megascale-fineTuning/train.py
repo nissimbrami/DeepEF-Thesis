@@ -32,13 +32,13 @@ RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
-FREEZE_LAYERS = False
+FREEZE_LAYERS = True
 MODEL_PATH = './Megascale-fineTuning/models'
 MODEL_NAME = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
 MINI_BATCH_SIZE = 256
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
-TRAINED_MODEL_PATH = './res/trianed_models-no_exdu_nosigmoid/best_model.pt'
-PRETRAINED = False
+TRAINED_MODEL_PATH = './res/trianed_models-cycle_per//best_model.pt'
+PRETRAINED = True
 
 # config wandb
 config = {
@@ -248,7 +248,7 @@ if __name__ == '__main__':
     tensor_root_dir = r'./data/Processed_K50_dG_datasets/training_data'
     mutations_root_dir = r'./data/Processed_K50_dG_datasets/mutation_datasets'
    
-    # run_training()
+    run_training()
     # Get validation proteins
     protein_val = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
                                                   mutations_root_dir=mutations_root_dir, train=False)

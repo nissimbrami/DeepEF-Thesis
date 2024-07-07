@@ -20,7 +20,7 @@ import wandb
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
-CFG.debug = True
+# CFG.debug = True
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:

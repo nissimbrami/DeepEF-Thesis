@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 2 cycles')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 2 cycles emp lossg')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -249,7 +249,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"lossc":round(lossc.item(),3),"sequence_len": Xjf.shape[1]})
             # Log metrics
             if not CFG.debug:
-                wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": len(seq[0]),
+                wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": Xjf.shape[1],
                            "Exd":Exd.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item(),
                            "step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item(), "Exdu":Exdu.item(),"Ecy1":Ecy1.item(),"Ecy2":Ecy2.item()})
             
@@ -307,7 +307,7 @@ def gradient_penalty(X_native, E_native):
                                             grad_outputs=torch.ones_like(E_native),
                                             create_graph=True, retain_graph=True)[0]
     # Use mse loss
-    lossg = torch.mean(partial_dx_native**2)
+    lossg = 100*torch.mean(partial_dx_native**2)
     return lossg
 
 def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, with_grad = True , reg_alpha = CFG.reg_alpha):
@@ -386,7 +386,7 @@ def main():
     model.energy_epsilon = 1e-6
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
     # configurate wandb
     wandb_config(wandb, model, optimizer, scheduler, train_loader,CFG.model_path)
     # Run training
@@ -403,6 +403,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-cycle_per2/'
+        CFG.model_path = './res/trianed_models-cycle_per_dgemp/'
         CFG.results_path = './res/results-emb/'
     main()

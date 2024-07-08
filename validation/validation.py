@@ -68,7 +68,7 @@ def run_thermodynamics_model(model, batch, mini_batch=512):
 def evaluate_mutations(model, data_loader, root_dir,model_path = CFG.model_path):
     model.eval()
     # model.train()
-    mutation_output_dir = Path(root_dir) / 'mutation_outputs' / Path(model_path).stem
+    mutation_output_dir = Path(root_dir) / 'mutation_outputs' / model_path.split('/')[-2]
     os.makedirs(mutation_output_dir, exist_ok=True)
     with torch.no_grad():
         for i, batch in tqdm(enumerate(data_loader), total=len(data_loader)):
@@ -84,8 +84,8 @@ def run_validation(root_dir, mode='evaluation', model_path=CFG.model_path):
     protein_dataset = AllProteinValidationDataset(tensor_root_dir, mutations_root_dir)
     if mode == 'evaluation':
         model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
-        model = load_checkpoint(model, device,model_path)
-        # model.load_state_dict(torch.load(model_path))
+        # model = load_checkpoint(model, device,model_path)
+        model.load_state_dict(torch.load(model_path)['model_state_dict'])
         data_loader = DataLoader(protein_dataset, batch_size=1, shuffle=False)
         evaluate_mutations(model, data_loader, root_dir,model_path)
     elif mode == 'split_single_protein':

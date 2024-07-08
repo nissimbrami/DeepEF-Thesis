@@ -97,8 +97,8 @@ def main():
     inf_dir = './data/S669/res/'
     # Load model
     # model_path = './res/trianed_models-no_exdu_nosigmoid/18_final_model.pt'
-    model_path ='./Megascale-fineTuning/models/PEM_fine_tuned/18.pt'
-    # model_path = './res/trianed_models-cycle_per/best_model.pt'
+    # model_path ='./Megascale-fineTuning/models/PEM_fine_tuned/18.pt'
+    model_path = './res/trianed_models-cycle_per/4_final_model.pt'
     model_name = model_path.split('/')[-2]
     # create output directory
     inf_dir = inf_dir + model_name + '/'
@@ -106,8 +106,8 @@ def main():
         os.makedirs(inf_dir)
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(device) 
     model_dict = torch.load(model_path,map_location=device)
-    # model.load_state_dict(model_dict['model_state_dict'])
-    model.load_state_dict(torch.load(model_path)) 
+    model.load_state_dict(model_dict['model_state_dict'])
+    # model.load_state_dict(torch.load(model_path)) 
     # Load data
     dataloader = create_dataloader(data_dir, 1)
     # Inference

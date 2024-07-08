@@ -4,7 +4,7 @@ from analysis.analysis_runner import run_analysis
 if __name__ == "__main__":
     
     # trained_models_path = 'res/trianed_models-no_exdu_nosigmoid'
-    trained_models_path = './res/trianed_models-cycle_per'
+    trained_models_path = './res/trianed_models-cycle_per/4_final_model.pt'
     # models_list = ['res/trianed_models-noLLMemb', 'res/trianed_models-newDecoys', 'res/trianed_models-nocoords','res/trianed_models-numerical_LG]
     # models_list = ['res/trianed_models-unfolded_reg','res/trianed_models-no_exdu','res/trianed_models-MSEgrad']
     models_list = [trained_models_path]

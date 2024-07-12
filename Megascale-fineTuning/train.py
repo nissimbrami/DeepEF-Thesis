@@ -34,10 +34,11 @@ DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
 FREEZE_LAYERS = True
 MODEL_PATH = './Megascale-fineTuning/models'
-MODEL_NAME = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
 MINI_BATCH_SIZE = 256
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
-TRAINED_MODEL_PATH = './res/trianed_models-cycle_per//best_model.pt'
+TRAINED_MODEL_PATH = './res/trianed_models-cycle_per/best_model.pt'
+BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
+MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
 PRETRAINED = True
 
 # config wandb

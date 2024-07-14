@@ -68,7 +68,7 @@ def run_thermodynamics_model(model, batch, mini_batch=512):
 def evaluate_mutations(model, data_loader, root_dir,model_path = CFG.model_path):
     model.eval()
     # model.train()
-    mutation_output_dir = Path(root_dir) / 'mutation_outputs' / model_path.split('/')[-2]
+    mutation_output_dir = Path(root_dir) / 'mutation_outputs' / os.path.join(model_path.split('/')[-2],model_path.split('/')[-1]) # model_path.split('/')[-2]
     os.makedirs(mutation_output_dir, exist_ok=True)
     with torch.no_grad():
         for i, batch in tqdm(enumerate(data_loader), total=len(data_loader)):

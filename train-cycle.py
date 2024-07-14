@@ -251,7 +251,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             if not CFG.debug:
                 wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": Xjf.shape[1],
                            "Exd":Exd.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item(),
-                           "step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item(), "Exdu":Exdu.item(),"Ecy1":Ecy1.item(),"Ecy2":Ecy2.item()})
+                           "step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item(), "Exdu":Exdu.item(),"Ecy1":Ecy1.item()})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -307,7 +307,7 @@ def gradient_penalty(X_native, E_native):
                                             grad_outputs=torch.ones_like(E_native),
                                             create_graph=True, retain_graph=True)[0]
     # Use mse loss
-    lossg = 100*torch.mean(partial_dx_native**2)
+    lossg = torch.mean(partial_dx_native**2)
     return lossg
 
 def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, with_grad = True , reg_alpha = CFG.reg_alpha):
@@ -340,7 +340,7 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, with_grad = True , reg_a
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
-def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2):
+def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1):
     """Decoy loss:
     - the energy of a decoy sequece is greater than the energy of the wild-type structure (Ejf<Exd)
     - the energy of a decoy structure is greater than the energy of the wild-type structure (Ejf<Ecd)

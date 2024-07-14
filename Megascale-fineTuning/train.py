@@ -33,12 +33,13 @@ NANO_TO_ANGSTROM = 0.1
 DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
 FREEZE_LAYERS = True
+CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 256
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
 TRAINED_MODEL_PATH = './res/trianed_models-cycle_per/best_model.pt'
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
-MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
+MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME+CRITERION if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME+CRITERION
 PRETRAINED = True
 
 # config wandb
@@ -140,7 +141,8 @@ class Trainer():
         self.train_ds = train_ds
         self.val_ds = val_ds
         self.device = device
-        self.criterion = nn.MSELoss()
+        # self.criterion = nn.MSELoss()
+        self.criterion = nn.L1Loss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
         self.model.to(self.device)
         self.mini_batch_size = MINI_BATCH_SIZE

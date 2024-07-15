@@ -184,6 +184,8 @@ class Trainer():
     def validate(self, epoch):
         self.model.eval()
         val_loss = 0
+        val_dg = torch.tensor([],device=self.device)
+        val_dg_pred = torch.tensor([],device=self.device)
         with torch.no_grad():
             for i, batch in enumerate(tqdm(self.val_ds,desc=f'Validation Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
@@ -192,9 +194,12 @@ class Trainer():
                     delta_g = batch['delta_g'][0, j: j + self.mini_batch_size].to(self.device)
                     loss = self.criterion(output,delta_g)
                     val_loss += loss.item()
+                    val_dg = torch.cat((val_dg, delta_g), dim=0)
+                    val_dg_pred = torch.cat((val_dg_pred, output), dim=0)
         val_loss /= len(self.val_ds)
         print(f'Validation Loss: {val_loss}')
-        wandb_log({'val_loss': val_loss,'epoch': epoch})
+        pc_corr = torch.corrcoef(torch.cat((val_dg[None,:],val_dg_pred[None,:])))[0, 1]
+        wandb_log({'val_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr})
         self.model.train()
         
     def get_deltaG(self, batch, i):

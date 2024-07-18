@@ -54,8 +54,9 @@ def test_dataloader():
         if i == 2:
             break
         
-def inference(model, dataloader, inf_dir):
+def inference(model, dataloader, inf_dir) :
     inf_df = pd.DataFrame()
+    model.eval()
     with torch.no_grad():
         for i, (idx, coords, masks, proT5_embs, mutation_seq,\
             one_hot, protein_id, mut,wt_one_hot,proT5_wt) in enumerate(tqdm(dataloader)):
@@ -98,10 +99,10 @@ def main():
     # Load model
     # model_path = './res/trianed_models-no_exdu_nosigmoid/18_final_model.pt'
     # model_path ='./Megascale-fineTuning/models/PEM_fine_tuned/10.pt'
-    # model_path = './Megascale-fineTuning/models/PEM_full_trained/20.pt'
-    model_path = './res/trianed_models-cycle_per/10_final_model.pt'
+    model_path = './Megascale-fineTuning/models/PEM_full_trained/20.pt'
+    # model_path = './res/trianed_models-cycle_per/10_final_model.pt'
     # model_path = './res/trianed_models-cycle_per_dgemp/best_model.pt'
-    model_path = './res/trianed_models-cycle_per2/best_model.pt'
+    # model_path = './res/trianed_models-cycle_per2/best_model.pt'
     model_name = model_path.split('/')[-2]
     # create output directory
     inf_dir = inf_dir + model_name + '/'

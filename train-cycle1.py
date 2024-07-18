@@ -307,7 +307,7 @@ def gradient_penalty(X_native, E_native):
                                             grad_outputs=torch.ones_like(E_native),
                                             create_graph=True, retain_graph=True)[0]
     # Use mse loss
-    lossg = 100*torch.mean(partial_dx_native**2)
+    lossg = 10*torch.mean(partial_dx_native**2)
     return lossg
 
 def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, with_grad = True , reg_alpha = CFG.reg_alpha):
@@ -403,6 +403,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-cycle_per_dgemp/'
+        CFG.model_path = './res/trianed_models-cycle_per_2/'
         CFG.results_path = './res/results-emb/'
     main()

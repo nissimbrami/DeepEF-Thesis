@@ -336,7 +336,9 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, with_grad = True ,
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     # lossc will be regularization term of sum of squered energys 
-    lossc = (torch.cat([Ejf.unsqueeze(0)[None,:], Eju.unsqueeze(0)[None,:], Exd.unsqueeze(0)[None,:], Ecd.unsqueeze(0)[None,:], Ecy1.unsqueeze(0)[None,:]])**2).mean()
+    lossc = (torch.cat([Ejf.unsqueeze(0)[None,:], Eju.unsqueeze(0)[None,:],
+                        Exd.unsqueeze(0)[None,:], Ecd.unsqueeze(0)[None,:],
+                        Ecy1.unsqueeze(0)[None,:], Ecy2.unsqueeze(0)[None,:]])**2).mean()
     lossc = reg_alpha * lossc
     
     return lossd+lossg+lossc , lossd, lossg, lossc
@@ -352,7 +354,9 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2):
     """
     # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
     loss_decoy = lambda x,y: x - y
-    loss = torch.cat([loss_decoy(Ejf, Exd).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecd).unsqueeze(0)[None,:], loss_decoy(Eju, Ecd).unsqueeze(0)[None,:], loss_decoy(Ejf, Eju).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy1).unsqueeze(0)[None,:]])
+    loss = torch.cat([loss_decoy(Ejf, Exd).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecd).unsqueeze(0)[None,:], 
+                      loss_decoy(Eju, Ecd).unsqueeze(0)[None,:], loss_decoy(Ejf, Eju).unsqueeze(0)[None,:], 
+                      loss_decoy(Ejf, Ecy1).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy2).unsqueeze(0)[None,:]])
     loss = torch.mean(loss)
     return loss
 

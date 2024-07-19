@@ -20,11 +20,11 @@ import wandb
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
-# CFG.debug = True
+CFG.debug = True
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 1 cycle fix')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 1 cycle norm')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -307,7 +307,7 @@ def gradient_penalty(X_native, E_native):
                                             grad_outputs=torch.ones_like(E_native),
                                             create_graph=True, retain_graph=True)[0]
     # Use mse loss
-    lossg = 10*torch.mean(partial_dx_native**2)
+    lossg = torch.mean(partial_dx_native**2)
     return lossg
 
 def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, with_grad = True , reg_alpha = CFG.reg_alpha):
@@ -335,7 +335,7 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, with_grad = True , reg_a
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     # lossc will be regularization term of sum of squered energys 
-    lossc = (Ejf**2 + Eju**2 + Exd**2 + Ecd**2 + Ecy1**2 ).mean()
+    lossc = (torch.cat([Ejf.unsqueeze(0)[None,:], Eju.unsqueeze(0)[None,:], Exd.unsqueeze(0)[None,:], Ecd.unsqueeze(0)[None,:], Ecy1.unsqueeze(0)[None,:]])**2).mean()
     lossc = reg_alpha * lossc
     
     return lossd+lossg+lossc , lossd, lossg, lossc
@@ -350,8 +350,9 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1):
     """
     # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
     loss_decoy = lambda x,y: x - y
-    
-    return loss_decoy(Ejf, Exd) + loss_decoy(Ejf, Ecd) + loss_decoy(Eju, Ecd)+ loss_decoy(Ejf, Eju) + loss_decoy(Ejf, Ecy1)
+    loss = torch.cat([loss_decoy(Ejf, Exd).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecd).unsqueeze(0)[None,:], loss_decoy(Eju, Ecd).unsqueeze(0)[None,:], loss_decoy(Ejf, Eju).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy1).unsqueeze(0)[None,:]])
+    loss = torch.mean(loss)
+    return loss
 
     
 def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch,scheduler):
@@ -401,6 +402,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-cycle_per_fix/'
+        CFG.model_path = './res/trianed_models-cycle_per_norm/'
         CFG.results_path = './res/results-emb/'
     main()

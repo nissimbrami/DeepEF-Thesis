@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 1 cycel permutation 1 cycle norm - only SM')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 1 cycel permutation 1 cycle norm - extra reg')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -128,7 +128,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                     E = model(X)
                     Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
                     # calculate the loss   
-                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False)
+                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False, reg_alpha = 0.9)
                 
             # Add gradient penalty
             Ejf_grad = torch.tensor(0.0).to(device)
@@ -185,18 +185,17 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 continue
             X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1),dim=0)
             
-            with torch.no_grad():
-                # half precision training
-                with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
-                    # calculate the energy for the folded unfolded and decoy structure
-                    E = model(X)
-                    Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
-                    # calculate the loss   
-                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False)
+            # half precision training
+            with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+                # calculate the energy for the folded unfolded and decoy structure
+                E = model(X)
+                Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
+                # calculate the loss   
+                loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False,reg_alpha=0.9)
                 
             # Scales the loss, and calls backward()
             # to create scaled gradients
-            # scaler.scale(loss).backward()
+            scaler.scale(loss).backward()
 
             # Clip gradients to a maximum norm of max_grad_norm to prevent exploding gradients
             if CFG.clip_grad_norm:
@@ -204,10 +203,10 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             
             # Unscales gradients and calls
             # or skips optimizer.step()
-            # scaler.step(optimizer)
+            scaler.step(optimizer)
 
             # Updates the scale for next iteration
-            # scaler.update()
+            scaler.update()
 
             # Add gradient penalty
             Ejf_grad = torch.tensor(0.0).to(device)
@@ -385,10 +384,10 @@ def main():
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
     # configurate wandb
-    wandb_config(wandb, model, optimizer, scheduler, train_loader,'./res/trianed_models-cycle_per_norm_SM/')
+    wandb_config(wandb, model, optimizer, scheduler, train_loader,'./res/trianed_models-cycle_per_norm_reg/')
     # Run training
     print('***Start training***')
-    epoch = 1
+    epoch = 2
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

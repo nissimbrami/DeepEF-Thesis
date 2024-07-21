@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 2 cycles norm')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 1 cycel permutation 1 cycle norm - only SM')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -126,9 +126,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                     # calculate the energy for the folded unfolded and decoy structure
                     E = model(X)
-                    Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2 = E[0], E[1], E[2], E[3], E[4], E[5], E[6]
+                    Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
                     # calculate the loss   
-                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, with_grad = False)
+                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False)
                 
             # Add gradient penalty
             Ejf_grad = torch.tensor(0.0).to(device)
@@ -183,19 +183,20 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             if Xjf is None:
                 n_skips += 1
                 continue
-            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2),dim=0)
+            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1),dim=0)
             
-            # half precision training
-            with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
-                # calculate the energy for the folded unfolded and decoy structure
-                E = model(X)
-                Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2 = E[0], E[1], E[2], E[3], E[4], E[5], E[6]
-                # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, with_grad = False)
-            
+            with torch.no_grad():
+                # half precision training
+                with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+                    # calculate the energy for the folded unfolded and decoy structure
+                    E = model(X)
+                    Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
+                    # calculate the loss   
+                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False)
+                
             # Scales the loss, and calls backward()
             # to create scaled gradients
-            scaler.scale(loss).backward()
+            # scaler.scale(loss).backward()
 
             # Clip gradients to a maximum norm of max_grad_norm to prevent exploding gradients
             if CFG.clip_grad_norm:
@@ -203,10 +204,10 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             
             # Unscales gradients and calls
             # or skips optimizer.step()
-            scaler.step(optimizer)
+            # scaler.step(optimizer)
 
             # Updates the scale for next iteration
-            scaler.update()
+            # scaler.update()
 
             # Add gradient penalty
             Ejf_grad = torch.tensor(0.0).to(device)
@@ -251,7 +252,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             if not CFG.debug:
                 wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": Xjf.shape[1],
                            "Exd":Exd.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item(),
-                           "step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item(), "Exdu":Exdu.item(),"Ecy1":Ecy1.item(),"Ecy2":Ecy2.item()})
+                           "step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item(), "Exdu":Exdu.item(),"Ecy1":Ecy1.item()})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -261,7 +262,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         if not CFG.debug:
             wandb.log({"epoch" : epoch ,"validation loss": val_loss, "learning rate": optimizer.param_groups[0]["lr"], "validation lossd": val_lossd, "validation lossg": val_lossg, "validation lossc": valid_lossc})
          # Update the learning rate based on the validation loss
-        scheduler.step()
+        scheduler.step(val_loss)
         print (f"validation loss: {val_loss}")
         if val_loss<best_val:
             print('saving model with valid loss: ',val_loss)
@@ -310,7 +311,7 @@ def gradient_penalty(X_native, E_native):
     lossg = torch.mean(partial_dx_native**2)
     return lossg
 
-def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, with_grad = True , reg_alpha = CFG.reg_alpha):
+def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, with_grad = True , reg_alpha = CFG.reg_alpha):
     """
     The loss function for the model corresponds to 3 main losses:
     1. lossg: the partial derivative of the energy with respect to the native structure
@@ -325,7 +326,6 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, with_grad = True ,
         Ecd (tensor): The energy of the decoy structure
         Exdu (tensor): The energy of the decoy structure unfolded
         Ecy1 (tensor): The energy of the cycle permutation structure first amino acid
-        Ecy2 (tensor): The energy of the cycle permutation structure last amino acid
     output:
         loss (tensor): The loss of the model
         lossd (tensor): The loss of the model due to the energy of the native structure divided by the decoy energy
@@ -333,30 +333,25 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, with_grad = True ,
         lossc (tensor): The loss of the model due to the energy softplus function for the native and mutant structure(unfolded and folded)
     """
     lossg = gradient_penalty(X_native, Ejf) if with_grad else torch.tensor(0.0).to(Ejf.device)
-    lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2)
+    lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     # lossc will be regularization term of sum of squered energys 
-    lossc = (torch.cat([Ejf.unsqueeze(0)[None,:], Eju.unsqueeze(0)[None,:],
-                        Exd.unsqueeze(0)[None,:], Ecd.unsqueeze(0)[None,:],
-                        Ecy1.unsqueeze(0)[None,:], Ecy2.unsqueeze(0)[None,:]])**2).mean()
+    lossc = (torch.cat([Ejf.unsqueeze(0)[None,:], Eju.unsqueeze(0)[None,:], Exd.unsqueeze(0)[None,:], Ecd.unsqueeze(0)[None,:], Ecy1.unsqueeze(0)[None,:]])**2).mean()
     lossc = reg_alpha * lossc
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
-def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2):
+def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1):
     """Decoy loss:
     - the energy of a decoy sequece is greater than the energy of the wild-type structure (Ejf<Exd)
     - the energy of a decoy structure is greater than the energy of the wild-type structure (Ejf<Ecd)
     - the energy of a folded decoy is greater than the energy of an unfolded decoy (Exdu<Exd)
     - the energy of a decoy structure is greater than the energy of the unfolded native structure (Eju<Ecd)
     - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy1)
-    - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy2)
     """
     # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
     loss_decoy = lambda x,y: x - y
-    loss = torch.cat([loss_decoy(Ejf, Exd).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecd).unsqueeze(0)[None,:], 
-                      loss_decoy(Eju, Ecd).unsqueeze(0)[None,:], loss_decoy(Ejf, Eju).unsqueeze(0)[None,:], 
-                      loss_decoy(Ejf, Ecy1).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy2).unsqueeze(0)[None,:]])
+    loss = torch.cat([loss_decoy(Ejf, Exd).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecd).unsqueeze(0)[None,:], loss_decoy(Eju, Ecd).unsqueeze(0)[None,:], loss_decoy(Ejf, Eju).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy1).unsqueeze(0)[None,:]])
     loss = torch.mean(loss)
     return loss
 
@@ -367,16 +362,13 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     if epoch > 0:
         model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer)
         epoch += 1
+        CFG.model_path = './res/trianed_models-cycle_per_norm_SM/'
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
     #load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
     validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer , val_type = 'robust')
     validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer, val_type = 'soft')
     validation(model, train_loader,CFG.device,-1, CFG.N, optimizer, val_type = 'train')  
-    # amino acid inference
-    # A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,val_type = 'robust') 
-    # create diffucion data
-    # diff_data(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
     
 def main():
     print('***Start main function***')
@@ -393,10 +385,10 @@ def main():
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
     # configurate wandb
-    wandb_config(wandb, model, optimizer, scheduler, train_loader,CFG.model_path)
+    wandb_config(wandb, model, optimizer, scheduler, train_loader,'./res/trianed_models-cycle_per_norm_SM/')
     # Run training
     print('***Start training***')
-    epoch = 2
+    epoch = 1
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 
@@ -408,6 +400,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-cycle_per_2_norm/'
+        CFG.model_path = './res/trianed_models-cycle_per_norm/'
         CFG.results_path = './res/results-emb/'
     main()

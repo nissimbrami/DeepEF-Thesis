@@ -18,7 +18,7 @@ def get_plots(model_name, protein_name, df, metric='dG'):
         plt.savefig(os.path.join(protein_graph_folder, f'{plot_function.__name__}.png'), dpi=300)
 
 def run_analysis(model_path = CFG.model_path):
-    model = Path(model_path).stem
+    model = '/'.join(model_path.split('/')[-2:])
     print(f'taking model {model}')
     df_correlation = pd.DataFrame(columns=['Protein', 'Pearson_dG', 'Spearman_dG','Pearson_dG_energy', 'Spearman_dG_energy','Pearson_dG_unEnergy', 'Spearman_dG_unEnergy','Pearson_unEnergy_energy', 'Spearman_unEnergy_energy',
                                            'Pearson_norm_avg', 'Spearman_norm_avg'])

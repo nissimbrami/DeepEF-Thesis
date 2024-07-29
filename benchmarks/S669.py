@@ -99,10 +99,10 @@ def main():
     # Load model
     # model_path = './res/trianed_models-no_exdu_nosigmoid/18_final_model.pt'
     # model_path ='./Megascale-fineTuning/models/PEM_fine_tuned/10.pt'
-    model_path = './Megascale-fineTuning/models/PEM_full_trained/20.pt'
+    # model_path = './Megascale-fineTuning/models/PEM_full_trained/20.pt'
     # model_path = './res/trianed_models-cycle_per/10_final_model.pt'
-    # model_path = './res/trianed_models-cycle_per_dgemp/best_model.pt'
-    # model_path = './res/trianed_models-cycle_per2/best_model.pt'
+    # model_path = './res/trianed_models-cycle_per_norm/5_final_model.pt'
+    model_path = './res/trianed_models-cycle_per_norm_SM/3_final_model.pt'
     model_name = model_path.split('/')[-2]
     # create output directory
     inf_dir = inf_dir + model_name + '/'

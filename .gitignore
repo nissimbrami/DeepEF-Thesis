@@ -20,3 +20,4 @@ experiments/.ipynb_checkpoints
 >>>>>>> 715964071456497696c39251fc06cd18f059c969
 wandb/*
 .vscode/launch.json
+*.db

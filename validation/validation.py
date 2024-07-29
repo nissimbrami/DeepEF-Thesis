@@ -70,6 +70,7 @@ def evaluate_mutations(model, data_loader, root_dir,model_path = CFG.model_path)
     # model.train()
     mutation_output_dir = Path(root_dir) / 'mutation_outputs' / os.path.join(model_path.split('/')[-2],model_path.split('/')[-1]) # model_path.split('/')[-2]
     os.makedirs(mutation_output_dir, exist_ok=True)
+    all_energy_out_df = pd.DataFrame()
     with torch.no_grad():
         for i, batch in tqdm(enumerate(data_loader), total=len(data_loader)):
             batch = normalize_batch(batch, True)
@@ -78,14 +79,15 @@ def evaluate_mutations(model, data_loader, root_dir,model_path = CFG.model_path)
             energy_out_df.to_csv(out_file, index=False)
 
 
-def run_validation(root_dir, mode='evaluation', model_path=CFG.model_path):
+def run_validation(root_dir, mode='evaluation', model_path=CFG.model_path,model=None):
     tensor_root_dir = Path(root_dir) / 'training_data'
     mutations_root_dir = Path(root_dir) / 'mutation_datasets'
     protein_dataset = AllProteinValidationDataset(tensor_root_dir, mutations_root_dir)
     if mode == 'evaluation':
-        model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
-        # model = load_checkpoint(model, device,model_path)
-        model.load_state_dict(torch.load(model_path)['model_state_dict'])
+        if model is None:
+            model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
+            # model = load_checkpoint(model, device,model_path)
+            model.load_state_dict(torch.load(model_path)['model_state_dict'])
         data_loader = DataLoader(protein_dataset, batch_size=1, shuffle=False)
         evaluate_mutations(model, data_loader, root_dir,model_path)
     elif mode == 'split_single_protein':

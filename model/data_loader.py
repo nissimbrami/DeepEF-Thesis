@@ -80,7 +80,7 @@ class SidChainDS(Dataset):
         if self.LLM_EMB:
             proT5_mut = torch.load(item_path + '/proT5_emb_mut.pt')
             proT5_emb = torch.load(item_path + '/proT5_emb.pt')
-            proT5_cycle1 = torch.load(item_path + '/proT5_emb_cycle.pt')
+            proT5_cycle1 = torch.load(item_path + '/proT5_emb_cycle1.pt')
             proT5_cycle2 = torch.load(item_path + '/proT5_emb_cycle2.pt')
         else:
             proT5_emb = torch.zeros((len(seq),1024))

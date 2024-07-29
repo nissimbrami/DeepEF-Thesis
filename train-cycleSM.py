@@ -361,7 +361,6 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     if epoch > 0:
         model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer)
         epoch += 1
-        CFG.model_path = './res/trianed_models-cycle_per_norm_SM/'
     training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
     #load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
@@ -399,6 +398,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-cycle_per_norm/'
+        CFG.model_path = './res/trianed_models-cycle_per_norm_SM/'
         CFG.results_path = './res/results-emb/'
     main()

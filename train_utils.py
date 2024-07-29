@@ -189,10 +189,10 @@ def diff_data(model, optimizer, dataloader, device,epoch,N,valid_loader):
         torch.save(all_Xn_int,"./all_Xn_int.pt")
         torch.save(all_Xn,"./all_Xn_padded.pt")
 
-def get_graph(x, one_hot, emb, mask):
+def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     """Get graph representation of protein"""
     D = get_dist_matrix(x) # N,N,16
-    D = torch.relu(torch.exp( CFG.gaussian_coef*D**2))
+    D = torch.relu(torch.exp(gaussian_coef*D**2))
     # remove masks values
     mask_index = torch.where(mask == 0)
     D[mask_index[0],:,:] = 0
@@ -207,10 +207,10 @@ def get_graph(x, one_hot, emb, mask):
     
     return Fh
 
-def get_unfolded_graph(x, one_hot, emb, mask):
+def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     """Get graph representation of a unfolded protein"""
     D = get_dist_matrix(x) # N,N,16
-    D = torch.relu(torch.exp( CFG.gaussian_coef*D**2))
+    D = torch.relu(torch.exp(gaussian_coef*D**2))
     # remove masks values
     mask_index = torch.where(mask == 0)
     D[mask_index[0],:,:] = 0
@@ -264,7 +264,9 @@ def add_gaussian_noise(X_native,sigma):
     X_decoy = X_native + noise
     return X_decoy
 
-def wandb_config(wandb, model, optimizer, scheduler, dataloader,model_path = CFG.model_path):
+def wandb_config(wandb, model, optimizer, scheduler, dataloader,
+                 model_path = CFG.model_path,reg_alpha = CFG.reg_alpha,gaussian_coef = CFG.gaussian_coef,
+                 lr = CFG.lr,num_layers = CFG.num_layers,dropout_rate = CFG.dropout_rate,precision = CFG.precision):
     """wandb_config """
     if not CFG.debug:
         wandb.config.learning_rate = optimizer.param_groups[0]['lr']
@@ -276,6 +278,13 @@ def wandb_config(wandb, model, optimizer, scheduler, dataloader,model_path = CFG
         wandb.config.dataset = type(dataloader.dataset).__name__
         wandb.config.wd = CFG.wd
         wandb.config.model_path = model_path
+        wandb.config.reg_alpha = reg_alpha
+        wandb.config.gaussian_coef = gaussian_coef
+        wandb.config.lr = lr
+        wandb.config.num_layers = num_layers
+        wandb.config.dropout_rate = dropout_rate
+        wandb.config.precision = precision
+        
 
 def zero_except_udiagonal(D):
     """Zero all values except the diagonal and its neighbors"""
@@ -341,3 +350,69 @@ def print_max_gradients(model):
         if param.grad is not None:
             max_grad = param.grad.data.abs().max().item()
             print(f"Max gradient for {name}: {max_grad}")
+            
+            
+def get_noised_proteins(data,device, config = CFG):
+    """
+    Returns a noised version of the protein data.
+    """
+    id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
+                proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy,proT5_cycle1, proT5_cycle2 = data
+            
+    # wild type and mutant type
+    Xjf = crd_backbone.to(device) # wilde type structure folded
+    Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
+    Xcd = torch.clone(crd_decoy).to(device) # decoy structure
+    Xcy1 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
+    Xcy2 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
+    
+    # change the decoy len to match the native len
+    if Xcd.shape[1] > Xjf.shape[1]:
+        Xcd = Xcd[:,:Xjf.shape[1],:,:]
+        mask_crd_decoy = mask_crd_decoy[:,:Xjf.shape[1]]
+    elif Xcd.shape[1] < Xjf.shape[1]:
+        # add zeros to the end of the decoy
+        Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0],Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:]).to(device)), dim=1)
+        mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(mask.shape[0],mask.shape[1] - mask_crd_decoy.shape[1])), dim=1)
+        
+    
+    # native structure and decoy structure
+    Xd = torch.clone(Xjf).to(device)
+    Xdu = torch.clone(Xjf).to(device)
+    seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
+    
+    # create decoy sequence
+    seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
+    
+    if seq_decoy.shape[1] >config.seq_len : # if the sequence is too long, skip it(GPU limitation)
+        return None,None,None,None,None,None,None
+    #emb = torch.cat((esm_embed,seq),dim=2)
+    emb = seq_one_hot.to(device)
+    emb_decoy = seq_decoy.to(device)
+    # get the cycle permutation
+    cycle_emb1 = get_one_hot(seq[0][-1] + seq[0][:-1]).to(device)
+    cycle_emb2 = get_one_hot(seq[0][1:] + seq[0][0]).to(device)
+    
+    # move proT5_emb to device
+    proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2 = proT5_emb_decoy.to(device), proT5_emb.to(device), proT5_cycle1.to(device), proT5_cycle2.to(device)
+    
+    # squeeze the data
+    Xd, Xjf, Xju, Xcd, Xdu, Xcy1, Xcy2 = Xd.squeeze(), Xjf.squeeze(), Xju.squeeze(), Xcd.squeeze(), Xdu.squeeze(), Xcy1.squeeze(), Xcy2.squeeze()
+    emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
+    mask_decoy, mask, mask_crd_decoy= mask_decoy.squeeze(), mask.squeeze(), mask_crd_decoy.squeeze()
+    proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2 = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_cycle1.squeeze(), proT5_cycle2.squeeze()
+    
+    # get folded graph  
+    Xjf = get_graph(Xjf, emb, proT5_emb, mask, gaussian_coef=config.gaussian_coef)
+    # get unfolded graph
+    Xju = get_unfolded_graph(Xju, emb, proT5_emb, mask, gaussian_coef=config.gaussian_coef)
+    # get decoy graph
+    Xd, Xcd, Xdu = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy, gaussian_coef=config.gaussian_coef), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy, gaussian_coef=config.gaussian_coef), get_unfolded_graph(Xdu, emb_decoy, proT5_emb_decoy, mask_decoy, gaussian_coef=config.gaussian_coef)
+    # Add cycle permutation
+    Xcy1 = get_graph(Xcy1, cycle_emb1, proT5_cycle1, mask, gaussian_coef=config.gaussian_coef)
+    Xcy2 = get_graph(Xcy2, cycle_emb2, proT5_cycle2, mask, gaussian_coef=config.gaussian_coef)
+    # Xjf.requires_grad = True
+    # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
+    Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = Xjf.unsqueeze(0),Xju.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0), Xdu.unsqueeze(0),Xcy1.unsqueeze(0),Xcy2.unsqueeze(0)
+
+    return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2

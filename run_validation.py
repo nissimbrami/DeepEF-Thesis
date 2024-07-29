@@ -1,21 +1,41 @@
+# This script runs the validation and analysis for all models in the models_list
+import os 
+import subprocess
+import gc
 from validation.validation import run_validation
 from analysis.analysis_runner import run_analysis
 
+
+
 if __name__ == "__main__":
     
-    # trained_models_path = 'res/trianed_models-no_exdu_nosigmoid'
-    trained_models_path = './res/trianed_models-cycle_per/4_final_model.pt'
-    # models_list = ['res/trianed_models-noLLMemb', 'res/trianed_models-newDecoys', 'res/trianed_models-nocoords','res/trianed_models-numerical_LG]
-    # models_list = ['res/trianed_models-unfolded_reg','res/trianed_models-no_exdu','res/trianed_models-MSEgrad']
-    # models_list = ['./res/trianed_models-cycle_per/13_final_model.pt', './res/trianed_models-cycle_per2/10_finael_model.pt']
-    models_list = ['res/trianed_models-cycle_per_norm/1_final_model.pt', 'res/trianed_models-cycle_per_norm/2_final_model.pt', 'res/trianed_models-cycle_per_norm/3_final_model.pt', 'res/trianed_models-cycle_per_norm/4_final_model.pt', 'res/trianed_models-cycle_per_norm/5_final_model.pt', 'res/trianed_models-cycle_per_norm/6_final_model.pt', 'res/trianed_models-cycle_per_norm/7_final_model.pt', 'res/trianed_models-cycle_per_norm/8_final_model.pt', 'res/trianed_models-cycle_per_norm/9_final_model.pt', 'res/trianed_models-cycle_per_norm/10_final_model.pt', 'res/trianed_models-cycle_per_norm/11_final_model.pt', 'res/trianed_models-cycle_per_norm/12_final_model.pt']
-
+    model_list = []
+    for i in range(1, 20):
+        cycle_norm = 'res/trianed_models-cycle_per_norm/' + str(i) + '_final_model.pt'
+        cycle_norm_2 = 'res/trianed_models-cycle_per_2_norm/' + str(i) + '_final_model.pt'
+        cycle_norm_SM = 'res/trianed_models-cycle_per_norm_SM/' + str(i) + '_final_model.pt'
+        model_list.append(cycle_norm)
+        model_list.append(cycle_norm_2)
+        model_list.append(cycle_norm_SM)
+    
     # run validation for all models
-    for model in models_list:
-        print('running validation for model: ', model)
-        run_validation(r'./data/Processed_K50_dG_datasets',model_path=r'./'+model)
-        print('validation done for model: ', model)
-        print('running analysis for model: ', model)
-        run_analysis(r'./'+model)
-        print('analysis done for model: ', model)
+    for model in model_list:
+        eval_path ='/'.join(model.split('/')[1:])
+        if os.path.exists(eval_path):
+            print('model already validated: ', model)
+            continue
+        try: 
+            print('running validation for model: ', model)
+            run_validation(r'./data/Processed_K50_dG_datasets',model_path=r'./'+model)
+            # clear memory
+            gc.collect()
+            print('validation done for model: ', model)
+            print('running analysis for model: ', model)
+            # run_analysis(r'./'+model)
+            print('analysis done for model: ', model)
+        except Exception as e:
+            print('error occured for model: ', model)
+            print(e)
+            continue
+        gc.collect()
 

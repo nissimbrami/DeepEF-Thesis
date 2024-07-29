@@ -77,7 +77,9 @@ def print_files_in_directory(directory,mutation=False,cycle1=False,cycle2=False)
                 
 
 # Provide the directory path here
-directory_path = './data/casp12_data_100/'
+# directory_path = './data/casp12_data_100/'
+directory_path = './data/casp12_data_30/'
 
 # print_files_in_directory(directory_path,mutation=False, cycle1 = True)
+print_files_in_directory(directory_path,mutation=False, cycle1 = True)
 print_files_in_directory(directory_path,mutation=False, cycle2 = True)

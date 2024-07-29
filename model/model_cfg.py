@@ -29,11 +29,8 @@ class CFG:
     embedding_size = 20
     filters = 64
     num_layers = 3
-    # model_path = "./res/trianed_models-deltaGNdecoylimit/"
+    dropout_rate = 0.2
     model_path = "./res/trianed_models-newDecoys/"
-    # model_path = "./res/trianed_models-nocoords/"
-    # model_path = "./res/trianed_models-noLLMemb/"
-    # model_path = "./res/trianed_models-nocoords_LLM/"
     
     gaussian_coef = -0.008*1e1
     #training parameters

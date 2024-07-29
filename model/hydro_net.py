@@ -269,18 +269,18 @@ class ProteinEnergyNet(nn.Module):
 class PEM(torch.nn.Module):
     """Protein energy model"""
   
-    def __init__(self, layers, gaussian_coef):
+    def __init__(self, layers, gaussian_coef,dropout_rate = 0.2):
         super().__init__()
         # GCN layers
         gcn_dim_in = 36
         gcn_dim_h = 64
         gcn_dim_out = 36
-        self.graph_model_gcn = [GCN(gcn_dim_in, gcn_dim_h, gcn_dim_out) for i in range(layers)]
+        self.graph_model_gcn = [GCN(gcn_dim_in, gcn_dim_h, gcn_dim_out, dropout_rate) for i in range(layers)]
         # GAT layers
         gat_dim_in = 36
         gat_dim_h = 64
         gat_dim_out = 36
-        self.graph_model_gat = [GAT(gat_dim_in, gat_dim_h, gat_dim_out) for i in range(layers)]
+        self.graph_model_gat = [GAT(gat_dim_in, gat_dim_h, gat_dim_out, 8, dropout_rate) for i in range(layers)]
         # Gaussian coefficient
         self.gaussian_coef = gaussian_coef
         # graph attention layers
@@ -534,13 +534,13 @@ class PEMSM(torch.nn.Module):
 class GAT(torch.nn.Module):
   
   """Graph Attention Network"""
-  def __init__(self, dim_in, dim_h, dim_out, heads=8):
+  def __init__(self, dim_in, dim_h, dim_out, heads=8, dropout_rate=0.2):
     super().__init__()
     self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
     self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
     # self.bn  = BatchNorm(dim_out)
     self.inst_norm = Normalization_layer(dim_out,affine=True)
-    self.dropout = nn.Dropout(0.2)
+    self.dropout = nn.Dropout(dropout_rate)
 
   def forward(self, x, edge_index, B, N):
     h=x
@@ -558,12 +558,12 @@ class GAT(torch.nn.Module):
 
 class GCN(torch.nn.Module):
   """Graph Convolutional Network"""
-  def __init__(self, dim_in, dim_h, dim_out):
+  def __init__(self, dim_in, dim_h, dim_out, dropout_rate=0.2):
     super().__init__()
     self.gcn1 = GCNConv(dim_in, dim_h)
     self.gcn2 = GCNConv(dim_h, dim_out)
     self.inst_norm = Normalization_layer(dim_out,affine=True)
-    self.dropout = nn.Dropout(0.2)
+    self.dropout = nn.Dropout(dropout_rate)
 
   def forward(self, x, edge_index, B, N):
     h=x

@@ -30,17 +30,18 @@ PROTT5_EMBEDDINGS = 'prott5_embeddings'
 VAL_RATIO = 0.2
 RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
-DEBUG = False
+DEBUG = True
 EPOCHS = 50 if not DEBUG else 1
 FREEZE_LAYERS = True
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 256
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
-TRAINED_MODEL_PATH = './res/trianed_models-cycle_per/best_model.pt'
+TRAINED_MODEL_PATH = "./res/trianed_models-./res/trianed_models-cycle_per_norm_SM//16_final_model.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME+CRITERION if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME+CRITERION
 PRETRAINED = True
+TM_PATH = "./data/ThermoMPNN/mega_test.csv"
 
 # config wandb
 config = {
@@ -86,6 +87,10 @@ class AllProteinValidationDataset(Dataset):
         self.tensor_root_dir = tensor_root_dir
         self.mutations_root_dir = mutations_root_dir
         self.protein_dirs = [protein for i, protein in enumerate(os.listdir(self.tensor_root_dir))]
+        # remove TM proteins 
+        tm_proteins = pd.read_csv(TM_PATH)
+        tm_proteins = tm_proteins['name'].apply(lambda x: x.split(".")[0]).unique().tolist()
+        self.protein_dirs = [protein for protein in self.protein_dirs if protein not in tm_proteins]
         if DEBUG:
             self.protein_dirs = self.protein_dirs[:2]
         # Train test split

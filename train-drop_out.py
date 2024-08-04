@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 1 cycle norm')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 dropout 0.5')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -119,7 +119,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             # zero the parameter gradients
             optimizer.zero_grad()
             Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = get_noised_proteins(data,device)
-            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1),dim=0)
+            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2),dim=0)
             
             with torch.no_grad():
                 # half precision validation
@@ -128,7 +128,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                     E = model(X)
                     Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
                     # calculate the loss   
-                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False)
+                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False, reg_alpha = 0.9)
                 
             # Add gradient penalty
             Ejf_grad = torch.tensor(0.0).to(device)
@@ -191,8 +191,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 E = model(X)
                 Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
                 # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False)
-            
+                loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False,reg_alpha=0.9)
+                
             # Scales the loss, and calls backward()
             # to create scaled gradients
             scaler.scale(loss).backward()
@@ -367,10 +367,6 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer , val_type = 'robust')
     validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer, val_type = 'soft')
     validation(model, train_loader,CFG.device,-1, CFG.N, optimizer, val_type = 'train')  
-    # amino acid inference
-    # A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,val_type = 'robust') 
-    # create diffucion data
-    # diff_data(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
     
 def main():
     print('***Start main function***')
@@ -380,17 +376,19 @@ def main():
     train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
     # Build the model
     print('***Build the model***')
-    model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
+    model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef,dropout_rate=CFG.dropout_rate).to(CFG.device)
     model.name = "PEM-With LLM embedding"
     model.energy_epsilon = 1e-6
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
     # configurate wandb
-    wandb_config(wandb, model, optimizer, scheduler, train_loader,CFG.model_path)
+    wandb_config(wandb, model, optimizer, scheduler, train_loader,
+                CFG.model_path,CFG.reg_alpha,CFG.gaussian_coef,CFG.lr,
+                CFG.num_layers,CFG.dropout_rate,CFG.precision)
     # Run training
     print('***Start training***')
-    epoch = 14
+    epoch = 0
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 
@@ -402,6 +400,8 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-cycle_per_norm/'
+        CFG.model_path = './res/trianed_models-droupout/'
         CFG.results_path = './res/results-emb/'
+    CFG.dropout_rate = 0.5
+    CFG.dropout_rate = -0.0008
     main()

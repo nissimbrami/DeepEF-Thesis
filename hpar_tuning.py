@@ -26,16 +26,18 @@ CFG.debug = False
 
 def objective(trial):
     CFG.data_path = './data/casp12_data_30/'
-    CFG.model_path = './res/trianed_models-hyper/'+str(trial.number)+'/'
+    CFG.model_path = './res/trianed_models-hyper_'+str(trial.number)+'/'
+    if CFG.debug:
+        CFG.model_path = './res/trianed_models-hyper-debug/'
     # Define the hyperparameters to optimize
     CFG.lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
     CFG.reg_alpha = trial.suggest_float("reg_alpha", 1e-1, 1, log=True)
     CFG.gaussian_coef = trial.suggest_float("gaussian_coef", 1e-5, 1e-2, log=True)
-    CFG.num_layers = trial.suggest_int("num_layers", 1, 4)
+    CFG.num_layers = trial.suggest_int("num_layers", 1, 4) if not CFG.debug else 1
     CFG.clip_grad_norm = trial.suggest_categorical("clip_grad_norm", [True, False])
     CFG.max_grad_norm = trial.suggest_float("max_grad_norm", 1e-2, 1, log=True)
     CFG.dropout_rate = trial.suggest_float("dropout_rate", 0, 0.8)
-    CFG.num_epochs = 5
+    CFG.num_epochs = 5 if not CFG.debug else 1
     CFG.precision = torch.float32
     
     # Set the wandb project
@@ -71,11 +73,13 @@ def objective(trial):
     if np.isnan(epoch_train_loss).any():
         return 0
     print('running megascale validation for model: ', CFG.model_path)
-    run_validation(r'./data/Processed_K50_dG_datasets', mode='evaluation', model_path=CFG.model_path+'best_model.pt',model=model)
+    run_validation(r'./data/Processed_K50_dG_datasets', mode='evaluation', model_path=CFG.model_path+'best_model.pt',model=model, debug = CFG.debug)
     print('getting validation results for model: ', CFG.model_path)
-    results = get_reults('./data/Processed_K50_dG_datasets/', 'mutation_outputs/', CFG.model_path+CFG.model_path+'best_model.pt')
+    results = get_reults('./data/Processed_K50_dG_datasets/', 'mutation_datasets/', CFG.model_path+'best_model.pt')
     pcc = results[['inferred_dG', 'deltaG']].corr(method='pearson').iloc[0,1]
-    wandb.log({"pcc": pcc})
+    spc = results[['inferred_dG', 'deltaG']].corr(method='spearman').iloc[0,1]
+    rmse = np.sqrt(((results['inferred_dG'] - results['deltaG'])**2).mean())
+    wandb.log({"pcc": pcc, "spc": spc, "rmse": rmse})
     return pcc
         
 # define validation function
@@ -376,6 +380,7 @@ def remove_rows_with_pattern(df, column_name, pattern):
 
 def get_reults(base_pred_dir, experiment_dir, model_res_dir):
     results = pd.DataFrame()
+    model_res_dir = os.path.join(base_pred_dir,'mutation_outputs',model_res_dir.split('/')[-2],model_res_dir.split('/')[-1]) + '/'
     for file in tqdm(os.listdir(model_res_dir)):
         if file.endswith(".csv"):
             # Load the predictions

@@ -30,14 +30,15 @@ PROTT5_EMBEDDINGS = 'prott5_embeddings'
 VAL_RATIO = 0.2
 RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
-DEBUG = True
+DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
-FREEZE_LAYERS = True
+FREEZE_LAYERS = False
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
-MINI_BATCH_SIZE = 256
+MINI_BATCH_SIZE = 32
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
-TRAINED_MODEL_PATH = "./res/trianed_models-./res/trianed_models-cycle_per_norm_SM//16_final_model.pt"
+TRAINED_MODEL_PATH = "./res/trianed_models-cycle_2_per_norm/12_final_model.pt"
+#TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_perL1/49.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME+CRITERION if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME+CRITERION
 PRETRAINED = True
@@ -229,6 +230,7 @@ class Trainer():
         
         return unfolded_energy - folded_energy
 
+
 def run_training():
     # Load the dataset
     protein_train = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
@@ -242,7 +244,10 @@ def run_training():
     # Create the model
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(DEVICE)
     if PRETRAINED: 
-        model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
+        try:
+            model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
+        except:
+            model.load_state_dict(torch.load(TRAINED_MODEL_PATH))
     
     # Train the model
     trainer = Trainer(model, train_ds, val_ds)
@@ -263,9 +268,9 @@ if __name__ == '__main__':
    
     run_training()
     # Get validation proteins
-    protein_val = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
-                                                  mutations_root_dir=mutations_root_dir, train=False)
-    # Create the dataloaders
-    val_ds = DataLoader(protein_val, batch_size=1, shuffle=False)
+    # protein_val = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+    #                                               mutations_root_dir=mutations_root_dir, train=False)
+    # # Create the dataloaders
+    # val_ds = DataLoader(protein_val, batch_size=1, shuffle=False)
     
-    get_valid_proteins(val_ds)
+    # get_valid_proteins(val_ds)

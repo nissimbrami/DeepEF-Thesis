@@ -1,8 +1,7 @@
-#### Hyper prameter tuning for the model using optuna
-
 from model.data_loader import fetch_dataloader,fetch_inference_loader
 from model.data_loader import params as data_params
 from model.model_cfg import CFG
+# from model.net import ProteinEnergyNet
 from model.hydro_net import PEM
 from model.net import params as model_params
 from train_utils import *
@@ -13,75 +12,91 @@ from torch.optim import lr_scheduler
 from torch.nn.utils import clip_grad_norm_ as clip_grad_norm
 from tqdm import tqdm
 import gc
+import time
+import sys
 import pandas as pd
-import numpy as np
 import wandb
-import optuna
-from optuna.samplers import TPESampler
-from optuna.pruners import MedianPruner
-from validation.validation import run_validation
 
-CFG.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-CFG.debug = False
+# Set the default data type to float32
+torch.set_default_dtype(CFG.torch_default_dtype)
+# torch.autograd.set_detect_anomaly(True)
+# CFG.debug = True
+# CFG.clip_grad_norm = True
+# Set wandb
+if not CFG.debug:
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 2 cycles norm')
+if CFG.debug:
+   CFG.model_path = "./res/debug/"
+   CFG.results_path = './res/results-debug/'
+   print('**** Debug mode ****')
 
-def objective(trial):
-    CFG.data_path = './data/casp12_data_30/'
-    CFG.model_path = './res/trianed_models-hyper_'+str(trial.number)+'/'
-    if CFG.debug:
-        CFG.model_path = './res/trianed_models-hyper-debug/'
-    # Define the hyperparameters to optimize
-    CFG.lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
-    CFG.reg_alpha = trial.suggest_float("reg_alpha", 1e-1, 1, log=True)
-    CFG.gaussian_coef = -1*trial.suggest_float("gaussian_coef", 1e-5, 1e-2, log=True)
-    CFG.num_layers = trial.suggest_int("num_layers", 1, 4) if not CFG.debug else 1
-    CFG.clip_grad_norm = trial.suggest_categorical("clip_grad_norm", [True, False])
-    CFG.max_grad_norm = trial.suggest_float("max_grad_norm", 1e-2, 1, log=True)
-    CFG.dropout_rate = trial.suggest_float("dropout_rate", 0, 0.8)
-    CFG.num_epochs = 5 if not CFG.debug else 1
-    CFG.precision = torch.float32
+
+
+def get_noised_proteins(data,device):
+    """
+    Returns a noised version of the protein data.
+    """
+    id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
+                proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy,proT5_cycle1, proT5_cycle2 = data
+            
+    # wild type and mutant type
+    Xjf = crd_backbone.to(device) # wilde type structure folded
+    Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
+    Xcd = torch.clone(crd_decoy).to(device) # decoy structure
+    Xcy1 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
+    Xcy2 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
     
-    # Set the wandb project
-    wandb.init(project="PEM-Hyperparameter-Tuning")
-    
-    # Define the data loader
-    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, 
-                           debug=CFG.debug,dataset='scn',LLM_EMB=True)
-    train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
-    # Define the model
-    model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef,dropout_rate=CFG.dropout_rate).to(CFG.device)
-    model.name = "PEM-With LLM embedding"
-    optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
-    # Define the learning rate scheduler based on loss
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
-    # configurate wandb
-    wandb_config(wandb, model, optimizer, scheduler, train_loader,
-                 CFG.model_path,CFG.reg_alpha,CFG.gaussian_coef,CFG.lr,
-                 CFG.num_layers,CFG.dropout_rate,CFG.precision)
-    # Run training
-     # setup half precision training
-    scaler = torch.cuda.amp.GradScaler()
-    valid_loss = 100
-    for epoch in (range(CFG.num_epochs)):  # loop over the dataset multiple times
-        torch.cuda.empty_cache()
-        gc.collect()
-        model.train()
-        model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, train_loader, CFG.device,epoch,valid_loader,valid_loss, scheduler,scaler)
-        if np.isnan(epoch_train_loss).any():
-            break
-        print(f'epoch: {epoch}, valid_loss: {valid_loss}')
-    # Get correlation of the model
-    if np.isnan(epoch_train_loss).any():
-        return 0
-    print('running megascale validation for model: ', CFG.model_path)
-    run_validation(r'./data/Processed_K50_dG_datasets', mode='evaluation', model_path=CFG.model_path+'best_model.pt',model=model, debug = CFG.debug)
-    print('getting validation results for model: ', CFG.model_path)
-    results = get_reults('./data/Processed_K50_dG_datasets/', 'mutation_datasets/', CFG.model_path+'best_model.pt')
-    pcc = results[['inferred_dG', 'deltaG']].corr(method='pearson').iloc[0,1]
-    spc = results[['inferred_dG', 'deltaG']].corr(method='spearman').iloc[0,1]
-    rmse = np.sqrt(((results['inferred_dG'] - results['deltaG'])**2).mean())
-    wandb.log({"pcc": pcc, "spc": spc, "rmse": rmse})
-    return pcc
+    # change the decoy len to match the native len
+    if Xcd.shape[1] > Xjf.shape[1]:
+        Xcd = Xcd[:,:Xjf.shape[1],:,:]
+        mask_crd_decoy = mask_crd_decoy[:,:Xjf.shape[1]]
+    elif Xcd.shape[1] < Xjf.shape[1]:
+        # add zeros to the end of the decoy
+        Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0],Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:]).to(device)), dim=1)
+        mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(mask.shape[0],mask.shape[1] - mask_crd_decoy.shape[1])), dim=1)
         
+    
+    # native structure and decoy structure
+    Xd = torch.clone(Xjf).to(device)
+    Xdu = torch.clone(Xjf).to(device)
+    seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
+    
+    # create decoy sequence
+    seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
+    
+    if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
+        return None,None,None,None,None,None,None
+    #emb = torch.cat((esm_embed,seq),dim=2)
+    emb = seq_one_hot.to(device)
+    emb_decoy = seq_decoy.to(device)
+    # get the cycle permutation
+    cycle_emb1 = get_one_hot(seq[0][-1] + seq[0][:-1]).to(device)
+    cycle_emb2 = get_one_hot(seq[0][1:] + seq[0][0]).to(device)
+    
+    # move proT5_emb to device
+    proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2 = proT5_emb_decoy.to(device), proT5_emb.to(device), proT5_cycle1.to(device), proT5_cycle2.to(device)
+    
+    # squeeze the data
+    Xd, Xjf, Xju, Xcd, Xdu, Xcy1, Xcy2 = Xd.squeeze(), Xjf.squeeze(), Xju.squeeze(), Xcd.squeeze(), Xdu.squeeze(), Xcy1.squeeze(), Xcy2.squeeze()
+    emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
+    mask_decoy, mask, mask_crd_decoy= mask_decoy.squeeze(), mask.squeeze(), mask_crd_decoy.squeeze()
+    proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2 = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_cycle1.squeeze(), proT5_cycle2.squeeze()
+    
+    # get folded graph  
+    Xjf = get_graph(Xjf, emb, proT5_emb, mask)
+    # get unfolded graph
+    Xju = get_unfolded_graph(Xju, emb, proT5_emb, mask)
+    # get decoy graph
+    Xd, Xcd, Xdu = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy), get_unfolded_graph(Xdu, emb_decoy, proT5_emb_decoy, mask_decoy)
+    # Add cycle permutation
+    Xcy1 = get_graph(Xcy1, cycle_emb1, proT5_cycle1, mask)
+    Xcy2 = get_graph(Xcy2, cycle_emb2, proT5_cycle2, mask)
+    # Xjf.requires_grad = True
+    # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
+    Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = Xjf.unsqueeze(0),Xju.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0), Xdu.unsqueeze(0),Xcy1.unsqueeze(0),Xcy2.unsqueeze(0)
+
+    return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2
+    
 # define validation function
 def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     """
@@ -103,7 +118,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             gc.collect()
             # zero the parameter gradients
             optimizer.zero_grad()
-            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = get_noised_proteins(data,device,CFG)
+            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = get_noised_proteins(data,device)
             X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2),dim=0)
             
             with torch.no_grad():
@@ -144,7 +159,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             
     return valid_loss/len(dataloader),valid_lossd/len(dataloader),valid_lossg/len(dataloader),valid_lossc/len(dataloader)
 
-def train_one_epoch(model, optimizer, dataloader, device,epoch,valid_loader,best_val=1000,scheduler=None,scaler=None):
+def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None,scaler=None):
     """
     Training function for the model.
     
@@ -164,7 +179,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,valid_loader,best
             gc.collect()
              # zero the parameter gradients
             optimizer.zero_grad()
-            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = get_noised_proteins(data,device,CFG)
+            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = get_noised_proteins(data,device)
             if Xjf is None:
                 n_skips += 1
                 continue
@@ -237,11 +252,6 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,valid_loader,best
                 wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": Xjf.shape[1],
                            "Exd":Exd.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item(),
                            "step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item(), "Exdu":Exdu.item(),"Ecy1":Ecy1.item(),"Ecy2":Ecy2.item()})
-            
-            # if nan break the loop
-            if torch.isnan(loss):
-                print('nan loss')
-                break
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -351,69 +361,55 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2):
     return loss
 
     
+def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch,scheduler):
+    "train and test the model"
+    valid_loss = 100
+    if epoch > 0:
+        model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer)
+        epoch += 1
+    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
+    #load the best model and check the validation
+    load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
+    validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer , val_type = 'robust')
+    validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer, val_type = 'soft')
+    validation(model, train_loader,CFG.device,-1, CFG.N, optimizer, val_type = 'train')  
+    # amino acid inference
+    # A_inference(model, amino_inference_loader, CFG.device, CFG.N,optimizer,val_type = 'robust') 
+    # create diffucion data
+    # diff_data(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
+    
 def main():
-    # Run trailes
-    # Create a study with a TPE sampler and a median pruner using SQLite storage
-    sampler = TPESampler()
-    pruner = MedianPruner()
-    study = optuna.create_study(study_name='distributed-study',direction="maximize",
-                                storage='sqlite:///example.db', sampler=sampler, pruner=pruner,
-                                load_if_exists =  True)
-
-    study.optimize(objective, n_trials=100)
-    print(study.best_params)
-    # Save the best hyperparameters
-    df = pd.DataFrame(study.best_params)
-    path = '/data/hyperparameter/'  
-    os.makedirs(path, exist_ok=True)
-    df.to_csv(path+'best_hyperparameters.csv')
-    
-    
+    print('***Start main function***')
+    print('***load the data with dataloader***')
+    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, 
+                           debug=CFG.debug,dataset='scn',LLM_EMB=True)
+    train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
+    # Build the model
+    print('***Build the model***')
+    model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef,dropout_rate=CFG.dropout_rate).to(CFG.device)
+    model.name = "PEM-With LLM embedding"
+    model.energy_epsilon = 1e-6
+    optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
+    # Define the learning rate scheduler based on loss
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
+    # configurate wandb
+    wandb_config(wandb, model, optimizer, scheduler, train_loader,CFG.model_path)
+    # Run training
+    print('***Start training***')
+    epoch = 0
+    trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 
-  
-# Function to remove rows where '1' is between two letters in a specific column
-def remove_rows_with_pattern(df, column_name, pattern):
-    mask = df[column_name].str.contains(pattern)
-    df_filtered = df[~mask]
-    return df_filtered
-
-def get_reults(base_pred_dir, experiment_dir, model_res_dir):
-    results = pd.DataFrame()
-    model_res_dir = os.path.join(base_pred_dir,'mutation_outputs',model_res_dir.split('/')[-2],model_res_dir.split('/')[-1]) + '/'
-    for file in tqdm(os.listdir(model_res_dir)):
-        if file.endswith(".csv"):
-            # Load the predictions
-            experiment_csv = pd.read_csv(base_pred_dir + experiment_dir + file, index_col=False)
-            experiment_csv = experiment_csv[~experiment_csv['name'].str.contains('ins|del')].reset_index(drop=True)
-            inference_csv = pd.read_csv(model_res_dir + file, index_col=False).drop(['mut_type'], axis=1)
-            aggregated_df = pd.concat([experiment_csv, inference_csv], axis=1)
-            aggregated_df['inferred_dG'] = aggregated_df['unfolded_energies'] - aggregated_df['folded_energies']
-
-            wt = aggregated_df[aggregated_df['mut_type'] == 'wt'].iloc[0]
-            aggregated_df['inferred_ddG'] = aggregated_df['inferred_dG'] - wt['inferred_dG'] 
-            aggregated_df['ddG'] = aggregated_df['deltaG'] - wt['deltaG']
-
-            mutation_df = aggregated_df['mut_type'].str.split(':', expand=True).apply(lambda x: pd.Series(list(x)))
-            aggregated_df[[f'mutation_{i}' for i in range(mutation_df.shape[1])]] = mutation_df
-            aggregated_df = aggregated_df[aggregated_df['mutation_1'].isna()] if 'mutation_1' in aggregated_df.columns else aggregated_df
-
-            # aggregated_df = aggregated_df[aggregated_df['mutation_0'] != 'wt']
-
-            # remove muratation_0 rows that contain 1 between two letters
-            # Remove rows where '1' is between two letters in the 'text' column
-            pattern = r'(?<=[a-zA-Z])1(?=[a-zA-Z])'
-            aggregated_df = remove_rows_with_pattern(aggregated_df, "mutation_0", pattern)
-            
-            # normelize inffered _ddG and deltaG row with mean 0 and std 1
-            # aggregated_df['inferred_dG'] = (aggregated_df['inferred_dG'] - aggregated_df['inferred_dG'].mean()) / aggregated_df['inferred_dG'].std()
-            # aggregated_df['deltaG'] = (aggregated_df['deltaG'] - aggregated_df['deltaG'].mean()) / aggregated_df['deltaG'].std()
-            
-            aggregated_df['protein_name'] = file.split('.')[0]
-            
-            results = pd.concat([results, aggregated_df], axis=0)
-            results = results.reset_index(drop=True)
-    return results 
     
+def print_par(model):
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print (name, param.data)
+   
 if __name__ == '__main__':
+    if not CFG.debug:
+        CFG.model_path = './res/trianed_models-2cycle_drop/'
+        CFG.results_path = './res/results-emb/'
+    CFG.dropout_rate = 0.5
+    CFG.gaussian_coef = -0.0008
     main()

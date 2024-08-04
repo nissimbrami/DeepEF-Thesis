@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 import sys
 sys.path.append('./')
@@ -88,8 +89,20 @@ def inference(model, dataloader, inf_dir) :
             res = {"index":idx[0].item(), "id":protein_id[0], "mut":mutation_seq[0], "mut_folded_energy":mut_folded_energy.item(), "mut_unfolded_energy":mut_unfolded_energy.item(), "mut_delta_G":mut_delta_G.item(), "wt_folded_energy":wt_folded_energy.item(), "wt_unfolded_energy":wt_unfolded_energy.item(), "wt_delta_G":wt_delta_G.item(), "ddG":ddG.item()}
             inf_df = inf_df.append(res, ignore_index=True)
     inf_df.to_csv(inf_dir+"inference_results.csv")
+    
+    return inf_df
             
-            
+def print_stat(inf_df):
+    folder_path = './data/S669/'
+    df_path = folder_path + 'Data_s669_with_predictions.csv'
+    df = pd.read_csv(df_path)
+
+    df_deepEF = inf_df
+    df['deepEF'] = df_deepEF['ddG']
+
+    print(f"Pearson correlatoin: {df[['DDG_checked_dir', 'deepEF']].corr(method='pearson').iloc[0,1]}")
+    print(f"MAE: {np.abs(df['DDG_checked_dir'] - df['deepEF']).mean()}")
+    print(f"RMSE: {np.sqrt(((df['DDG_checked_dir'] - df['deepEF'])**2).mean())}")    
             
 
 def main():
@@ -117,7 +130,9 @@ def main():
     # Load data
     dataloader = create_dataloader(data_dir, 1)
     # Inference
-    inference(model, dataloader, inf_dir)
+    inf_df = inference(model, dataloader, inf_dir)
+    # Print statistics  
+    print_stat(inf_df)
     
 if __name__ == "__main__":
     main()

@@ -403,5 +403,5 @@ if __name__ == '__main__':
         CFG.model_path = './res/trianed_models-droupout/'
         CFG.results_path = './res/results-emb/'
     CFG.dropout_rate = 0.5
-    CFG.dropout_rate = -0.0008
+    CFG.gaussian_coef = -0.0008
     main()

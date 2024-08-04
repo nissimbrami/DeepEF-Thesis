@@ -37,12 +37,14 @@ CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 32
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
-TRAINED_MODEL_PATH = "./res/trianed_models-cycle_2_per_norm/12_final_model.pt"
-#TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_perL1/49.pt"
+# TRAINED_MODEL_PATH = "./res/trianed_models-cycle_2_per_norm/15_final_model.pt"
+TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_perL1/30.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME+CRITERION if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME+CRITERION
 PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
+LR = 1e-4
+DROP_OUT = 0.2
 
 # config wandb
 config = {
@@ -62,7 +64,9 @@ config = {
     'mini_batch_size': MINI_BATCH_SIZE,
     'device': DEVICE,
     'trained_model_path': TRAINED_MODEL_PATH,
-    'pretrained': PRETRAINED
+    'pretrained': PRETRAINED,
+    'lr': LR,
+    'dropout': DROP_OUT
 }
 if not DEBUG:
     wandb.init(project='MegaScaleFineTuning', config=config, name=MODEL_NAME)
@@ -149,7 +153,7 @@ class Trainer():
         self.device = device
         # self.criterion = nn.MSELoss()
         self.criterion = nn.L1Loss()
-        self.optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=DROP_OUT)
         self.model.to(self.device)
         self.mini_batch_size = MINI_BATCH_SIZE
         self.model_name = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
@@ -168,6 +172,7 @@ class Trainer():
             self.model.train()
             for i, batch in enumerate(tqdm(self.train_ds, desc=f'Training Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
+                batch_loss = 0
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
                     self.optimizer.zero_grad()
                     output = self.get_deltaG(batch, j)
@@ -175,9 +180,9 @@ class Trainer():
                     loss = self.criterion(output, delta_g)
                     loss.backward()
                     self.optimizer.step()
-                    
-                    running_loss += loss.item()
+                    batch_loss += loss.item()
                     wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i})
+                running_loss += batch_loss/ batch['prott5'].size(1)
                 if (i+1) % 100 == 0:
                     wandb_log({'epoch': epoch, 'running_loss': running_loss/100})
                     running_loss = 0
@@ -195,13 +200,16 @@ class Trainer():
         with torch.no_grad():
             for i, batch in enumerate(tqdm(self.val_ds,desc=f'Validation Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
+                batch_loss = 0
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
                     output = self.get_deltaG(batch, j)
                     delta_g = batch['delta_g'][0, j: j + self.mini_batch_size].to(self.device)
                     loss = self.criterion(output,delta_g)
-                    val_loss += loss.item()
+                    batch_loss += loss.item()
                     val_dg = torch.cat((val_dg, delta_g), dim=0)
                     val_dg_pred = torch.cat((val_dg_pred, output), dim=0)
+                batch_loss /= batch['prott5'].size(1)
+            val_loss += batch_loss
         val_loss /= len(self.val_ds)
         print(f'Validation Loss: {val_loss}')
         pc_corr = torch.corrcoef(torch.cat((val_dg[None,:],val_dg_pred[None,:])))[0, 1]
@@ -242,7 +250,7 @@ def run_training():
     val_ds = DataLoader(protein_val, batch_size=1, shuffle=False)
     
     # Create the model
-    model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(DEVICE)
+    model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = DROP_OUT).to(DEVICE)
     if PRETRAINED: 
         try:
             model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)

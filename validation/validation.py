@@ -69,7 +69,7 @@ def run_thermodynamics_model(model, batch, mini_batch=256,debug = False):
     return energy_out_df
 
 
-def evaluate_mutations(model, data_loader, root_dir,model_path = CFG.model_path,debug = CFG.debug):
+def evaluate_mutations(model, data_loader, root_dir,model_path = CFG.model_path,debug = CFG.debug, mini_batch_size=256):
     model.eval()
     # model.train()
     mutation_output_dir = Path(root_dir) / 'mutation_outputs' / os.path.join(model_path.split('/')[-2],model_path.split('/')[-1]) # model_path.split('/')[-2]
@@ -77,24 +77,26 @@ def evaluate_mutations(model, data_loader, root_dir,model_path = CFG.model_path,
     with torch.no_grad():
         for i, batch in tqdm(enumerate(data_loader), total=len(data_loader)):
             batch = normalize_batch(batch, True)
-            energy_out_df = run_thermodynamics_model(model = model, batch = batch, debug = debug)
+            energy_out_df = run_thermodynamics_model(model = model, batch = batch, debug = debug, mini_batch = mini_batch_size)
             out_file = mutation_output_dir / f"{batch['name'][0]}.csv"
             energy_out_df.to_csv(out_file, index=False)
             if debug:
                 break
 
 
-def run_validation(root_dir, mode='evaluation', model_path=CFG.model_path,model=None,debug = CFG.debug):
+def run_validation(root_dir, mode='evaluation', model_path=CFG.model_path, mini_batch_size = 256,model=None,debug = CFG.debug):
     tensor_root_dir = Path(root_dir) / 'training_data'
     mutations_root_dir = Path(root_dir) / 'mutation_datasets'
     protein_dataset = AllProteinValidationDataset(tensor_root_dir, mutations_root_dir)
     if mode == 'evaluation':
         if model is None:
             model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
-            # model = load_checkpoint(model, device,model_path)
-            model.load_state_dict(torch.load(model_path)['model_state_dict'])
+            try:
+                model.load_state_dict(torch.load(model_path)['model_state_dict'])
+            except:
+                model.load_state_dict(torch.load(model_path))
         data_loader = DataLoader(protein_dataset, batch_size=1, shuffle=False)
-        evaluate_mutations(model, data_loader, root_dir,model_path,debug)
+        evaluate_mutations(model, data_loader, root_dir,model_path, mini_batch_size =mini_batch_size,debug=debug)
     elif mode == 'split_single_protein':
         pass
     elif mode == 'split_whole_set':

@@ -63,24 +63,25 @@ def print_stat(model_path):
     
 
 
-if __name__ == "__main__":
-    
+def main():
     model_list = []
     for i in range(1, 20):
-        cycle_norm = 'res/trianed_models-cycle_per_norm/' + str(i) + '_final_model.pt'
-        cycle_norm_2 = 'res/trianed_models-cycle_per_2_norm/' + str(i) + '_final_model.pt'
-        cycle_norm_SM = 'res/trianed_models-cycle_per_norm_SM/' + str(i) + '_final_model.pt'
-        model_list.append(cycle_norm)
-        model_list.append(cycle_norm_2)
-        model_list.append(cycle_norm_SM)
-        
-    model_list = ['Megascale-fineTuning/models/PEM_full_trained-PEM_fine_tuned-trianed_models-cycle_perL1L1/1.pt']
+        # cycle_norm = 'res/trianed_models-cycle_per_norm/' + str(i) + '_final_model.pt'
+        # cycle_norm_2 = 'res/trianed_models-cycle_per_2_norm/' + str(i) + '_final_model.pt'
+        # cycle_norm_SM = 'res/trianed_models-cycle_per_norm_SM/' + str(i) + '_final_model.pt'
+        # model_list.append(cycle_norm)
+        # model_list.append(cycle_norm_2)
+        # model_list.append(cycle_norm_SM)
+        model.list.append('Megascale-fineTuning/models/PEM_full_trained-PEM_fine_tuned-trianed_models-cycle_perL1L1/' + str(i) + '.pt')
+    # model_list = ['Megascale-fineTuning/models/PEM_full_trained-PEM_fine_tuned-trianed_models-cycle_perL1L1/1.pt']
     mini_batch_size = 64
     # run validation for all models
     for model in model_list:
         eval_path ='/'.join(model.split('/')[1:])
         if os.path.exists(eval_path):
             print('model already validated: ', model)
+            print('printing stats for model: ', model)
+            print_stat(model)
             continue
         try: 
             print('running validation for model: ', model)
@@ -99,4 +100,10 @@ if __name__ == "__main__":
         print('printing stats for model: ', model)
         print_stat(model)
         gc.collect()
+
+
+
+if __name__ == "__main__":
+    
+    main()
 

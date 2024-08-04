@@ -37,14 +37,16 @@ CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 32
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
-# TRAINED_MODEL_PATH = "./res/trianed_models-cycle_2_per_norm/15_final_model.pt"
-TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_perL1/30.pt"
+TRAINED_MODEL_PATH = "./res/trianed_models-cycle_per_norm_SM/13_final_model.pt"
+# TRAINED_MODEL_PATH = "./res/trianed_models-cycle_2_per_norm/1_final_model.pt"
+# TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_perL1/30.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
-MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME+CRITERION if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME+CRITERION
+MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
 PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
-LR = 1e-4
+LR = 1e-3
 DROP_OUT = 0.2
+REG_LAMBDA = 0.01
 
 # config wandb
 config = {
@@ -66,7 +68,8 @@ config = {
     'trained_model_path': TRAINED_MODEL_PATH,
     'pretrained': PRETRAINED,
     'lr': LR,
-    'dropout': DROP_OUT
+    'dropout': DROP_OUT,
+    'reg_lambda': REG_LAMBDA
 }
 if not DEBUG:
     wandb.init(project='MegaScaleFineTuning', config=config, name=MODEL_NAME)
@@ -177,11 +180,16 @@ class Trainer():
                     self.optimizer.zero_grad()
                     output = self.get_deltaG(batch, j)
                     delta_g = batch['delta_g'][0, j: j + self.mini_batch_size].to(self.device)
-                    loss = self.criterion(output, delta_g)
+                    l1_loss = self.criterion(output, delta_g)
+                    if FREEZE_LAYERS:
+                        reg_loss += REG_LAMBDA * (self.model.fc1.weight.norm(2) + self.model.fc2.weight.norm(2))
+                    else:
+                        reg_loss += REG_LAMBDA * sum([param.norm(2) for param in self.model.parameters()])
+                    loss = l1_loss + reg_loss
                     loss.backward()
                     self.optimizer.step()
                     batch_loss += loss.item()
-                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i})
+                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i,'l1_loss': l1_loss.item(), 'reg_loss': reg_loss.item()})
                 running_loss += batch_loss/ batch['prott5'].size(1)
                 if (i+1) % 100 == 0:
                     wandb_log({'epoch': epoch, 'running_loss': running_loss/100})

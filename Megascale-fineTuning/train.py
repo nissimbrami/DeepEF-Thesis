@@ -32,7 +32,7 @@ RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
-FREEZE_LAYERS = False
+FREEZE_LAYERS = True
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 32
@@ -42,6 +42,7 @@ TRAINED_MODEL_PATH = "./res/trianed_models-cycle_per_norm_SM/13_final_model.pt"
 # TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_perL1/30.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
+MODEL_NAME += 'reg'
 PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
 LR = 1e-3
@@ -155,6 +156,7 @@ class Trainer():
         self.val_ds = val_ds
         self.device = device
         # self.criterion = nn.MSELoss()
+        self.L2_loss = nn.MSELoss()
         self.criterion = nn.L1Loss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=DROP_OUT)
         self.model.to(self.device)
@@ -178,18 +180,19 @@ class Trainer():
                 batch_loss = 0
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
                     self.optimizer.zero_grad()
-                    output = self.get_deltaG(batch, j)
+                    output,u_energy,f_energy = self.get_deltaG(batch, j)
                     delta_g = batch['delta_g'][0, j: j + self.mini_batch_size].to(self.device)
                     l1_loss = self.criterion(output, delta_g)
                     if FREEZE_LAYERS:
-                        reg_loss += REG_LAMBDA * (self.model.fc1.weight.norm(2) + self.model.fc2.weight.norm(2))
+                        reg_loss = REG_LAMBDA * (self.L2_loss(self.model.fc1.weight) + self.L2_loss(self.model.fc2.weight))
                     else:
-                        reg_loss += REG_LAMBDA * sum([param.norm(2) for param in self.model.parameters()])
-                    loss = l1_loss + reg_loss
+                        reg_loss = REG_LAMBDA * sum([self.L2_loss(param) for param in self.model.parameters()])
+                    energy_reg = REG_LAMBDA * (self.L2_loss(u_energy) + self.L2_loss(f_energy))
+                    loss = l1_loss + reg_loss +energy_reg
                     loss.backward()
                     self.optimizer.step()
                     batch_loss += loss.item()
-                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i,'l1_loss': l1_loss.item(), 'reg_loss': reg_loss.item()})
+                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i,'l1_loss': l1_loss.item(), 'reg_loss': reg_loss.item(), 'energy_reg': energy_reg.item()})
                 running_loss += batch_loss/ batch['prott5'].size(1)
                 if (i+1) % 100 == 0:
                     wandb_log({'epoch': epoch, 'running_loss': running_loss/100})
@@ -210,7 +213,7 @@ class Trainer():
                 batch = normalize_batch(batch, True)
                 batch_loss = 0
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
-                    output = self.get_deltaG(batch, j)
+                    output,u_energy,f_energy = self.get_deltaG(batch, j)
                     delta_g = batch['delta_g'][0, j: j + self.mini_batch_size].to(self.device)
                     loss = self.criterion(output,delta_g)
                     batch_loss += loss.item()
@@ -244,7 +247,7 @@ class Trainer():
         folded_energy = minibatch_energy[:minibatch_energy.size(0) // 2]
         unfolded_energy = minibatch_energy[minibatch_energy.size(0) // 2:]
         
-        return unfolded_energy - folded_energy
+        return unfolded_energy - folded_energy,unfolded_energy,folded_energy
 
 
 def run_training():

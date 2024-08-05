@@ -12,8 +12,7 @@ from analysis.analysis_runner import run_analysis
 def get_TMprotein():
     TM_path = "./data/ThermoMPNN/mega_test.csv"
     TM_df = pd.read_csv(TM_path)
-    TM_df['protein_name'] = TM_df['name'].apply(lambda x: x.split(".")[0])
-    TM_proteins = TM_df["protein_name"].unique().tolist()
+    TM_proteins = TM_df["name_original"].unique().tolist()
     return TM_proteins
 
 def get_reults(base_pred_dir='./data/Processed_K50_dG_datasets/', experiment_dir='mutation_datasets/', 
@@ -53,13 +52,13 @@ def print_stat(model_path):
     model_res_dir = './data/Processed_K50_dG_datasets/mutation_outputs/' + ('/').join(model_path.split('/')[-2:]) + '/'
     results = get_reults(model_res_dir=model_res_dir)
     TM_proteins = get_TMprotein()
-    TM_results = results[results['protein_name'].isin(TM_proteins)]
+    TM_results = results[results['name'].isin(TM_proteins)]
     print('TM_proteins: ', len(TM_proteins))
     print('TM_results: ', len(TM_results))
     # pc, sp and RMSE
-    print(f"pearson coorelation DDG {TM_results[['inferred_dG', 'ddG']].corr(method='pearson').iloc[0,1]}")
-    print(f"spearman coorelation DDG {TM_results[['inferred_dG', 'ddG']].corr(method='spearman').iloc[0,1]}")
-    print(f"RMSE DDG {np.sqrt(np.mean((TM_results['inferred_dG'] - TM_results['ddG'])**2))}")
+    print(f"pearson coorelation DDG {TM_results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1]}")
+    print(f"spearman coorelation DDG {TM_results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1]}")
+    print(f"RMSE DDG {np.sqrt(np.mean((TM_results['inferred_ddG'] - TM_results['ddG'])**2))}")
     
 
 
@@ -72,12 +71,13 @@ def main():
         # model_list.append(cycle_norm)
         # model_list.append(cycle_norm_2)
         # model_list.append(cycle_norm_SM)
-        model.list.append('Megascale-fineTuning/models/PEM_full_trained-PEM_fine_tuned-trianed_models-cycle_perL1L1/' + str(i) + '.pt')
+        model_list.append('Megascale-fineTuning/models/PEM_full_trained-PEM_fine_tuned-trianed_models-cycle_perL1L1/' + str(i) + '.pt')
     # model_list = ['Megascale-fineTuning/models/PEM_full_trained-PEM_fine_tuned-trianed_models-cycle_perL1L1/1.pt']
     mini_batch_size = 64
+    model_list = ['Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_per_norm_SM/9.pt']
     # run validation for all models
     for model in model_list:
-        eval_path ='/'.join(model.split('/')[1:])
+        eval_path ='/'.join(model.split('/')[-2:])
         if os.path.exists(eval_path):
             print('model already validated: ', model)
             print('printing stats for model: ', model)

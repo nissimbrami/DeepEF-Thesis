@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
+import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
 from model.hydro_net import PEM
 from model.model_cfg import CFG
@@ -156,9 +157,8 @@ class Trainer():
         self.val_ds = val_ds
         self.device = device
         # self.criterion = nn.MSELoss()
-        self.L2_loss = nn.MSELoss()
         self.criterion = nn.L1Loss()
-        self.optimizer = optim.Adam(self.model.parameters(), lr=DROP_OUT)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=LR)
         self.model.to(self.device)
         self.mini_batch_size = MINI_BATCH_SIZE
         self.model_name = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
@@ -184,10 +184,11 @@ class Trainer():
                     delta_g = batch['delta_g'][0, j: j + self.mini_batch_size].to(self.device)
                     l1_loss = self.criterion(output, delta_g)
                     if FREEZE_LAYERS:
-                        reg_loss = REG_LAMBDA * (self.L2_loss(self.model.fc1.weight) + self.L2_loss(self.model.fc2.weight))
+                        reg_loss = REG_LAMBDA * (F.mse_loss(self.model.fc1.weight,torch.zeros_like(self.model.fc1.weight)) + F.mse_loss(self.model.fc2.weight,torch.zeros_like(self.model.fc2.weight)))
                     else:
-                        reg_loss = REG_LAMBDA * sum([self.L2_loss(param) for param in self.model.parameters()])
-                    energy_reg = REG_LAMBDA * (self.L2_loss(u_energy) + self.L2_loss(f_energy))
+                        reg_loss = REG_LAMBDA * sum([F.mse_loss(param,torch.zeros_like(param)) for param in self.model.parameters()])
+                    energys = torch.cat((u_energy,f_energy),dim=0)
+                    energy_reg = REG_LAMBDA * (F.mse_loss(energys,torch.zeros_like(energys)))
                     loss = l1_loss + reg_loss +energy_reg
                     loss.backward()
                     self.optimizer.step()
@@ -216,6 +217,9 @@ class Trainer():
                     output,u_energy,f_energy = self.get_deltaG(batch, j)
                     delta_g = batch['delta_g'][0, j: j + self.mini_batch_size].to(self.device)
                     loss = self.criterion(output,delta_g)
+                    energys = torch.cat((u_energy,f_energy),dim=0)
+                    energy_reg = REG_LAMBDA * (F.mse_loss(energys,torch.zeros_like(energys)))
+                    loss += energy_reg
                     batch_loss += loss.item()
                     val_dg = torch.cat((val_dg, delta_g), dim=0)
                     val_dg_pred = torch.cat((val_dg_pred, output), dim=0)

@@ -51,6 +51,15 @@ def print_stat(model_path):
     
     model_res_dir = './data/Processed_K50_dG_datasets/mutation_outputs/' + ('/').join(model_path.split('/')[-2:]) + '/'
     results = get_reults(model_res_dir=model_res_dir)
+    print('results: ', len(results))
+    # pc, sp and RMSE
+    print(f"pearson coorelation DDG {results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1]}")
+    print(f"spearman coorelation DDG {results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1]}")
+    print(f"RMSE DDG {np.sqrt(np.mean((results['inferred_ddG'] - results['ddG'])**2))}")
+    print(f"pearson coorelation dG {results[['inferred_dG', 'deltaG']].corr(method='pearson').iloc[0,1]}")
+    print(f"spearman coorelation dG {results[['inferred_dG', 'deltaG']].corr(method='spearman').iloc[0,1]}")
+    print(f"RMSE dG {np.sqrt(np.mean((results['inferred_dG'] - results['deltaG'])**2))}")
+    
     TM_proteins = get_TMprotein()
     TM_results = results[results['name'].isin(TM_proteins)]
     print('TM_proteins: ', len(TM_proteins))
@@ -85,7 +94,7 @@ def main():
             continue
         try: 
             print('running validation for model: ', model)
-            run_validation(r'./data/Processed_K50_dG_datasets',model_path=r'./'+model, mini_batch_size=mini_batch_size)
+            # run_validation(r'./data/Processed_K50_dG_datasets',model_path=r'./'+model, mini_batch_size=mini_batch_size)
             # clear memory
             gc.collect()
             print('validation done for model: ', model)

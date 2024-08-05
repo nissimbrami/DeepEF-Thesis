@@ -393,7 +393,9 @@ def main():
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
     # configurate wandb
-    wandb_config(wandb, model, optimizer, scheduler, train_loader,CFG.model_path)
+    wandb_config(wandb, model, optimizer, scheduler, train_loader,
+                CFG.model_path,CFG.reg_alpha,CFG.gaussian_coef,CFG.lr,
+                CFG.num_layers,CFG.dropout_rate,CFG.precision)
     # Run training
     print('***Start training***')
     epoch = 0

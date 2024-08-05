@@ -128,7 +128,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                     E = model(X)
                     Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
                     # calculate the loss   
-                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False, reg_alpha = 0.9)
+                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False, reg_alpha = CFG.reg_alpha)
                 
             # Add gradient penalty
             Ejf_grad = torch.tensor(0.0).to(device)
@@ -191,7 +191,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 E = model(X)
                 Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
                 # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False,reg_alpha=0.9)
+                loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False,reg_alpha=CFG.reg_alpha)
                 
             # Scales the loss, and calls backward()
             # to create scaled gradients
@@ -404,4 +404,5 @@ if __name__ == '__main__':
         CFG.results_path = './res/results-emb/'
     CFG.dropout_rate = 0.5
     CFG.gaussian_coef = -0.0008
+    CFG.reg_alpha = 0.9
     main()

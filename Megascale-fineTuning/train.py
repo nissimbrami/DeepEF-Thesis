@@ -43,7 +43,7 @@ TRAINED_MODEL_PATH = "./res/trianed_models-cycle_per_norm_SM/13_final_model.pt"
 # TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_perL1/30.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
-MODEL_NAME += 'reg'
+MODEL_NAME += 'scheduler'
 PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
 LR = 1e-3
@@ -159,6 +159,7 @@ class Trainer():
         # self.criterion = nn.MSELoss()
         self.criterion = nn.L1Loss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=LR)
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='max', factor=0.1, patience=5, verbose=True)
         self.model.to(self.device)
         self.mini_batch_size = MINI_BATCH_SIZE
         self.model_name = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
@@ -202,7 +203,11 @@ class Trainer():
             # save the model
             torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, MODEL_NAME, f'{epoch}.pt'))
             
-            self.validate(epoch)
+            pc_corr = self.validate(epoch)
+            # update the learning rate
+            self.scheduler.step(pc_corr)
+            current_lr = self.optimizer.param_groups[0]['lr']
+            wandb_log({'epoch': epoch, 'lr': current_lr})
 
     def validate(self, epoch):
         self.model.eval()
@@ -230,6 +235,7 @@ class Trainer():
         pc_corr = torch.corrcoef(torch.cat((val_dg[None,:],val_dg_pred[None,:])))[0, 1]
         wandb_log({'val_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr})
         self.model.train()
+        return pc_corr
         
     def get_deltaG(self, batch, i):
         # move all to the same device

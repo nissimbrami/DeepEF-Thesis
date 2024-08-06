@@ -10,8 +10,8 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, Subset
 import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
 from model.hydro_net import PEM
@@ -19,6 +19,7 @@ from model.model_cfg import CFG
 from train_utils import get_graph, get_unfolded_graph, load_checkpoint
 import wandb
 from tqdm import tqdm
+from sklearn.model_selection import KFold
 
 import pandas as pd
 
@@ -33,21 +34,21 @@ RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
-FREEZE_LAYERS = True
+FREEZE_LAYERS = False
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 32
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
-TRAINED_MODEL_PATH = "./res/trianed_models-cycle_per_norm_SM/13_final_model.pt"
+# TRAINED_MODEL_PATH = "./res/trianed_models-cycle_per_norm_SM/13_final_model.pt"
 # TRAINED_MODEL_PATH = "./res/trianed_models-cycle_2_per_norm/1_final_model.pt"
-# TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_perL1/30.pt"
+TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_per_norm_SMscheduler/14.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
-MODEL_NAME += 'scheduler'
+MODEL_NAME += 'kfolds'
 PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
-LR = 1e-3
-DROP_OUT = 0.2
+LR = 1e-4
+DROP_OUT = 0.5
 REG_LAMBDA = 0.01
 
 # config wandb
@@ -73,16 +74,17 @@ config = {
     'dropout': DROP_OUT,
     'reg_lambda': REG_LAMBDA
 }
-if not DEBUG:
-    wandb.init(project='MegaScaleFineTuning', config=config, name=MODEL_NAME)
 
 if not os.path.exists(os.path.join(MODEL_PATH, MODEL_NAME)):
     os.makedirs(os.path.join(MODEL_PATH, MODEL_NAME))
 
 
-def wandb_log(log_dict):
+def wandb_log(log_dict,run = None):
     if not DEBUG:
-        wandb.log(log_dict)
+        if run is not None:
+            run.log(log_dict)
+        else:
+            wandb.log(log_dict)
 
 def normalize_batch(batch, LLM_EMB = True):
     batch['one_hot'] = batch['one_hot'][:, :, :, :-1]
@@ -102,13 +104,13 @@ class AllProteinValidationDataset(Dataset):
         tm_proteins = tm_proteins['name'].apply(lambda x: x.split(".")[0]).unique().tolist()
         self.protein_dirs = [protein for protein in self.protein_dirs if protein not in tm_proteins]
         if DEBUG:
-            self.protein_dirs = self.protein_dirs[:2]
-        # Train test split
-        self.training_protein, self.val_proteins = train_test_split(self.protein_dirs, test_size=VAL_RATIO, random_state=RANDOM_SEED)
-        if train:
-            self.protein_dirs = self.training_protein
-        else:
-            self.protein_dirs = self.val_proteins
+            self.protein_dirs = self.protein_dirs[:5]
+        # # Train test split
+        # self.training_protein, self.val_proteins = train_test_split(self.protein_dirs, test_size=VAL_RATIO, random_state=RANDOM_SEED)
+        # if train:
+        #     self.protein_dirs = self.training_protein
+        # else:
+        #     self.protein_dirs = self.val_proteins
 
     def __len__(self):
         return len(self.protein_dirs)
@@ -164,7 +166,16 @@ class Trainer():
         self.mini_batch_size = MINI_BATCH_SIZE
         self.model_name = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
 
-    def train(self, epochs = 10):
+    def train(self, epochs = 10, kf = 0):
+        """
+        Train the model
+        args:
+        epochs: int, number of epochs
+        kf: int, kfold number
+        """
+        if not DEBUG:
+            run = wandb.init(project='MegaScaleFineTuning', config=config, name=MODEL_NAME + f'Kfold{kf}')
+        
         # Freeze the layers and only train the last layer
         if FREEZE_LAYERS:
             for param in self.model.parameters():
@@ -174,6 +185,7 @@ class Trainer():
             for param in self.model.fc1.parameters():
                 param.requires_grad = True
         running_loss = 0
+        wandb_step = 0
         for epoch in range(epochs):
             self.model.train()
             for i, batch in enumerate(tqdm(self.train_ds, desc=f'Training Epoch: {epoch}')):
@@ -194,22 +206,33 @@ class Trainer():
                     loss.backward()
                     self.optimizer.step()
                     batch_loss += loss.item()
-                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i,'l1_loss': l1_loss.item(), 'reg_loss': reg_loss.item(), 'energy_reg': energy_reg.item()})
+                    wandb_step += 1
+                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i,'l1_loss': l1_loss.item(), 'reg_loss': reg_loss.item(), 'energy_reg': energy_reg.item(), 'wandb_step': wandb_step},run)
                 running_loss += batch_loss/ batch['prott5'].size(1)
                 if (i+1) % 100 == 0:
-                    wandb_log({'epoch': epoch, 'running_loss': running_loss/100})
+                    wandb_log({'epoch': epoch, 'running_loss': running_loss/100},run)
                     running_loss = 0
                     
             # save the model
-            torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, MODEL_NAME, f'{epoch}.pt'))
+            if not DEBUG:
+                torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, MODEL_NAME, f'kf_{kf}_epoch_{epoch}.pt'))
             
-            pc_corr = self.validate(epoch)
+            pc_corr = self.validate(epoch,run)
             # update the learning rate
             self.scheduler.step(pc_corr)
             current_lr = self.optimizer.param_groups[0]['lr']
-            wandb_log({'epoch': epoch, 'lr': current_lr})
+            wandb_log({'epoch': epoch, 'lr': current_lr}, run)
+        return self.model, pc_corr
 
-    def validate(self, epoch):
+    def validate(self, epoch, run = None):
+        """
+        Validate the model
+        args:
+        epoch: int, the current epoch
+        run: wandb run object
+        returns:
+        pc_corr: float, pearson correlation
+        """
         self.model.eval()
         val_loss = 0
         val_dg = torch.tensor([],device=self.device)
@@ -233,7 +256,7 @@ class Trainer():
         val_loss /= len(self.val_ds)
         print(f'Validation Loss: {val_loss}')
         pc_corr = torch.corrcoef(torch.cat((val_dg[None,:],val_dg_pred[None,:])))[0, 1]
-        wandb_log({'val_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr})
+        wandb_log({'val_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr},run)
         self.model.train()
         return pc_corr
         
@@ -261,27 +284,43 @@ class Trainer():
 
 
 def run_training():
-    # Load the dataset
-    protein_train = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
-                                                  mutations_root_dir=mutations_root_dir, train=True)
-    protein_val = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
-                                                  mutations_root_dir=mutations_root_dir, train=False)
-    # Create the dataloaders
-    train_ds = DataLoader(protein_train, batch_size=1, shuffle=False)
-    val_ds = DataLoader(protein_val, batch_size=1, shuffle=False)
-    
-    # Create the model
-    model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = DROP_OUT).to(DEVICE)
-    if PRETRAINED: 
-        try:
-            model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
-        except:
-            model.load_state_dict(torch.load(TRAINED_MODEL_PATH))
-    
-    # Train the model
-    trainer = Trainer(model, train_ds, val_ds)
-    trainer.train(epochs = EPOCHS)
+    k_folds = 5
+    kfold = KFold(n_splits=k_folds, shuffle=True, random_state=RANDOM_SEED)
 
+    results = {}
+
+    prot_ds = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+                                          mutations_root_dir=mutations_root_dir, train=True)
+    
+    for fold, (train_ids, test_ids) in enumerate(kfold.split(prot_ds)):
+        print(f'FOLD {fold}')
+        print('--------------------------------')
+        # Sample elements randomly from a given list of ids, no replacement.
+        train_subsampler = Subset(prot_ds, train_ids)
+        test_subsampler = Subset(prot_ds, test_ids)
+    
+        # Create the dataloaders
+        train_ds = DataLoader(train_subsampler, batch_size=1, shuffle=False)
+        val_ds = DataLoader(test_subsampler, batch_size=1, shuffle=False)
+    
+        # Create the model
+        model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate).to(DEVICE)
+        if PRETRAINED: 
+            try:
+                model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
+            except:
+                model.load_state_dict(torch.load(TRAINED_MODEL_PATH))
+        
+        # Train the model
+        trainer = Trainer(model, train_ds, val_ds)
+        model, pc_corr = trainer.train(epochs = EPOCHS, kf=fold)
+        results[fold] = pc_corr
+        
+    print(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')
+    print('--------------------------------')
+    for key, value in results.items():
+        print(f'Fold {key}: {value} %')
+        
 def get_valid_proteins(val_ds):
     # create dataframe and append the name of the protein and the mutations
     df = pd.DataFrame(columns=['name', 'mutations'])
@@ -294,7 +333,7 @@ def get_valid_proteins(val_ds):
 if __name__ == '__main__':
     tensor_root_dir = r'./data/Processed_K50_dG_datasets/training_data'
     mutations_root_dir = r'./data/Processed_K50_dG_datasets/mutation_datasets'
-   
+    CFG.dropout_rate = DROP_OUT
     run_training()
     # Get validation proteins
     # protein_val = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,

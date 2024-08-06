@@ -33,7 +33,7 @@ VAL_RATIO = 0.2
 RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG = False
-EPOCHS = 50 if not DEBUG else 1
+EPOCHS = 10 if not DEBUG else 1
 FREEZE_LAYERS = False
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
@@ -191,6 +191,7 @@ class Trainer():
             for i, batch in enumerate(tqdm(self.train_ds, desc=f'Training Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
                 batch_loss = 0
+                batch_idx = 0
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
                     self.optimizer.zero_grad()
                     output,u_energy,f_energy = self.get_deltaG(batch, j)
@@ -208,7 +209,8 @@ class Trainer():
                     batch_loss += loss.item()
                     wandb_step += 1
                     wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i,'l1_loss': l1_loss.item(), 'reg_loss': reg_loss.item(), 'energy_reg': energy_reg.item(), 'wandb_step': wandb_step},run)
-                running_loss += batch_loss/ batch['prott5'].size(1)
+                batch_loss /= batch_idx
+                running_loss += batch_loss
                 if (i+1) % 100 == 0:
                     wandb_log({'epoch': epoch, 'running_loss': running_loss/100},run)
                     running_loss = 0
@@ -241,7 +243,9 @@ class Trainer():
             for i, batch in enumerate(tqdm(self.val_ds,desc=f'Validation Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
                 batch_loss = 0
+                batch_idx = 0
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
+                    batch_idx += 1
                     output,u_energy,f_energy = self.get_deltaG(batch, j)
                     delta_g = batch['delta_g'][0, j: j + self.mini_batch_size].to(self.device)
                     loss = self.criterion(output,delta_g)
@@ -251,7 +255,7 @@ class Trainer():
                     batch_loss += loss.item()
                     val_dg = torch.cat((val_dg, delta_g), dim=0)
                     val_dg_pred = torch.cat((val_dg_pred, output), dim=0)
-                batch_loss /= batch['prott5'].size(1)
+                batch_loss /= batch_idx
             val_loss += batch_loss
         val_loss /= len(self.val_ds)
         print(f'Validation Loss: {val_loss}')

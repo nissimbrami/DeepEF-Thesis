@@ -32,7 +32,7 @@ class CFG:
     dropout_rate = 0.2
     model_path = "./res/trianed_models-newDecoys/"
     
-    gaussian_coef = -0.008*1e1
+    gaussian_coef = -0.008*1e-1
     #training parameters
     lr = 0.0001
     wd = 0.00001

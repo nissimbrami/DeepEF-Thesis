@@ -191,7 +191,7 @@ class Trainer():
             for i, batch in enumerate(tqdm(self.train_ds, desc=f'Training Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
                 batch_loss = 0
-                batch_idx = 0
+                batch_idx = 1
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
                     self.optimizer.zero_grad()
                     output,u_energy,f_energy = self.get_deltaG(batch, j)
@@ -243,7 +243,7 @@ class Trainer():
             for i, batch in enumerate(tqdm(self.val_ds,desc=f'Validation Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
                 batch_loss = 0
-                batch_idx = 0
+                batch_idx = 1
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
                     batch_idx += 1
                     output,u_energy,f_energy = self.get_deltaG(batch, j)

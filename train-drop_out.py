@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 dropout 0.8')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 dropout 0.8 gs 008')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -83,14 +83,14 @@ def get_noised_proteins(data,device):
     proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2 = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_cycle1.squeeze(), proT5_cycle2.squeeze()
     
     # get folded graph  
-    Xjf = get_graph(Xjf, emb, proT5_emb, mask)
+    Xjf = get_graph(Xjf, emb, proT5_emb, mask,CFG.gaussian_coef)
     # get unfolded graph
-    Xju = get_unfolded_graph(Xju, emb, proT5_emb, mask)
+    Xju = get_unfolded_graph(Xju, emb, proT5_emb, mask,CFG.gaussian_coef)
     # get decoy graph
-    Xd, Xcd, Xdu = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy), get_unfolded_graph(Xdu, emb_decoy, proT5_emb_decoy, mask_decoy)
+    Xd, Xcd, Xdu = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy,CFG.gaussian_coef), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy,CFG.gaussian_coef), get_unfolded_graph(Xdu, emb_decoy, proT5_emb_decoy, mask_decoy,CFG.gaussian_coef)
     # Add cycle permutation
-    Xcy1 = get_graph(Xcy1, cycle_emb1, proT5_cycle1, mask)
-    Xcy2 = get_graph(Xcy2, cycle_emb2, proT5_cycle2, mask)
+    Xcy1 = get_graph(Xcy1, cycle_emb1, proT5_cycle1, mask,CFG.gaussian_coef)
+    Xcy2 = get_graph(Xcy2, cycle_emb2, proT5_cycle2, mask,CFG.gaussian_coef)
     # Xjf.requires_grad = True
     # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
     Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = Xjf.unsqueeze(0),Xju.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0), Xdu.unsqueeze(0),Xcy1.unsqueeze(0),Xcy2.unsqueeze(0)
@@ -400,7 +400,7 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-droupout-0.8/'
+        CFG.model_path = './res/trianed_models-droupout-0.8,gs/'
         CFG.results_path = './res/results-emb/'
     CFG.dropout_rate = 0.8
     CFG.gaussian_coef = -0.0008

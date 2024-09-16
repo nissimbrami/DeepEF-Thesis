@@ -410,9 +410,9 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-gs0008/'
+        CFG.model_path = './res/trianed_models-gs08/'
         CFG.results_path = './res/results-emb/'
     CFG.dropout_rate = 0.3
-    CFG.gaussian_coef = -0.0008
+    CFG.gaussian_coef = -0.08
     CFG.reg_alpha = 0.5
     main()

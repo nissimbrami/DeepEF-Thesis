@@ -73,22 +73,22 @@ def print_stat(model_path):
 
 def main():
     model_list = []
-    for i in range(1, 30):
+    for i in range(15, 16):
     #    model_list.append(f'res/trianed_models-2cycle_drop/{i}_final_model.pt')
-       model_list.append(f'res/trianed_models-droupout/{i}_final_model.pt')
-       model_list.append(f'res/trianed_models-droupout-0.8/{i}_final_model.pt')
-       model_list.append(f'res/trianed_models-2cycle_drop/{i}_final_model.pt')
-    #    model_list.append(f'res/trianed_models-cycle_per_norm_SM/{i}_final_model.pt')
+    #    model_list.append(f'res/trianed_models-droupout/{i}_final_model.pt')
+    #    model_list.append(f'res/trianed_models-droupout-0.8/{i}_final_model.pt')
+        model_list.append(f'res/trianed_models-cycle_per_2_norm/{i}_final_model.pt')
+        # model_list.append(f'res/trianed_models-droupout-0.8,gs/{i}_final_model.pt')
     # model_list = ['Megascale-fineTuning/models/PEM_full_trained-PEM_fine_tuned-trianed_models-cycle_perL1L1/1.pt']
-    mini_batch_size = 64
+    mini_batch_size = 128
     # run validation for all models
     for model in model_list:
-        eval_path ='/'.join(model.split('/')[-2:])
-        if os.path.exists(eval_path):
-            print('model already validated: ', model)
-            print('printing stats for model: ', model)
-            print_stat(model)
-            continue
+        # eval_path ='/'.join(model.split('/')[-2:])
+        # if os.path.exists(eval_path):
+        #     print('model already validated: ', model)
+        #     print('printing stats for model: ', model)
+        #     print_stat(model)
+        #     continue
         try: 
             print('running validation for model: ', model)
             run_validation(r'./data/Processed_K50_dG_datasets',model_path=r'./'+model, mini_batch_size=mini_batch_size)

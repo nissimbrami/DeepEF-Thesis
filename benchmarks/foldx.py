@@ -1,60 +1,3 @@
-# import os
-# import subprocess
-# from tqdm import  tqdm
-
-# # Path to FoldX executable
-# foldx_path = "/cs/casp15/Shahar/foldx/foldx_20241231"
-# base_path = '/cs/casp15/Shahar/DeepPEF'
-
-# def validate_foldx():
-#     foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldx"
-#     pdb_path = base_path + "/data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
-#     foldx_ds = os.listdir(foldx_ds_path)
-#     for protein in tqdm(foldx_ds):
-#         # Check if mutant file is empty
-#         mutant_file = f'{foldx_ds_path}/{protein}/mutant_file.txt'
-#         if os.path.getsize(mutant_file) == 0:
-#             continue
-#         # Create a directory for FoldX output
-#         os.makedirs(f'{foldx_ds_path}/{protein}/foldx_output', exist_ok=True)
-#         output_dir = f'{foldx_ds_path}/{protein}/foldx_output'
-#         # Path to the original PDB file
-#         pdb_name = f'{protein}.pdb'
-#         # mutation path
-#         mutation_path = f'{foldx_ds_path}/{protein}/mutant_file.txt'
-#         # Run FoldX stability analysis
-#         foldx_command = f"{foldx_path} --command=BuildModel --pdb-dir={pdb_path} --pdb={pdb_name} --mutant-file={mutation_path}  --output-dir={output_dir}"
-#         subprocess.run(foldx_command, shell=True)
-#         print(f"Finished {protein}")
-        
-
-# def test_foldx():
-    
-#     # Path to FoldX executable
-#     foldx_path = "/cs/casp15/Shahar/foldx/foldx_20241231"
-
-#     # Path to the original PDB file
-#     pdb_path = "./data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
-#     pdb_name = '1A32.pdb'
-
-#     # Create a directory for FoldX output
-#     output_dir = "./data/foldx_output"
-#     os.makedirs(output_dir, exist_ok=True)
-#     # mutation path
-#     mutation_path = './benchmarks/mutant_file.txt'
-#     wild_type = 'SPEVQIAILTEQINNLNEHLRVHKKDHHSRRGLLKMVGKRRRLLAYLRNKDVARYREIVEKLG'
-
-#     # Run FoldX stability analysis
-#     foldx_command = f"{foldx_path} --command=BuildModel --pdb-dir={pdb_path} --pdb={pdb_name} --mutant-file={mutation_path}  --output-dir={output_dir}"
-#     # foldx_command = f"{foldx_path} --command=Stability --pdb-dir={pdb_path} --pdb={pdb_name}  --output-dir={output_dir}"
-#     print(foldx_command)
-#     subprocess.run(foldx_command, shell=True)
-    
-# if __name__ == "__main__":
-#     # test_foldx()
-#     validate_foldx()
-
-
 import os
 import subprocess
 from tqdm import tqdm
@@ -134,7 +77,7 @@ def extract_energy_values(file_content):
     return energy_values
 
 def create_summery():
-    foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldx"
+    foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldxFIX"
     pdb_path = base_path + "/data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
     foldx_ds = os.listdir(foldx_ds_path)
     summery_df = pd.DataFrame()

@@ -24,7 +24,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 2 cycles norm')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 2 gs0008')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -410,8 +410,9 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-2cycle_drop/'
+        CFG.model_path = './res/trianed_models-gs0008/'
         CFG.results_path = './res/results-emb/'
-    CFG.dropout_rate = 0.5
+    CFG.dropout_rate = 0.3
     CFG.gaussian_coef = -0.0008
+    CFG.reg_alpha = 0.5
     main()

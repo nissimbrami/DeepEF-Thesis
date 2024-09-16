@@ -34,14 +34,15 @@ RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG = False
 EPOCHS = 10 if not DEBUG else 1
-FREEZE_LAYERS = False
+FREEZE_LAYERS = True
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 32
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
 # TRAINED_MODEL_PATH = "./res/trianed_models-cycle_per_norm_SM/13_final_model.pt"
 # TRAINED_MODEL_PATH = "./res/trianed_models-cycle_2_per_norm/1_final_model.pt"
-TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_per_norm_SMscheduler/14.pt"
+# TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_per_norm_SMscheduler/14.pt"
+TRAINED_MODEL_PATH = "./res/trianed_models-2cycle_drop/12_final_model.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
 MODEL_NAME += 'kf'
@@ -174,7 +175,7 @@ class Trainer():
         kf: int, kfold number
         """
         if not DEBUG:
-            run = wandb.init(project='MegaScaleFineTuning', config=config, name=MODEL_NAME + f'Kfold{kf}')
+            run = wandb.init(project='KFMegaScaleFineTuning', config=config, name=MODEL_NAME + f'Kfold{kf}')
         
         # Freeze the layers and only train the last layer
         if FREEZE_LAYERS:
@@ -319,6 +320,7 @@ def run_training():
         trainer = Trainer(model, train_ds, val_ds)
         model, pc_corr = trainer.train(epochs = EPOCHS, kf=fold)
         results[fold] = pc_corr
+        wandb.finish()
         
     print(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')
     print('--------------------------------')

@@ -417,4 +417,5 @@ if __name__ == '__main__':
     CFG.dropout_rate = 0.3
     CFG.gaussian_coef = -0.08
     CFG.reg_alpha = 0.1
+    CFG.lr = 0.00001
     main()

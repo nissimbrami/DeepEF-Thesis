@@ -38,12 +38,23 @@ def get_emb(sequence_examples):
     emb_0 = embedding_repr.last_hidden_state[0,:seq_len]
     return emb_0
 
-def print_files_in_directory(directory,mutation=False,cycle1=False,cycle2=False):
+def print_files_in_directory(directory,mutation=False,
+                             cycle1=False,cycle2=False,
+                             cycle3=False,cycle4=False,
+                             cycle5=False,cycle6=False):
     n_saved = 0
     if cycle1:
         emb_file_name = 'proT5_emb_cycle1.pt'
     elif cycle2:
         emb_file_name = 'proT5_emb_cycle2.pt'
+    elif cycle3:
+        emb_file_name = 'proT5_emb_cycle3.pt'
+    elif cycle4:
+        emb_file_name = 'proT5_emb_cycle4.pt'
+    elif cycle5:
+        emb_file_name = 'proT5_emb_cycle5.pt'
+    elif cycle6:
+        emb_file_name = 'proT5_emb_cycle6.pt'
     elif mutation:
         emb_file_name = 'proT5_emb_mut.pt'
     else:
@@ -54,12 +65,17 @@ def print_files_in_directory(directory,mutation=False,cycle1=False,cycle2=False)
             if (file_name == 'seq.pt'):
                 seq = torch.load(os.path.join(root, file_name))
                 if cycle1:
-                    last = seq[-1]
-                    seq = last + seq[:-1]
-                
+                    seq = seq[-1:] + seq[:-1]
                 if cycle2:
-                    first = seq[0]
-                    seq = seq[1:] + first
+                    seq = seq[1:] + seq[:1]
+                if cycle3:
+                    seq = seq[-2:] + seq[:-2]
+                if cycle4:
+                    seq = seq[-5:] + seq[:-5]
+                if cycle5:
+                    seq = seq[2:] + seq[:2]
+                if cycle6:
+                    seq = seq[5:] + seq[:5]
                    
                 if mutation:
                     mix_index = torch.randperm(len(seq))[:2] # randomly select 2 positions to swap
@@ -77,9 +93,17 @@ def print_files_in_directory(directory,mutation=False,cycle1=False,cycle2=False)
                 
 
 # Provide the directory path here
-# directory_path = './data/casp12_data_100/'
-directory_path = './data/casp12_data_30/'
+directory_path = './data/casp12_data_100/'
+# directory_path = './data/casp12_data_30/'
 
 # print_files_in_directory(directory_path,mutation=False, cycle1 = True)
-print_files_in_directory(directory_path,mutation=False, cycle1 = True)
-print_files_in_directory(directory_path,mutation=False, cycle2 = True)
+# print_files_in_directory(directory_path,mutation=False, cycle1 = True)
+# print_files_in_directory(directory_path,mutation=False, cycle2 = True)
+print("******************Cycle 3*********************")
+print_files_in_directory(directory_path,mutation=False, cycle3 = True)
+print("******************Cycle 4*********************")
+print_files_in_directory(directory_path,mutation=False, cycle4 = True)
+print("******************Cycle 5*********************")
+print_files_in_directory(directory_path,mutation=False, cycle5 = True)
+print("******************Cycle 6*********************")
+print_files_in_directory(directory_path,mutation=False, cycle6 = True)

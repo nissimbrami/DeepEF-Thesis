@@ -20,13 +20,11 @@ import wandb
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
-CFG.debug = False
-CFG.batch_size = 2
-CFG.num_workers = 4
+# CFG.debug = True
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 adding cycle permutation')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 1 cycle norm')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -34,6 +32,71 @@ if CFG.debug:
 
 
 
+def get_noised_proteins(data,device):
+    """
+    Returns a noised version of the protein data.
+    """
+    id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
+                proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy,proT5_cycle1, proT5_cycle2 = data
+            
+    # wild type and mutant type
+    Xjf = crd_backbone.to(device) # wilde type structure folded
+    Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
+    Xcd = torch.clone(crd_decoy).to(device) # decoy structure
+    Xcy1 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
+    Xcy2 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
+    
+    # change the decoy len to match the native len
+    if Xcd.shape[1] > Xjf.shape[1]:
+        Xcd = Xcd[:,:Xjf.shape[1],:,:]
+        mask_crd_decoy = mask_crd_decoy[:,:Xjf.shape[1]]
+    elif Xcd.shape[1] < Xjf.shape[1]:
+        # add zeros to the end of the decoy
+        Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0],Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:]).to(device)), dim=1)
+        mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(mask.shape[0],mask.shape[1] - mask_crd_decoy.shape[1])), dim=1)
+        
+    
+    # native structure and decoy structure
+    Xd = torch.clone(Xjf).to(device)
+    Xdu = torch.clone(Xjf).to(device)
+    seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
+    
+    # create decoy sequence
+    seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
+    
+    if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
+        return None,None,None,None,None,None,None
+    #emb = torch.cat((esm_embed,seq),dim=2)
+    emb = seq_one_hot.to(device)
+    emb_decoy = seq_decoy.to(device)
+    # get the cycle permutation
+    cycle_emb1 = get_one_hot(seq[0][-1] + seq[0][:-1]).to(device)
+    cycle_emb2 = get_one_hot(seq[0][1:] + seq[0][0]).to(device)
+    
+    # move proT5_emb to device
+    proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2 = proT5_emb_decoy.to(device), proT5_emb.to(device), proT5_cycle1.to(device), proT5_cycle2.to(device)
+    
+    # squeeze the data
+    Xd, Xjf, Xju, Xcd, Xdu, Xcy1, Xcy2 = Xd.squeeze(), Xjf.squeeze(), Xju.squeeze(), Xcd.squeeze(), Xdu.squeeze(), Xcy1.squeeze(), Xcy2.squeeze()
+    emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
+    mask_decoy, mask, mask_crd_decoy= mask_decoy.squeeze(), mask.squeeze(), mask_crd_decoy.squeeze()
+    proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2 = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_cycle1.squeeze(), proT5_cycle2.squeeze()
+    
+    # get folded graph  
+    Xjf = get_graph(Xjf, emb, proT5_emb, mask)
+    # get unfolded graph
+    Xju = get_unfolded_graph(Xju, emb, proT5_emb, mask)
+    # get decoy graph
+    Xd, Xcd, Xdu = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy), get_unfolded_graph(Xdu, emb_decoy, proT5_emb_decoy, mask_decoy)
+    # Add cycle permutation
+    Xcy1 = get_graph(Xcy1, cycle_emb1, proT5_cycle1, mask)
+    Xcy2 = get_graph(Xcy2, cycle_emb2, proT5_cycle2, mask)
+    # Xjf.requires_grad = True
+    # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
+    Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = Xjf.unsqueeze(0),Xju.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0), Xdu.unsqueeze(0),Xcy1.unsqueeze(0),Xcy2.unsqueeze(0)
+
+    return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2
+    
 # define validation function
 def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     """
@@ -55,57 +118,18 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             gc.collect()
             # zero the parameter gradients
             optimizer.zero_grad()
-            id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
-                proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy = data
+            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = get_noised_proteins(data,device)
+            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1),dim=0)
             
-            batch_size = crd_backbone.shape[0]
-            # wild type and mutant type
-            Xjf = crd_backbone.to(device) # wilde type structure folded
-            Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
-            Xcd = crd_decoy.to(device) # decoy structure
-            
-            
-            # native structure and decoy structure
-            Xd = torch.clone(Xjf).to(device)
-            Xdu = torch.clone(Xjf).to(device)
-            seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
-            
-            # create decoy sequence
-            seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
-            
-            if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
-                n_skips += 1
-                continue
-            #emb = torch.cat((esm_embed,seq),dim=2)
-            emb = seq_one_hot.to(device)
-            emb_decoy = seq_decoy.to(device)
-            
-            # move proT5_emb to device
-            proT5_emb_decoy, proT5_emb = proT5_emb_decoy.to(device), proT5_emb.to(device)
-           
-            # zero the parameter gradients
-            optimizer.zero_grad()
-            
-            # get folded graph  
-            Xjf = torch.stack([get_graph(Xjf[i], emb[i], proT5_emb[i], mask[i]) for i in range(Xjf.shape[0])])
-            # get unfolded graph
-            Xju = torch.stack([get_unfolded_graph(Xju[i], emb[i], proT5_emb[i], mask[i]) for i in range(Xju.shape[0])])
-            # get decoy graph
-            Xd, Xcd, Xdu = torch.stack([get_graph(Xd[i], emb_decoy[i], proT5_emb_decoy[i], mask_decoy[i]) for i in range(Xd.shape[0])]), torch.stack([get_graph(Xcd[i], emb[i], proT5_emb[i], mask_crd_decoy[i]) for i in range(Xcd.shape[0])]),\
-                torch.stack([get_unfolded_graph(Xdu[i], emb_decoy[i], proT5_emb_decoy[i], mask_decoy[i]) for i in range(Xdu.shape[0])])
-            # Xjf.requires_grad = True
-            # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
-            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu),dim=0)
-            
-            # half precision training
             with torch.no_grad():
+                # half precision validation
                 with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                     # calculate the energy for the folded unfolded and decoy structure
                     E = model(X)
-                    Ejf, Eju, Exd, Ecd, Exdu = E[:batch_size], E[batch_size:2*batch_size], E[2*batch_size:3*batch_size], E[3*batch_size:4*batch_size], E[4*batch_size:]
+                    Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
                     # calculate the loss   
-                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, with_grad = False)
-            
+                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False)
+                
             # Add gradient penalty
             Ejf_grad = torch.tensor(0.0).to(device)
             if CFG.gradient_penalty:
@@ -126,8 +150,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             valid_lossd += lossd.item()
             valid_lossg += lossg.item()
             valid_lossc += lossc.item()
-            # delete all the variables
-            del Xjf,Xju,Xd,emb_decoy, emb, mask_decoy, mask, proT5_emb_decoy, proT5_emb, proT5_mut, X, E, Ejf, Eju, Exd
+            
             torch.cuda.empty_cache()
             gc.collect()
             # update the progress bar
@@ -156,56 +179,19 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             gc.collect()
              # zero the parameter gradients
             optimizer.zero_grad()
-            id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
-                proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy = data
-            
-            batch_size = crd_backbone.shape[0]
-            # wild type and mutant type
-            Xjf = crd_backbone.to(device) # wilde type structure folded
-            Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
-            Xcd = crd_decoy.to(device) # decoy structure
-            
-            
-            # native structure and decoy structure
-            Xd = torch.clone(Xjf).to(device)
-            Xdu = torch.clone(Xjf).to(device)
-            seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
-            
-            # create decoy sequence
-            seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
-            
-            if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
+            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = get_noised_proteins(data,device)
+            if Xjf is None:
                 n_skips += 1
                 continue
-            #emb = torch.cat((esm_embed,seq),dim=2)
-            emb = seq_one_hot.to(device)
-            emb_decoy = seq_decoy.to(device)
-            
-            # move proT5_emb to device
-            proT5_emb_decoy, proT5_emb = proT5_emb_decoy.to(device), proT5_emb.to(device)
-           
-            # zero the parameter gradients
-            optimizer.zero_grad()
-    
-            
-            # get folded graph  
-            Xjf = torch.stack([get_graph(Xjf[i], emb[i], proT5_emb[i], mask[i]) for i in range(Xjf.shape[0])])
-            # get unfolded graph
-            Xju = torch.stack([get_unfolded_graph(Xju[i], emb[i], proT5_emb[i], mask[i]) for i in range(Xju.shape[0])])
-            # get decoy graph
-            Xd, Xcd, Xdu = torch.stack([get_graph(Xd[i], emb_decoy[i], proT5_emb_decoy[i], mask_decoy[i]) for i in range(Xd.shape[0])]), torch.stack([get_graph(Xcd[i], emb[i], proT5_emb[i], mask_crd_decoy[i]) for i in range(Xcd.shape[0])]),\
-                torch.stack([get_unfolded_graph(Xdu[i], emb_decoy[i], proT5_emb_decoy[i], mask_decoy[i]) for i in range(Xdu.shape[0])])
-            # Xjf.requires_grad = True
-            # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
-            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu),dim=0)
+            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1),dim=0)
             
             # half precision training
             with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                 # calculate the energy for the folded unfolded and decoy structure
                 E = model(X)
-                Ejf, Eju, Exd, Ecd, Exdu = E[:batch_size], E[batch_size:2*batch_size], E[2*batch_size:3*batch_size], E[3*batch_size:4*batch_size], E[4*batch_size:]
+                Ejf, Eju, Exd, Ecd, Exdu, Ecy1 = E[0], E[1], E[2], E[3], E[4], E[5]
                 # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, with_grad = False)
+                loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, with_grad = False)
             
             # Scales the loss, and calls backward()
             # to create scaled gradients
@@ -260,11 +246,12 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             torch.cuda.empty_cache()
             gc.collect()
             # update the progress bar
-            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"lossc":round(lossc.item(),3),"sequence_len": len(seq[0])})
+            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"lossc":round(lossc.item(),3),"sequence_len": Xjf.shape[1]})
             # Log metrics
             if not CFG.debug:
-                wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": len(seq[0])})
-                wandb.log({"Ejf":Ejf.tolist(), "Eju": Eju.tolist(), "Ejf":Ejf.tolist(), "Ecd":Ecd.tolist(), "Exdu":Exdu.tolist()})
+                wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": Xjf.shape[1],
+                           "Exd":Exd.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item(),
+                           "step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item(), "Exdu":Exdu.item(),"Ecy1":Ecy1.item()})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -323,7 +310,7 @@ def gradient_penalty(X_native, E_native):
     lossg = torch.mean(partial_dx_native**2)
     return lossg
 
-def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True , reg_alpha = CFG.reg_alpha):
+def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, with_grad = True , reg_alpha = CFG.reg_alpha):
     """
     The loss function for the model corresponds to 3 main losses:
     1. lossg: the partial derivative of the energy with respect to the native structure
@@ -337,6 +324,7 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True , reg_alpha =
         Exd (tensor): The energy of the decoy sequence
         Ecd (tensor): The energy of the decoy structure
         Exdu (tensor): The energy of the decoy structure unfolded
+        Ecy1 (tensor): The energy of the cycle permutation structure first amino acid
     output:
         loss (tensor): The loss of the model
         lossd (tensor): The loss of the model due to the energy of the native structure divided by the decoy energy
@@ -344,51 +332,27 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, with_grad = True , reg_alpha =
         lossc (tensor): The loss of the model due to the energy softplus function for the native and mutant structure(unfolded and folded)
     """
     lossg = gradient_penalty(X_native, Ejf) if with_grad else torch.tensor(0.0).to(Ejf.device)
-    lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju).mean()
+    lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1)
     # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
     # lossc will be regularization term of sum of squered energys 
-    lossc = (Ejf**2 + Eju**2 + Exd**2 + Ecd**2).mean()
+    lossc = (torch.cat([Ejf.unsqueeze(0)[None,:], Eju.unsqueeze(0)[None,:], Exd.unsqueeze(0)[None,:], Ecd.unsqueeze(0)[None,:], Ecy1.unsqueeze(0)[None,:]])**2).mean()
     lossc = reg_alpha * lossc
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
-def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju):
+def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1):
     """Decoy loss:
     - the energy of a decoy sequece is greater than the energy of the wild-type structure (Ejf<Exd)
     - the energy of a decoy structure is greater than the energy of the wild-type structure (Ejf<Ecd)
     - the energy of a folded decoy is greater than the energy of an unfolded decoy (Exdu<Exd)
     - the energy of a decoy structure is greater than the energy of the unfolded native structure (Eju<Ecd)
+    - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy1)
     """
     # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
     loss_decoy = lambda x,y: x - y
-    
-    return loss_decoy(Ejf, Exd) + loss_decoy(Ejf, Ecd) + loss_decoy(Eju, Ecd)+ loss_decoy(Ejf, Eju) 
-# def loss_decoy(E_native,E_decoy,decoy_threshold = CFG.decoy_threshold):
-#     """Decoy loss, the energy of the native structure divided by the decoy energy"""
-#     # if E_native * decoy_threshold < E_decoy:
-#     #     return torch.tensor(0.0).to(E_native.device)
-#     return torch.log((E_native+1) / (E_decoy+1) +1)
-
-def energy_softplus(Ejf, Ekf, Eju, Eku, beta = 1):
-    """Energy softplus,
-    As we know the energy diffrence between an unfolded protein and folded protein is positive.
-    Therefore we will add it to the loss as lossc"""
-    
-    folded_threshold = 2 # the ratio between the energy of the folded and unfolded protein should be greater than 2
-    softplus = lambda x: torch.log(torch.exp(beta*x)+1)/beta
-    if (Ekf * folded_threshold < Eku and Eku > Ekf):
-        lossc1 = softplus(-Ekf) 
-    else:
-        lossc1 = softplus(Ekf-Eku)
-        
-    if (Ejf * folded_threshold < Eju and Eju > Ejf):
-        lossc2 = softplus(-Ejf) 
-    else:
-        lossc2 = softplus(Ejf-Eju)
-    # lossd2 = torch.where(lossd2 < 0.05, torch.tensor(0.0).to(lossd2.device), torch.where(lossd2 > 10.0, lossd2/2.0, lossd2))
-    return lossc1+lossc2
-
-
+    loss = torch.cat([loss_decoy(Ejf, Exd).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecd).unsqueeze(0)[None,:], loss_decoy(Eju, Ecd).unsqueeze(0)[None,:], loss_decoy(Ejf, Eju).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy1).unsqueeze(0)[None,:]])
+    loss = torch.mean(loss)
+    return loss
 
     
 def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch,scheduler):
@@ -411,9 +375,9 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
 def main():
     print('***Start main function***')
     print('***load the data with dataloader***')
-    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, debug=CFG.debug,dataset='scn')
+    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, 
+                           debug=CFG.debug,dataset='scn',LLM_EMB=True)
     train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
-    # amino_inference_loader = fetch_inference_loader(data_dir=CFG.inference_path, params=d_params)
     # Build the model
     print('***Build the model***')
     model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef).to(CFG.device)
@@ -421,12 +385,12 @@ def main():
     model.energy_epsilon = 1e-6
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
     # configurate wandb
     wandb_config(wandb, model, optimizer, scheduler, train_loader,CFG.model_path)
     # Run training
     print('***Start training***')
-    epoch = 0
+    epoch = 14
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 
@@ -438,6 +402,6 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-cycle/'
+        CFG.model_path = './res/trianed_models-cycle_per_norm/'
         CFG.results_path = './res/results-emb/'
     main()

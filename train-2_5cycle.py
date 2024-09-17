@@ -23,7 +23,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel permutation 2 gs08')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 cycel 2-5')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -69,7 +69,7 @@ def get_noised_proteins(data,device):
     seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
     
     if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
-        return None,None,None,None,None,None,None
+        return None,None,None,None,None,None,None,None,None,None,None
     #emb = torch.cat((esm_embed,seq),dim=2)
     emb = seq_one_hot.to(device)
     emb_decoy = seq_decoy.to(device)
@@ -434,7 +434,7 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-gs08/'
+        CFG.model_path = './res/trianed_models-cycle2_5/'
         CFG.results_path = './res/results-emb/'
     # CFG.data_path = './data/casp12_data_30/'
     CFG.dropout_rate = 0.3

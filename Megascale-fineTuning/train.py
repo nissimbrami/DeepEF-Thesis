@@ -49,7 +49,7 @@ MODEL_NAME += 'kf'
 PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
 LR = 1e-4
-DROP_OUT = 0.5
+DROP_OUT = 0.2
 REG_LAMBDA = 0.01
 
 # config wandb

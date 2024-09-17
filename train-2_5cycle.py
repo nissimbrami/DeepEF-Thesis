@@ -1,7 +1,6 @@
 from model.data_loader import fetch_dataloader,fetch_inference_loader
 from model.data_loader import params as data_params
 from model.model_cfg import CFG
-# from model.net import ProteinEnergyNet
 from model.hydro_net import PEM
 from model.net import params as model_params
 from train_utils import *
@@ -37,7 +36,8 @@ def get_noised_proteins(data,device):
     Returns a noised version of the protein data.
     """
     id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
-                proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy,proT5_cycle1, proT5_cycle2 = data
+                proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy,proT5_cycle1,\
+                proT5_cycle2, proT5_cycle3, proT5_cycle4, proT5_cycle5, proT5_cycle6 = data
             
     # wild type and mutant type
     Xjf = crd_backbone.to(device) # wilde type structure folded
@@ -47,6 +47,8 @@ def get_noised_proteins(data,device):
     Xcy2 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
     Xcy3 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
     Xcy4 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
+    Xcy5 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
+    Xcy6 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
     
     # change the decoy len to match the native len
     if Xcd.shape[1] > Xjf.shape[1]:
@@ -74,16 +76,20 @@ def get_noised_proteins(data,device):
     # get the cycle permutation
     cycle_emb1 = get_one_hot(seq[0][-1] + seq[0][:-1]).to(device)
     cycle_emb2 = get_one_hot(seq[0][1:] + seq[0][0]).to(device)
+    cycle_emb3 = get_one_hot(seq[0][-2:] + seq[0][:-2]).to(device)
+    cycle_emb4 = get_one_hot(seq[0][-5:] + seq[0][:-5]).to(device)
+    cycle_emb5 = get_one_hot(seq[0][2:] + seq[0][:2]).to(device)
+    cycle_emb6 = get_one_hot(seq[0][5:] + seq[0][:5]).to(device)
     
     # move proT5_emb to device
-    proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2 = proT5_emb_decoy.to(device), proT5_emb.to(device), proT5_cycle1.to(device), proT5_cycle2.to(device)
+    proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2, proT5_cycle3, proT5_cycle4, proT5_cycle5, proT5_cycle6  = proT5_emb_decoy.to(device), proT5_emb.to(device), proT5_cycle1.to(device), proT5_cycle2.to(device), proT5_cycle3.to(device),proT5_cycle4.to(device), proT5_cycle5.to(device), proT5_cycle6.to(device)
     
     # squeeze the data
-    Xd, Xjf, Xju, Xcd, Xdu, Xcy1, Xcy2 = Xd.squeeze(), Xjf.squeeze(), Xju.squeeze(), Xcd.squeeze(), Xdu.squeeze(), Xcy1.squeeze(), Xcy2.squeeze()
+    Xd, Xjf, Xju, Xcd, Xdu, Xcy1, Xcy2, Xcy3, Xcy4, Xcy5, Xcy6 = Xd.squeeze(), Xjf.squeeze(), Xju.squeeze(), Xcd.squeeze(), Xdu.squeeze(), Xcy1.squeeze(), Xcy2.squeeze(), Xcy3.squeeze(), Xcy4.squeeze(), Xcy5.squeeze(), Xcy6.squeeze()
     emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
     mask_decoy, mask, mask_crd_decoy= mask_decoy.squeeze(), mask.squeeze(), mask_crd_decoy.squeeze()
-    proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2 = proT5_emb_decoy.squeeze(), proT5_emb.squeeze(), proT5_cycle1.squeeze(), proT5_cycle2.squeeze()
-    
+    proT5_emb_decoy, proT5_emb = proT5_emb_decoy.squeeze(), proT5_emb.squeeze()
+    proT5_cycle1, proT5_cycle2, proT5_cycle3, proT5_cycle4, proT5_cycle5, proT5_cycle6 = proT5_cycle1.squeeze(), proT5_cycle2.squeeze(), proT5_cycle3.squeeze(), proT5_cycle4.squeeze(), proT5_cycle5.squeeze(), proT5_cycle6.squeeze()
     # get folded graph  
     Xjf = get_graph(Xjf, emb, proT5_emb, mask)
     # get unfolded graph
@@ -93,11 +99,15 @@ def get_noised_proteins(data,device):
     # Add cycle permutation
     Xcy1 = get_graph(Xcy1, cycle_emb1, proT5_cycle1, mask)
     Xcy2 = get_graph(Xcy2, cycle_emb2, proT5_cycle2, mask)
+    Xcy3 = get_graph(Xcy3, cycle_emb3, proT5_cycle3, mask)
+    Xcy4 = get_graph(Xcy4, cycle_emb4, proT5_cycle4, mask)
+    Xcy5 = get_graph(Xcy5, cycle_emb5, proT5_cycle5, mask)
+    Xcy6 = get_graph(Xcy6, cycle_emb6, proT5_cycle6, mask)
     # Xjf.requires_grad = True
     # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
-    Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = Xjf.unsqueeze(0),Xju.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0), Xdu.unsqueeze(0),Xcy1.unsqueeze(0),Xcy2.unsqueeze(0)
+    Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6 = Xjf.unsqueeze(0),Xju.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0), Xdu.unsqueeze(0),Xcy1.unsqueeze(0),Xcy2.unsqueeze(0),Xcy3.unsqueeze(0),Xcy4.unsqueeze(0),Xcy5.unsqueeze(0),Xcy6.unsqueeze(0)
 
-    return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2
+    return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6
     
 # define validation function
 def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
@@ -120,17 +130,17 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             gc.collect()
             # zero the parameter gradients
             optimizer.zero_grad()
-            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = get_noised_proteins(data,device)
-            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2),dim=0)
+            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6 = get_noised_proteins(data,device)
+            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6),dim=0)
             
             with torch.no_grad():
                 # half precision validation
                 with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                     # calculate the energy for the folded unfolded and decoy structure
                     E = model(X)
-                    Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2 = E[0], E[1], E[2], E[3], E[4], E[5], E[6]
+                    Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, Ecy5, Ecy6 = E[0], E[1], E[2], E[3], E[4], E[5], E[6], E[7], E[8], E[9], E[10]
                     # calculate the loss   
-                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, with_grad = False)
+                    loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, Ecy5, Ecy6, with_grad = False)
                 
             # Add gradient penalty
             Ejf_grad = torch.tensor(0.0).to(device)
@@ -181,19 +191,19 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             gc.collect()
              # zero the parameter gradients
             optimizer.zero_grad()
-            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2 = get_noised_proteins(data,device)
+            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6 = get_noised_proteins(data,device)
             if Xjf is None:
                 n_skips += 1
                 continue
-            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2),dim=0)
+            X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6),dim=0)
             
             # half precision training
             with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
                 # calculate the energy for the folded unfolded and decoy structure
                 E = model(X)
-                Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2 = E[0], E[1], E[2], E[3], E[4], E[5], E[6]
+                Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, Ecy5, Ecy6 = E[0], E[1], E[2], E[3], E[4], E[5], E[6], E[7], E[8], E[9], E[10]
                 # calculate the loss   
-                loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, with_grad = False)
+                loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, Ecy5, Ecy6, with_grad = False)
             
             # Scales the loss, and calls backward()
             # to create scaled gradients
@@ -253,7 +263,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             if not CFG.debug:
                 wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": Xjf.shape[1],
                            "Exd":Exd.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item(),
-                           "step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item(), "Exdu":Exdu.item(),"Ecy1":Ecy1.item(),"Ecy2":Ecy2.item()})
+                           "step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item(), "Exdu":Exdu.item(),"Ecy1":Ecy1.item(),"Ecy2":Ecy2.item(),"Ecy3":Ecy3.item(),"Ecy4":Ecy4.item(),"Ecy5":Ecy5.item(),"Ecy6":Ecy6.item()})
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
@@ -312,7 +322,7 @@ def gradient_penalty(X_native, E_native):
     lossg = torch.mean(partial_dx_native**2)
     return lossg
 
-def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, with_grad = True , reg_alpha = CFG.reg_alpha):
+def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, Ecy5, Ecy6, with_grad = True , reg_alpha = CFG.reg_alpha):
     """
     The loss function for the model corresponds to 3 main losses:
     1. lossg: the partial derivative of the energy with respect to the native structure
@@ -328,6 +338,10 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, with_grad = True ,
         Exdu (tensor): The energy of the decoy structure unfolded
         Ecy1 (tensor): The energy of the cycle permutation structure first amino acid
         Ecy2 (tensor): The energy of the cycle permutation structure last amino acid
+        Ecy3 (tensor): The energy of the cycle permutation structure last two amino acid
+        Ecy4 (tensor): The energy of the cycle permutation structure last five amino acid
+        Ecy5 (tensor): The energy of the cycle permutation structure first two amino acid
+        Ecy6 (tensor): The energy of the cycle permutation structure first five amino acid
     output:
         loss (tensor): The loss of the model
         lossd (tensor): The loss of the model due to the energy of the native structure divided by the decoy energy
@@ -335,17 +349,19 @@ def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, with_grad = True ,
         lossc (tensor): The loss of the model due to the energy softplus function for the native and mutant structure(unfolded and folded)
     """
     lossg = gradient_penalty(X_native, Ejf) if with_grad else torch.tensor(0.0).to(Ejf.device)
-    lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2)
-    # lossc = energy_softplus(Ejf, Ekf, Eju, Eku)
+    lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2, Ecy3, Ecy4, Ecy5, Ecy6)
     # lossc will be regularization term of sum of squered energys 
     lossc = (torch.cat([Ejf.unsqueeze(0)[None,:], Eju.unsqueeze(0)[None,:],
                         Exd.unsqueeze(0)[None,:], Ecd.unsqueeze(0)[None,:],
-                        Ecy1.unsqueeze(0)[None,:], Ecy2.unsqueeze(0)[None,:]])**2).mean()
+                        Exdu.unsqueeze(0)[None,:], Ecy1.unsqueeze(0)[None,:],
+                        Ecy2.unsqueeze(0)[None,:], Ecy3.unsqueeze(0)[None,:],
+                        Ecy4.unsqueeze(0)[None,:], Ecy5.unsqueeze(0)[None,:],
+                        Ecy6.unsqueeze(0)[None,:]])**2).mean()
     lossc = reg_alpha * lossc
     
     return lossd+lossg+lossc , lossd, lossg, lossc
   
-def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2):
+def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2, Ecy3, Ecy4, Ecy5, Ecy6):
     """Decoy loss:
     - the energy of a decoy sequece is greater than the energy of the wild-type structure (Ejf<Exd)
     - the energy of a decoy structure is greater than the energy of the wild-type structure (Ejf<Ecd)
@@ -353,12 +369,18 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2):
     - the energy of a decoy structure is greater than the energy of the unfolded native structure (Eju<Ecd)
     - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy1)
     - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy2)
+    - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy3)
+    - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy4)
+    - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy5)
+    - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy6)
     """
     # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
     loss_decoy = lambda x,y: x - y
     loss = torch.cat([loss_decoy(Ejf, Exd).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecd).unsqueeze(0)[None,:], 
                       loss_decoy(Eju, Ecd).unsqueeze(0)[None,:], loss_decoy(Ejf, Eju).unsqueeze(0)[None,:], 
-                      loss_decoy(Ejf, Ecy1).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy2).unsqueeze(0)[None,:]])
+                      loss_decoy(Ejf, Ecy1).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy2).unsqueeze(0)[None,:],
+                      loss_decoy(Ejf, Ecy3).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy4).unsqueeze(0)[None,:],
+                        loss_decoy(Ejf, Ecy5).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy6).unsqueeze(0)[None,:]])
     loss = torch.mean(loss)
     return loss
 
@@ -414,8 +436,8 @@ if __name__ == '__main__':
     if not CFG.debug:
         CFG.model_path = './res/trianed_models-gs08/'
         CFG.results_path = './res/results-emb/'
+    # CFG.data_path = './data/casp12_data_30/'
     CFG.dropout_rate = 0.3
     CFG.gaussian_coef = -0.08
     CFG.reg_alpha = 0.1
-    CFG.lr = 0.00001
     main()

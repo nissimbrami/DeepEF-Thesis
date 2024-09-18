@@ -96,10 +96,11 @@ def normalize_batch(batch, LLM_EMB = True):
 
 class AllProteinValidationDataset(Dataset):
 
-    def __init__(self, tensor_root_dir, mutations_root_dir, train  = True):
+    def __init__(self, tensor_root_dir, mutations_root_dir, train  = True, one_mut = True):
         self.tensor_root_dir = tensor_root_dir
         self.mutations_root_dir = mutations_root_dir
         self.protein_dirs = [protein for i, protein in enumerate(os.listdir(self.tensor_root_dir))]
+        self.one_mut = one_mut # remove the mutations with more than one mutation
         # remove TM proteins 
         tm_proteins = pd.read_csv(TM_PATH)
         tm_proteins = tm_proteins['name'].apply(lambda x: x.split(".")[0]).unique().tolist()
@@ -120,14 +121,22 @@ class AllProteinValidationDataset(Dataset):
         protein_dir = os.path.join(self.tensor_root_dir, self.protein_dirs[idx])
         mutations_path = os.path.join(self.mutations_root_dir, f'{self.protein_dirs[idx]}.csv')
         mutations = pd.read_csv(mutations_path)
-        mutations = mutations[~mutations['mut_type'].str.contains('ins|del')]
+        mutations = mutations[~mutations['mut_type'].str.contains('ins|del')].reset_index(drop=True)
         # Load and preprocess the data for each protein
         coords_tensor = torch.load(os.path.join(protein_dir, COORDS))
         delta_g_tensor = torch.load(os.path.join(protein_dir, DELTA_G))
         mask_tensor = torch.load(os.path.join(protein_dir, MASKS))
         one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT))
         embedding_tensor = self.load_embedding_tensor(os.path.join(protein_dir, PROTT5_EMBEDDINGS))
-
+        
+        # remove the mutations with more than one mutation
+        if self.one_mut:
+            one_mut_index = mutations[~mutations['mut_type'].str.contains(':')]
+            mutations = mutations.loc[one_mut_index.index]
+            delta_g_tensor = delta_g_tensor[one_mut_index.index]
+            one_hot_tensor = one_hot_tensor[one_mut_index.index]
+            embedding_tensor = embedding_tensor[one_mut_index.index]
+            
         mutations_data = {
             'name': self.protein_dirs[idx],
             'mutations': mutations['mut_type'].to_list(),
@@ -175,7 +184,7 @@ class Trainer():
         kf: int, kfold number
         """
         if not DEBUG:
-            run = wandb.init(project='KFMegaScaleFineTuning', config=config, name=MODEL_NAME + f'Kfold{kf}')
+            run = wandb.init(project='KF-1MUT-MegaScaleFineTuning', config=config, name=MODEL_NAME + f'Kfold{kf}')
         
         # Freeze the layers and only train the last layer
         if FREEZE_LAYERS:

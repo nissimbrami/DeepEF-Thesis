@@ -10,6 +10,7 @@ class benckmark_datasets:
     
     def __init__(self, dataset_name):
         self.dataset_name = dataset_name
+        self.only_validation = False
         self.validation_dataset = pd.read_csv(VALIDATION_DATASET_PATH)
         self.dataset = self.load_dataset()
         
@@ -28,7 +29,8 @@ class benckmark_datasets:
         df = pd.read_csv(ROSETTA_DATASET_PATH)
         df['pdb_name'] = df['name'].apply(lambda x: x.split(".")[0])
         # save only whats in the validation set
-        df = df[df['pdb_name'].isin(self.validation_dataset['name'])]
+        if self.only_validation:
+            df = df[df['pdb_name'].isin(self.validation_dataset['name'])]
         return df
         
 def test_benckmark_datasets():

@@ -8,6 +8,7 @@ import pandas as pd
 # Path to FoldX executable
 foldx_path = "/cs/casp15/Shahar/foldx/foldx_20241231"
 base_path = '/cs/casp15/Shahar/DeepPEF'
+DEBUG = False
 
 def run_foldx(protein, foldx_ds_path, pdb_path):
     # Check if mutant file is empty
@@ -15,8 +16,8 @@ def run_foldx(protein, foldx_ds_path, pdb_path):
     if os.path.getsize(mutant_file) == 0:
         return
     # Create a directory for FoldX output
-    os.makedirs(f'{foldx_ds_path}/{protein}/foldx_output', exist_ok=True)
-    output_dir = f'{foldx_ds_path}/{protein}/foldx_output'
+    os.makedirs(f'{foldx_ds_path}/{protein}/foldx_output2', exist_ok=True)
+    output_dir = f'{foldx_ds_path}/{protein}/foldx_output2'
     # Path to the original PDB file
     pdb_name = f'{protein}.pdb'
     # Mutation path
@@ -30,9 +31,11 @@ def validate_foldx():
     foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldx"
     pdb_path = base_path + "/data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
     foldx_ds = os.listdir(foldx_ds_path)
-    
-    with ProcessPoolExecutor() as executor:
-        list(tqdm(executor.map(run_foldx, foldx_ds, [foldx_ds_path]*len(foldx_ds), [pdb_path]*len(foldx_ds)), total=len(foldx_ds)))
+    if DEBUG:
+        foldx_ds = foldx_ds[:5]
+    for protein in tqdm(foldx_ds):
+        print(f"Running FoldX for {protein}")
+        run_foldx(protein, foldx_ds_path, pdb_path)
     
     print("All Proteins are done")
 
@@ -45,7 +48,7 @@ def test_foldx():
     pdb_name = '1A32.pdb'
 
     # Create a directory for FoldX output
-    output_dir = "./data/foldx_output"
+    output_dir = "./data/foldx_output2"
     os.makedirs(output_dir, exist_ok=True)
     # Mutation path
     mutation_path = './benchmarks/mutant_file.txt'
@@ -77,13 +80,13 @@ def extract_energy_values(file_content):
     return energy_values
 
 def create_summery():
-    foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldxFIX"
+    foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldx"
     pdb_path = base_path + "/data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
     foldx_ds = os.listdir(foldx_ds_path)
     summery_df = pd.DataFrame()
     
     for protein in tqdm(foldx_ds):
-        foldx_enerrgy_path = f'{foldx_ds_path}/{protein}/foldx_output/Average_{protein}.fxout'
+        foldx_enerrgy_path = f'{foldx_ds_path}/{protein}/foldx_output2/Average_{protein}.fxout'
         # check if the file exists
         if not os.path.exists(foldx_enerrgy_path):
             continue

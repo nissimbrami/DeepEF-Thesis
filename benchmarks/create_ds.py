@@ -70,9 +70,10 @@ def creat_foldx_ds():
     
         
         foldx_df = pd.concat([foldx_df, protein_df])
-        foldx_df.to_csv(f"./data/Processed_K50_dG_datasets/foldx/{protein.replace('.csv','')}/foldx.csv", index=False)
+        protein_df.to_csv(f"./data/Processed_K50_dG_datasets/foldx/{protein.replace('.csv','')}/foldx.csv", index=False)
         #save mutant_df without header and as txt file
         mutant_df.to_csv(f"./data/Processed_K50_dG_datasets/foldx/{protein.replace('.csv','')}/mutant_file.txt", index=False, header=False, sep=' ')
+    foldx_df.to_csv("./data/Processed_K50_dG_datasets/foldx_all.csv", index=False)
 
 def main():
     # create_rosetta_csv()

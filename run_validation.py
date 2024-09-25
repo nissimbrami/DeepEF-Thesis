@@ -73,14 +73,15 @@ def print_stat(model_path):
 
 def main():
     model_list = []
-    for i in range(15, 16):
+    for i in range(8, 11):
     #    model_list.append(f'res/trianed_models-2cycle_drop/{i}_final_model.pt')
     #    model_list.append(f'res/trianed_models-droupout/{i}_final_model.pt')
     #    model_list.append(f'res/trianed_models-droupout-0.8/{i}_final_model.pt')
-        model_list.append(f'res/trianed_models-cycle_per_2_norm/{i}_final_model.pt')
+        # model_list.append(f'res/trianed_models-cycle_per_2_norm/{i}_final_model.pt')
+        model_list.append(f'res/trianed_models-cycle2_5/{i}_final_model.pt')
         # model_list.append(f'res/trianed_models-droupout-0.8,gs/{i}_final_model.pt')
     # model_list = ['Megascale-fineTuning/models/PEM_full_trained-PEM_fine_tuned-trianed_models-cycle_perL1L1/1.pt']
-    mini_batch_size = 128
+    mini_batch_size = 64
     # run validation for all models
     for model in model_list:
         # eval_path ='/'.join(model.split('/')[-2:])

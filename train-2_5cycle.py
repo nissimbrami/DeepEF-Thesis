@@ -416,7 +416,7 @@ def main():
                 CFG.num_layers,CFG.dropout_rate,CFG.precision)
     # Run training
     print('***Start training***')
-    epoch = 0
+    epoch = 9
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 

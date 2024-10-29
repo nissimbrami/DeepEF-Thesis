@@ -26,7 +26,7 @@ if not CFG.debug:
     wandb.init(project="Evaluate base training",name = 'cycel 2-5')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
-   CFG.results_path = './res/results-debug/'
+   CFG.results_path = './res/debug/results-debug/'
    print('**** Debug mode ****')
 
 
@@ -104,7 +104,7 @@ def get_noised_proteins(data,device):
     return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4
     
 # define validation function
-def validation(model, dataloader, device, epoch, N, optimizer, val_type='robust'):
+def validation(model, dataloader, device, epoch, N, optimizer):
     """
     Validation function for the model.
     """
@@ -179,12 +179,12 @@ def save_results_to_csv(results, filename):
     df.to_csv(filename, index=False)
     print(f"Results saved to {filename}")
 
-def evaluate_and_save(model, dataloader, device, epoch, N, optimizer, val_type='robust'):
+def evaluate_and_save(model, dataloader, device, epoch, N, optimizer,dataset):
     """
     Evaluate the model and save the results.
     """
-    results = validation(model, dataloader, device, epoch, N, optimizer, val_type)
-    csv_filename = f"{CFG.results_path}evaluation_results_epoch_{epoch}.csv"
+    results = validation(model, dataloader, device, epoch, N, optimizer)
+    csv_filename = f"{CFG.results_path}evaluation_results_dataset_{dataset}.csv"
     save_results_to_csv(results, csv_filename)
 
 
@@ -280,13 +280,17 @@ def main():
     # Load the best model
     load_checkpoint(CFG.model_path + "best_model.pt", model, optimizer, CFG.device)
     
+    # Evaluate and save resulys for training set
+    print("Evaluating training set...")
+    evaluate_and_save(model, train_loader, CFG.device, -1, CFG.N, optimizer,'training'
+                      )
     # Evaluate and save results for validation set
     print("Evaluating validation set...")
-    evaluate_and_save(model, valid_loader, CFG.device, -1, CFG.N, optimizer, val_type='robust')
+    evaluate_and_save(model, valid_loader, CFG.device, -1, CFG.N, optimizer,'validation')
     
     # Evaluate and save results for test set
     print("Evaluating test set...")
-    evaluate_and_save(model, test_loader, CFG.device, -1, CFG.N, optimizer, val_type='robust')
+    evaluate_and_save(model, test_loader, CFG.device, -1, CFG.N, optimizer,'test')
     
     return 1
 

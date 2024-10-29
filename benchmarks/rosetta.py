@@ -1,7 +1,7 @@
 import pyrosetta
 pyrosetta.init()
 
-
+import sys
 import pyrosetta
 from pyrosetta import pose_from_pdb
 from pyrosetta.toolbox.mutants import mutate_residue
@@ -63,10 +63,17 @@ def test_calculate_delta_g():
         results.append((pdb_file, initial_score, final_score, delta_g))
         print(f"Protein: {pdb_file}, Initial Score: {initial_score}, Final Score: {final_score}, ΔG: {delta_g}")
 
-def validate_deltaG():
+def validate_deltaG(quarter):
     dataset = benckmark_datasets("Rosetta")
     df_results = pd.DataFrame(columns=["name","pdb_path", "mut_type", "rosetta_wildtype", "rosetta_mutant", "rosseta_deltaG", "deltaG"])
-    for i in tqdm(range(len(dataset.dataset))):
+    
+    # Calculate start and end indices for this quarter
+    total_len = len(dataset.dataset)
+    quarter_size = total_len // 4
+    start_idx = (quarter - 1) * quarter_size
+    end_idx = start_idx + quarter_size if quarter < 4 else total_len
+    
+    for i in tqdm(range(start_idx, end_idx)):
         item = dataset.get_item(i)
         pdb_file = item['pdb_path']
         # Check only for mutations
@@ -81,8 +88,11 @@ def validate_deltaG():
     # Add correlation metrics
     df_results["pearson"] = df_results["rosetta_deltaG"].corr(df_results["deltaG"], method='pearson')
     df_results["spearman"] = df_results["rosetta_deltaG"].corr(df_results["deltaG"], method='spearman')
-    df_results.to_csv("./data/Processed_K50_dG_datasets/rosetta_valid.csv", index=False)
+    df_results.to_csv(f"./data/Processed_K50_dG_datasets/rosetta_valid_{quarter}.csv", index=False)
 
 if __name__ == "__main__":
-    # test_calculate_delta_g()
-    validate_deltaG()
+    # test_calculate_delta_g()asdasddas
+    # get from parameters the data quarter
+    quarter = int(sys.argv[1])
+    print(quarter) 
+    # validate_deltaG(quarter)

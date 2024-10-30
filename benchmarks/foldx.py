@@ -4,6 +4,7 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 import re
 import pandas as pd
+import sys
 
 # Path to FoldX executable
 foldx_path = "/cs/casp15/Shahar/foldx/foldx_20241231"
@@ -27,17 +28,27 @@ def run_foldx(protein, foldx_ds_path, pdb_path):
     subprocess.run(foldx_command, shell=True)
     print(f"Finished {protein}")
 
-def validate_foldx():
+def validate_foldx(quarter):
     foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldx"
     pdb_path = base_path + "/data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
     foldx_ds = os.listdir(foldx_ds_path)
+    
+    # Calculate start and end indices for this quarter
+    total_len = len(foldx_ds)
+    quarter_size = total_len // 4
+    start_idx = (quarter - 1) * quarter_size
+    end_idx = start_idx + quarter_size if quarter < 4 else total_len
+    
     if DEBUG:
         foldx_ds = foldx_ds[:5]
+    else:
+        foldx_ds = foldx_ds[start_idx:end_idx]
+        
     for protein in tqdm(foldx_ds):
         print(f"Running FoldX for {protein}")
         run_foldx(protein, foldx_ds_path, pdb_path)
     
-    print("All Proteins are done")
+    print("Quarter {} is done".format(quarter))
 
 def test_foldx():
     # Path to FoldX executable
@@ -79,10 +90,18 @@ def extract_energy_values(file_content):
     
     return energy_values
 
-def create_summery():
+def create_summery(quarter):
     foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldx"
     pdb_path = base_path + "/data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
     foldx_ds = os.listdir(foldx_ds_path)
+    
+    # Calculate start and end indices for this quarter
+    total_len = len(foldx_ds)
+    quarter_size = total_len // 4
+    start_idx = (quarter - 1) * quarter_size
+    end_idx = start_idx + quarter_size if quarter < 4 else total_len
+    
+    foldx_ds = foldx_ds[start_idx:end_idx]
     summery_df = pd.DataFrame()
     
     for protein in tqdm(foldx_ds):
@@ -97,9 +116,11 @@ def create_summery():
         df['foldx_dg'] = extract_energy_values(file_content)
         df.to_csv(f'{foldx_ds_path}/{protein}/foldx.csv', index=False)
         summery_df = pd.concat([summery_df, df])
-    summery_df.to_csv(f'{foldx_ds_path}/foldx_summery.csv', index=False)
+    summery_df.to_csv(f'{foldx_ds_path}/foldx_summery_{quarter}.csv', index=False)
 
 if __name__ == "__main__":
     # test_foldx()
-    validate_foldx()
-    create_summery()
+    quarter = int(sys.argv[1])
+    print(quarter)
+    validate_foldx(quarter)
+    create_summery(quarter)

@@ -125,6 +125,8 @@ def validation(model, dataloader, device, epoch, N, optimizer):
                 gc.collect()
                 
                 Xjf, Xju, Xd, Xcd, Xdu, Xcy1, Xcy2, Xcy3, Xcy4 = get_noised_proteins(data, device)
+                if Xjf is None:
+                    continue
                 X = torch.cat((Xjf, Xju, Xd, Xcd, Xdu, Xcy1, Xcy2, Xcy3, Xcy4), dim=0)
                 
                 with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):

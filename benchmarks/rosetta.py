@@ -2,7 +2,6 @@ import pyrosetta
 pyrosetta.init()
 
 import sys
-import pyrosetta
 from pyrosetta import pose_from_pdb
 from pyrosetta.toolbox.mutants import mutate_residue
 from dataset import benckmark_datasets
@@ -65,7 +64,7 @@ def test_calculate_delta_g():
 
 def validate_deltaG(quarter):
     dataset = benckmark_datasets("Rosetta")
-    df_results = pd.DataFrame(columns=["name","pdb_path", "mut_type", "rosetta_wildtype", "rosetta_mutant", "rosseta_deltaG", "deltaG"])
+    df_results = pd.DataFrame(columns=["name","pdb_path", "mut_type", "rosetta_wildtype", "rosetta_mutant", "rosetta_deltaG", "deltaG"])
     
     # Calculate start and end indices for this quarter
     total_len = len(dataset.dataset)
@@ -94,5 +93,5 @@ if __name__ == "__main__":
     # test_calculate_delta_g()asdasddas
     # get from parameters the data quarter
     quarter = int(sys.argv[1])
-    print(quarter) 
-    # validate_deltaG(quarter)
+    print(f"quarter number{quarter}") 
+    validate_deltaG(quarter)

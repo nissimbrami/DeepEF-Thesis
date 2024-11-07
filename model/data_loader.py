@@ -13,17 +13,21 @@ import pandas as pd
 
 class SidChainDS(Dataset):
     """Protein dataset."""
-    def __init__(self, data_path ,set_type,debug, LLM_EMB=True):
+    def __init__(self, data_path ,set_type,debug, LLM_EMB=True, outliners_path = None):
         """
             Initialize the dataset
         Args:
             data_path (str): data path
-            set_type (str): 'train','test' or 'valid'
+            set_type (str): 'train','test' or 'valid
+            debug (bool): debug mode
+            LLM_EMB (bool): use the large language model embeddings
+            outliners_path (str): path to the outliners file'
         """
         self.data_path = data_path
         self.LLM_EMB = LLM_EMB
         self.pad_data = False
         self.set_type = set_type
+        self.outliners_path = outliners_path
         self.data_dir = []
         if(set_type == 'valid'):
             self.folders  =[data_path+val_path for val_path in ['valid-10/','valid-20/','valid-30/','valid-40/','valid-50/']]
@@ -33,8 +37,17 @@ class SidChainDS(Dataset):
             self.data_dir = [os.path.join(data_path+set_type, f) for f in os.listdir(data_path+set_type) if os.path.isdir(os.path.join(data_path+set_type, f))]   
         if(debug):
             self.data_dir = self.data_dir[:CFG.debug_size]
-        # remove the mega-scale proteins
+        # remove the outliners
+        if self.outliners_path:
+            self.remove_outliners()
+         # remove the mega-scale proteins 
         self.remove_megascale_proteins()
+    
+    def remove_outliners(self):
+        """remove the outliners from the dataset"""
+        outliners = pd.read_csv(self.outliners_path)
+        outliners_ids = outliners['protein_id'].to_list()
+        self.data_dir = [f for f in self.data_dir if not any(f_out in f for f_out in outliners_ids)]
     
     def remove_megascale_proteins(self):
         """remove the proteins from the mega-scale dataset"""
@@ -400,7 +413,7 @@ def fetch_dataloader(data_dir, params):
     """
     # Sidechainnet dataset
     if params.dataset == 'scn':
-        train_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='train', debug=params.debug, LLM_EMB = params.LLM_EMB), batch_size=params.batch_size, shuffle=True,
+        train_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='train', debug=params.debug, LLM_EMB = params.LLM_EMB,outliners_path = params.outliners_path), batch_size=params.batch_size, shuffle=True,
                                             num_workers=params.num_workers,
                                             pin_memory=params.cuda)
         valid_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='valid', debug=params.debug, LLM_EMB = params.LLM_EMB), batch_size=params.batch_size, shuffle=True,
@@ -449,7 +462,7 @@ def fetch_inference_loader(data_dir, params):
 
 
 class params:
-    def __init__(self,batch_size,num_workers,cuda,constraint, dataset,debug=False,LLM_EMB=True):
+    def __init__(self,batch_size,num_workers,cuda,constraint, dataset,debug=False,LLM_EMB=True,outliners_path=None):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cuda = cuda
@@ -457,4 +470,5 @@ class params:
         self.constraint = constraint
         self.dataset = dataset
         self.LLM_EMB =LLM_EMB
+        self.outliners_path = outliners_path
         

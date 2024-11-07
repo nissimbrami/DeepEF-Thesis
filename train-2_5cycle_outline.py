@@ -23,7 +23,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 13 cycel 2-5')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 no outliners - 2 std')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -399,7 +399,7 @@ def main():
     print('***Start main function***')
     print('***load the data with dataloader***')
     d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, 
-                           debug=CFG.debug,dataset='scn',LLM_EMB=True)
+                           debug=CFG.debug,dataset='scn',LLM_EMB=True,outliners_path=outliners_path)
     train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
     # Build the model
     print('***Build the model***')
@@ -415,7 +415,7 @@ def main():
                 CFG.num_layers,CFG.dropout_rate,CFG.precision)
     # Run training
     print('***Start training***')
-    epoch = 13
+    epoch = 0
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 
@@ -429,7 +429,8 @@ if __name__ == '__main__':
     if not CFG.debug:
         CFG.model_path = './res/trianed_models-cycle2_5/'
         CFG.results_path = './res/results-emb/'
-    # CFG.data_path = './data/casp12_data_30/'
+    outliners_path = './experiments/eval_res/ejf_2_outliners.csv'
+    
     CFG.dropout_rate = 0.3
     CFG.gaussian_coef = -0.08
     CFG.reg_alpha = 0.1

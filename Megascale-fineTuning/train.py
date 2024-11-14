@@ -20,7 +20,7 @@ from train_utils import get_graph, get_unfolded_graph, load_checkpoint
 import wandb
 from tqdm import tqdm
 from sklearn.model_selection import KFold
-
+import gc
 import pandas as pd
 
 # Constants
@@ -34,7 +34,7 @@ RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG = False
 EPOCHS = 50 if not DEBUG else 1
-FREEZE_LAYERS = True
+FREEZE_LAYERS = False
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 32
@@ -123,10 +123,10 @@ class AllProteinValidationDataset(Dataset):
         mutations = pd.read_csv(mutations_path)
         mutations = mutations[~mutations['mut_type'].str.contains('ins|del')].reset_index(drop=True)
         # Load and preprocess the data for each protein
-        coords_tensor = torch.load(os.path.join(protein_dir, COORDS))
-        delta_g_tensor = torch.load(os.path.join(protein_dir, DELTA_G))
-        mask_tensor = torch.load(os.path.join(protein_dir, MASKS))
-        one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT))
+        coords_tensor = torch.load(os.path.join(protein_dir, COORDS),weights_only=True)
+        delta_g_tensor = torch.load(os.path.join(protein_dir, DELTA_G),weights_only=True)
+        mask_tensor = torch.load(os.path.join(protein_dir, MASKS),weights_only=True)
+        one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT),weights_only=True)
         embedding_tensor = self.load_embedding_tensor(os.path.join(protein_dir, PROTT5_EMBEDDINGS))
         
         # remove the mutations with more than one mutation
@@ -155,7 +155,7 @@ class AllProteinValidationDataset(Dataset):
                                      key=lambda x: int(os.path.splitext(x)[0].split('_')[-1]))
         for filename in all_embedding_files:
             if filename.endswith('.pt'):
-                embedding_tensor = torch.load(filename)
+                embedding_tensor = torch.load(filename,weights_only=True).to('cpu') # load the tensor to cpu memory
                 embeddings.append(embedding_tensor)
         return torch.vstack(embeddings)
 
@@ -183,6 +183,7 @@ class Trainer():
         epochs: int, number of epochs
         kf: int, kfold number
         """
+        run = None
         if not DEBUG:
             run = wandb.init(project='KF-1MUT-MegaScaleFineTuning', config=config, name=MODEL_NAME + f'Kfold{kf}')
         
@@ -265,6 +266,9 @@ class Trainer():
                     batch_loss += loss.item()
                     val_dg = torch.cat((val_dg, delta_g), dim=0)
                     val_dg_pred = torch.cat((val_dg_pred, output), dim=0)
+                    # clear memory
+                    torch.cuda.empty_cache()
+                    gc.collect()
                 batch_loss /= batch_idx
             val_loss += batch_loss
         val_loss /= len(self.val_ds)

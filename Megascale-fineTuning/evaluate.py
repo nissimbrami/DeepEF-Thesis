@@ -270,7 +270,7 @@ def evaluat_model():
         model_dict = torch.load(TRAINED_MODEL_PATH,map_location=DEVICE,weights_only=False)
         model.load_state_dict(model_dict['model_state_dict'])
     except :
-        model.load_state_dict(torch.load(TRAINED_MODEL_PATH),weights_only=True)
+        model.load_state_dict(torch.load(TRAINED_MODEL_PATH,weights_only=True))
     model.eval()
 
     # Load the training dataset

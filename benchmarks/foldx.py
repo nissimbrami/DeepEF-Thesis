@@ -14,6 +14,9 @@ DEBUG = False
 def run_foldx(protein, foldx_ds_path, pdb_path):
     # Check if mutant file is empty
     mutant_file = f'{foldx_ds_path}/{protein}/mutant_file.txt'
+    # Check if mutant file exists and not empty
+    if not os.path.exists(mutant_file):
+        return
     if os.path.getsize(mutant_file) == 0:
         return
     # Create a directory for FoldX output
@@ -28,16 +31,16 @@ def run_foldx(protein, foldx_ds_path, pdb_path):
     subprocess.run(foldx_command, shell=True)
     print(f"Finished {protein}")
 
-def validate_foldx(quarter):
+def validate_foldx(fraction):
     foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldx"
     pdb_path = base_path + "/data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
     foldx_ds = os.listdir(foldx_ds_path)
     
     # Calculate start and end indices for this quarter
     total_len = len(foldx_ds)
-    quarter_size = total_len // 4
-    start_idx = (quarter - 1) * quarter_size
-    end_idx = start_idx + quarter_size if quarter < 4 else total_len
+    fraction_size = total_len // 10
+    start_idx = (fraction - 1) * fraction_size
+    end_idx = start_idx + fraction_size if fraction < 10 else total_len
     
     if DEBUG:
         foldx_ds = foldx_ds[:5]
@@ -48,7 +51,7 @@ def validate_foldx(quarter):
         print(f"Running FoldX for {protein}")
         run_foldx(protein, foldx_ds_path, pdb_path)
     
-    print("Quarter {} is done".format(quarter))
+    print("Quarter {} is done".format(fraction))
 
 def test_foldx():
     # Path to FoldX executable
@@ -90,16 +93,16 @@ def extract_energy_values(file_content):
     
     return energy_values
 
-def create_summery(quarter):
+def create_summery(fraction):
     foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldx"
     pdb_path = base_path + "/data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
     foldx_ds = os.listdir(foldx_ds_path)
     
     # Calculate start and end indices for this quarter
     total_len = len(foldx_ds)
-    quarter_size = total_len // 4
-    start_idx = (quarter - 1) * quarter_size
-    end_idx = start_idx + quarter_size if quarter < 4 else total_len
+    quarter_size = total_len // 10
+    start_idx = (fraction - 1) * quarter_size
+    end_idx = start_idx + quarter_size if fraction < 10 else total_len
     
     foldx_ds = foldx_ds[start_idx:end_idx]
     summery_df = pd.DataFrame()
@@ -116,11 +119,11 @@ def create_summery(quarter):
         df['foldx_dg'] = extract_energy_values(file_content)
         df.to_csv(f'{foldx_ds_path}/{protein}/foldx.csv', index=False)
         summery_df = pd.concat([summery_df, df])
-    summery_df.to_csv(f'{foldx_ds_path}/foldx_summery_{quarter}.csv', index=False)
+    summery_df.to_csv(f'{foldx_ds_path}/foldx_summery_{fraction}.csv', index=False)
 
 if __name__ == "__main__":
     # test_foldx()
-    quarter = int(sys.argv[1])
-    print(quarter)
-    validate_foldx(quarter)
-    create_summery(quarter)
+    fraction = int(sys.argv[1])
+    print(fraction)
+    validate_foldx(fraction)
+    create_summery(fraction)

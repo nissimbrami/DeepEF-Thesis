@@ -33,7 +33,7 @@ VAL_RATIO = 0.2
 RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG = False
-EPOCHS = 10 if not DEBUG else 1
+EPOCHS = 50 if not DEBUG else 1
 FREEZE_LAYERS = True
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
@@ -42,13 +42,13 @@ DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
 # TRAINED_MODEL_PATH = "./res/trianed_models-cycle_per_norm_SM/13_final_model.pt"
 # TRAINED_MODEL_PATH = "./res/trianed_models-cycle_2_per_norm/1_final_model.pt"
 # TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_per_norm_SMscheduler/14.pt"
-TRAINED_MODEL_PATH = "./res/trianed_models-2cycle_drop/12_final_model.pt"
+TRAINED_MODEL_PATH = "./res/trianed_models-2cycle_drop/25_final_model.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
 MODEL_NAME += 'kf'
 PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
-LR = 1e-4
+LR = 1e-5
 DROP_OUT = 0.2
 REG_LAMBDA = 0.01
 
@@ -297,6 +297,40 @@ class Trainer():
         return unfolded_energy - folded_energy,unfolded_energy,folded_energy
 
 
+def train_fold(fold):
+    """"Train the model for a single fold"""
+    k_folds = 5
+    kfold = KFold(n_splits=k_folds, shuffle=True, random_state=RANDOM_SEED)
+    
+    prot_ds = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+                                            mutations_root_dir=mutations_root_dir, train=True)
+    
+    train_ids, test_ids = list(kfold.split(prot_ds))[fold]
+    # Sample elements randomly from a given list of ids, no replacement.
+    train_subsampler = Subset(prot_ds, train_ids)
+    test_subsampler = Subset(prot_ds, test_ids)
+
+    # Create the dataloaders
+    train_ds = DataLoader(train_subsampler, batch_size=1, shuffle=False)
+    val_ds = DataLoader(test_subsampler, batch_size=1, shuffle=False)
+      
+    print(f'FOLD {fold}')
+    print('--------------------------------')
+    # Create the model
+    model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate).to(DEVICE)
+    if PRETRAINED: 
+        try:
+            model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
+        except:
+            model.load_state_dict(torch.load(TRAINED_MODEL_PATH))
+    
+    # Train the model
+    trainer = Trainer(model, train_ds, val_ds)
+    model, pc_corr = trainer.train(epochs = EPOCHS, kf=fold)
+    wandb.finish()
+    return model, pc_corr
+
+
 def run_training():
     k_folds = 5
     kfold = KFold(n_splits=k_folds, shuffle=True, random_state=RANDOM_SEED)
@@ -349,7 +383,8 @@ if __name__ == '__main__':
     tensor_root_dir = r'./data/Processed_K50_dG_datasets/training_data'
     mutations_root_dir = r'./data/Processed_K50_dG_datasets/mutation_datasets'
     CFG.dropout_rate = DROP_OUT
-    run_training()
+    # run_training()
+    train_fold(4)
     # Get validation proteins
     # protein_val = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
     #                                               mutations_root_dir=mutations_root_dir, train=False)

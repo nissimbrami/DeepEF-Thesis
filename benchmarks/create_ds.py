@@ -16,6 +16,32 @@ def split_string(s):
     split_segments = [split_segment(segment) for segment in segments]
     return split_segments
 
+def create_blusom62_csv():
+    """Create a csv file with blusom62 data."""
+    pdb_dir = "./data/Processed_K50_dG_datasets/AlphaFold_model_PDBs/"
+    mutation_dir ="./data/Processed_K50_dG_datasets/mutation_datasets/"
+    blusom62_df = pd.DataFrame()
+    # Get all data
+    protein_list = os.listdir(mutation_dir)
+    for protein in tqdm(protein_list):
+        protein_df = pd.DataFrame(columns=["name","pdb_path", "mut_type", "deltaG"])
+        protein_mutation = pd.read_csv(mutation_dir + protein )
+        protein_df["name"] = protein_mutation['name']
+        protein_df["pdb_path"] = pdb_dir + protein.replace(".csv", "")+".pdb"
+        protein_df["mut_type"] = protein_mutation["mut_type"]
+        protein_df["deltaG"] = protein_mutation["deltaG"]
+        protein_df["Stabilizing_mut"] = protein_mutation["Stabilizing_mut"]
+        # If there is no mutation, skip the protein
+        if protein_mutation[protein_mutation['mut_type'] == 'wt'].empty:
+            continue
+        wt_deltaG = protein_mutation[protein_mutation['mut_type'] == 'wt']['deltaG'].iloc[0]
+        protein_df['ddg'] = protein_df['deltaG'] - wt_deltaG
+        # split the mut_type to tuples
+        protein_df['mut_tuple'] = protein_df['mut_type'].apply(split_string)
+        
+        blusom62_df = pd.concat([blusom62_df, protein_df])
+    blusom62_df.to_csv("./data/Processed_K50_dG_datasets/blusom62.csv", index=False)
+
 def create_rosetta_csv():
     """Create a csv file with rosetta data."""
     pdb_dir = "./data/Processed_K50_dG_datasets/AlphaFold_model_PDBs/"
@@ -30,7 +56,6 @@ def create_rosetta_csv():
         protein_df["pdb_path"] = pdb_dir + protein.replace(".csv", "")+".pdb"
         protein_df["mut_type"] = protein_mutation["mut_type"]
         protein_df["deltaG"] = protein_mutation["deltaG"]
-        
         # split the mut_type to tuples
         protein_df['mut_tuple'] = protein_df['mut_type'].apply(split_string)
         
@@ -77,7 +102,8 @@ def creat_foldx_ds():
 
 def main():
     # create_rosetta_csv()
-    creat_foldx_ds()
+    # creat_foldx_ds()
+    create_blusom62_csv()
     
 
 if __name__ == "__main__":

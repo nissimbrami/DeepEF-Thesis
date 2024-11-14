@@ -32,7 +32,7 @@ PROTT5_EMBEDDINGS = 'prott5_embeddings'
 VAL_RATIO = 0.2
 RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
-DEBUG = False
+DEBUG = True
 EPOCHS = 50 if not DEBUG else 1
 FREEZE_LAYERS = False
 CRITERION = "L1"
@@ -96,14 +96,16 @@ def normalize_batch(batch, LLM_EMB = True):
 
 class AllProteinValidationDataset(Dataset):
 
-    def __init__(self, tensor_root_dir, mutations_root_dir, train  = True, one_mut = True):
+    def __init__(self, tensor_root_dir, mutations_root_dir, train  = True, one_mut = True ):
         self.tensor_root_dir = tensor_root_dir
+        self.train = train
         self.mutations_root_dir = mutations_root_dir
         self.protein_dirs = [protein for i, protein in enumerate(os.listdir(self.tensor_root_dir))]
         self.one_mut = one_mut # remove the mutations with more than one mutation
         # remove TM proteins 
         tm_proteins = pd.read_csv(TM_PATH)
         tm_proteins = tm_proteins['name'].apply(lambda x: x.split(".")[0]).unique().tolist()
+        self.test_protein = [protein for protein in self.protein_dirs if protein in tm_proteins]
         self.protein_dirs = [protein for protein in self.protein_dirs if protein not in tm_proteins]
         if DEBUG:
             self.protein_dirs = self.protein_dirs[:5]
@@ -115,7 +117,10 @@ class AllProteinValidationDataset(Dataset):
         #     self.protein_dirs = self.val_proteins
 
     def __len__(self):
-        return len(self.protein_dirs)
+        if self.train:
+            return len(self.protein_dirs)
+        else:
+            return len(self.test_protein)
 
     def __getitem__(self, idx):
         protein_dir = os.path.join(self.tensor_root_dir, self.protein_dirs[idx])
@@ -231,13 +236,14 @@ class Trainer():
                 torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, MODEL_NAME, f'kf_{kf}_epoch_{epoch}.pt'))
             
             pc_corr = self.validate(epoch,run)
+            self.model.train()
             # update the learning rate
             self.scheduler.step(pc_corr)
             current_lr = self.optimizer.param_groups[0]['lr']
             wandb_log({'epoch': epoch, 'lr': current_lr}, run)
         return self.model, pc_corr
 
-    def validate(self, epoch, run = None):
+    def validate(self, epoch, run = None, test = False):
         """
         Validate the model
         args:
@@ -274,8 +280,10 @@ class Trainer():
         val_loss /= len(self.val_ds)
         print(f'Validation Loss: {val_loss}')
         pc_corr = torch.corrcoef(torch.cat((val_dg[None,:],val_dg_pred[None,:])))[0, 1]
-        wandb_log({'val_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr},run)
-        self.model.train()
+        if not test:
+            wandb_log({'val_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr},run)
+        else:
+            wandb_log({'test_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr},run)
         return pc_corr
         
     def get_deltaG(self, batch, i):
@@ -334,6 +342,23 @@ def train_fold(fold):
     wandb.finish()
     return model, pc_corr
 
+def test_fold(fold, model):
+    """Test the model for a single fold"""
+    prot_ds = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+                                            mutations_root_dir=mutations_root_dir, train=False)
+    # Create the dataloaders
+    test_dl = DataLoader(prot_ds, batch_size=1, shuffle=False)
+      
+    print(f'FOLD {fold}')
+    print('--------------------------------')
+    
+    # Test the model
+    trainer = Trainer(model, None, test_dl)
+    pc_corr = trainer.validate(0, test=True)
+    print(f'Pearson Correlation: {pc_corr}')
+    wandb.finish()
+    
+    
 
 def run_training():
     k_folds = 5
@@ -388,7 +413,9 @@ if __name__ == '__main__':
     mutations_root_dir = r'./data/Processed_K50_dG_datasets/mutation_datasets'
     CFG.dropout_rate = DROP_OUT
     # run_training()
-    train_fold(4)
+    model, pc_corr = train_fold(4)
+    test_fold(4, model)
+    
     # Get validation proteins
     # protein_val = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
     #                                               mutations_root_dir=mutations_root_dir, train=False)

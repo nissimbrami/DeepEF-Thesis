@@ -31,7 +31,12 @@ def run_foldx(protein, foldx_ds_path, pdb_path):
     subprocess.run(foldx_command, shell=True)
     print(f"Finished {protein}")
 
-def validate_foldx(fraction):
+def validate_foldx(fraction, start_offset=0):
+    """Validate FoldX stability analysis for a fraction of the dataset
+    Args:
+        fraction (int): The fraction number
+        start_idx (int): The starting index for the fraction
+    """
     foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldx"
     pdb_path = base_path + "/data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
     foldx_ds = os.listdir(foldx_ds_path)
@@ -45,7 +50,7 @@ def validate_foldx(fraction):
     if DEBUG:
         foldx_ds = foldx_ds[:5]
     else:
-        foldx_ds = foldx_ds[start_idx:end_idx]
+        foldx_ds = foldx_ds[start_idx + start_offset:end_idx]
         
     for protein in tqdm(foldx_ds):
         print(f"Running FoldX for {protein}")
@@ -124,6 +129,7 @@ def create_summery(fraction):
 if __name__ == "__main__":
     # test_foldx()
     fraction = int(sys.argv[1])
+    start_offset = int(sys.argv[2])
     print(fraction)
-    validate_foldx(fraction)
+    validate_foldx(fraction,start_offset)
     create_summery(fraction)

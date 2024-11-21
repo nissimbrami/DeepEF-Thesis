@@ -23,7 +23,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 13 no outliners - 2 std')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 13 no outliners - 3 std')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -427,9 +427,9 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-cycle2_5_outline2/'
+        CFG.model_path = './res/trianed_models-cycle2_5_outline3/'
         CFG.results_path = './res/results-emb/'
-    outliners_path = './experiments/eval_res/ejf_2_outliners.csv'
+    outliners_path = './experiments/eval_res/ejf_3_outliners.csv'
     
     CFG.dropout_rate = 0.3
     CFG.gaussian_coef = -0.08

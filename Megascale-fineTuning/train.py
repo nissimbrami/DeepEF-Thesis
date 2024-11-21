@@ -32,23 +32,22 @@ PROTT5_EMBEDDINGS = 'prott5_embeddings'
 VAL_RATIO = 0.2
 RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
-DEBUG = True
-EPOCHS = 50 if not DEBUG else 1
-FREEZE_LAYERS = False
+DEBUG  = False
+EPOCHS = 30 if not DEBUG else 1
+FREEZE_LAYERS = True
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
-MINI_BATCH_SIZE = 32
+MINI_BATCH_SIZE = 256
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
 # TRAINED_MODEL_PATH = "./res/trianed_models-cycle_per_norm_SM/13_final_model.pt"
-# TRAINED_MODEL_PATH = "./res/trianed_models-cycle_2_per_norm/1_final_model.pt"
-# TRAINED_MODEL_PATH = "./Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-cycle_per_norm_SMscheduler/14.pt"
-TRAINED_MODEL_PATH = "./res/trianed_models-2cycle_drop/25_final_model.pt"
+TRAINED_MODEL_PATH = "./res/trianed_models-cycle2_5/25_final_model.pt"
+# TRAINED_MODEL_PATH = "./res/trianed_models-2cycle_drop/25_final_model.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
 MODEL_NAME += 'kf'
 PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
-LR = 1e-5
+LR = 1e-4
 DROP_OUT = 0.2
 REG_LAMBDA = 0.01
 
@@ -123,6 +122,45 @@ class AllProteinValidationDataset(Dataset):
             return len(self.test_protein)
 
     def __getitem__(self, idx):
+        if self.train:
+            return self.load_protein_data(idx)
+        else:
+            return self.load_test_protein_data(idx)
+        
+    def load_test_protein_data(self, idx):
+        protein_dir = os.path.join(self.tensor_root_dir, self.test_protein[idx])
+        mutations_path = os.path.join(self.mutations_root_dir, f'{self.test_protein[idx]}.csv')
+        mutations = pd.read_csv(mutations_path)
+        mutations = mutations[~mutations['mut_type'].str.contains('ins|del')].reset_index(drop=True)
+        # Load and preprocess the data for each protein
+        coords_tensor = torch.load(os.path.join(protein_dir, COORDS),weights_only=True)
+        delta_g_tensor = torch.load(os.path.join(protein_dir, DELTA_G),weights_only=True)
+        mask_tensor = torch.load(os.path.join(protein_dir, MASKS),weights_only=True)
+        one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT),weights_only=True)
+        embedding_tensor = self.load_embedding_tensor(os.path.join(protein_dir, PROTT5_EMBEDDINGS))
+        
+        # remove the mutations with more than one mutation
+        if self.one_mut:
+            one_mut_index = mutations[~mutations['mut_type'].str.contains(':')]
+            mutations = mutations.loc[one_mut_index.index]
+            delta_g_tensor = delta_g_tensor[one_mut_index.index]
+            one_hot_tensor = one_hot_tensor[one_mut_index.index]
+            embedding_tensor = embedding_tensor[one_mut_index.index]
+        
+        mutations_data = {
+            'name': self.test_protein[idx],
+            'mutations': mutations['mut_type'].to_list(),
+            'prott5': embedding_tensor,
+            'coords': coords_tensor,
+            'one_hot': one_hot_tensor,
+            'delta_g': delta_g_tensor,
+            'masks': mask_tensor
+        }
+        
+        return mutations_data
+    
+    def load_protein_data(self, idx):
+        
         protein_dir = os.path.join(self.tensor_root_dir, self.protein_dirs[idx])
         mutations_path = os.path.join(self.mutations_root_dir, f'{self.protein_dirs[idx]}.csv')
         mutations = pd.read_csv(mutations_path)
@@ -235,7 +273,7 @@ class Trainer():
             if not DEBUG:
                 torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, MODEL_NAME, f'kf_{kf}_epoch_{epoch}.pt'))
             
-            pc_corr = self.validate(epoch,run)
+            pc_corr, val_loss = self.validate(epoch,run)
             self.model.train()
             # update the learning rate
             self.scheduler.step(pc_corr)
@@ -284,7 +322,7 @@ class Trainer():
             wandb_log({'val_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr},run)
         else:
             wandb_log({'test_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr},run)
-        return pc_corr
+        return pc_corr, val_loss
         
     def get_deltaG(self, batch, i):
         # move all to the same device
@@ -309,7 +347,7 @@ class Trainer():
         return unfolded_energy - folded_energy,unfolded_energy,folded_energy
 
 
-def train_fold(fold):
+def train_fold(fold, model = None):
     """"Train the model for a single fold"""
     k_folds = 5
     kfold = KFold(n_splits=k_folds, shuffle=True, random_state=RANDOM_SEED)
@@ -328,13 +366,14 @@ def train_fold(fold):
       
     print(f'FOLD {fold}')
     print('--------------------------------')
-    # Create the model
-    model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate).to(DEVICE)
-    if PRETRAINED: 
-        try:
-            model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
-        except:
-            model.load_state_dict(torch.load(TRAINED_MODEL_PATH))
+    if model is None:
+        # Create the model
+        model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate).to(DEVICE)
+        if PRETRAINED: 
+            try:
+                model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
+            except:
+                model.load_state_dict(torch.load(TRAINED_MODEL_PATH))
     
     # Train the model
     trainer = Trainer(model, train_ds, val_ds)
@@ -354,8 +393,9 @@ def test_fold(fold, model):
     
     # Test the model
     trainer = Trainer(model, None, test_dl)
-    pc_corr = trainer.validate(0, test=True)
-    print(f'Pearson Correlation: {pc_corr}')
+    pc_corr, val_loss = trainer.validate(0, test=True)
+    wandb_log({'test_pc_corr': pc_corr, 'test_loss': val_loss})
+    print(f'Pearson Correlation: {pc_corr} , Test Loss: {val_loss}')
     wandb.finish()
     
     
@@ -414,6 +454,12 @@ if __name__ == '__main__':
     CFG.dropout_rate = DROP_OUT
     # run_training()
     model, pc_corr = train_fold(4)
+    test_fold(4, model)
+    # After training the last layer, train the whole model with lower learning rate
+    FREEZE_LAYERS = False
+    LR = 1e-5
+    print('Training the whole model with lower learning rate')
+    model, pc_corr = train_fold(4, model)
     test_fold(4, model)
     
     # Get validation proteins

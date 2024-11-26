@@ -378,7 +378,7 @@ def train_fold(fold, model = None):
     # Train the model
     trainer = Trainer(model, train_ds, val_ds)
     model, pc_corr = trainer.train(epochs = EPOCHS, kf=fold)
-    wandb.finish()
+    
     return model, pc_corr
 
 def test_fold(fold, model):
@@ -455,6 +455,7 @@ if __name__ == '__main__':
     # run_training()
     model, pc_corr = train_fold(4)
     test_fold(4, model)
+    wandb.finish()
     # After training the last layer, train the whole model with lower learning rate
     FREEZE_LAYERS = False
     LR = 1e-5

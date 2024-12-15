@@ -73,10 +73,10 @@ def print_stat(model_path):
 
 def main():
     model_list = []
-    for i in range(10, 14):
-       model_list.append(f'res/trianed_models-cycle2_5_outline2/{i}_final_model.pt')
-       model_list.append(f'res/trianed_models-cycle2_5_outline3/{i}_final_model.pt')
-    #    model_list.append(f'res/trianed_models-cycle2_5/{i}_final_model.pt')
+    for i in range(24 , 26):
+    #    model_list.append(f'res/trianed_models-cycle2_5_outline2/{i}_final_model.pt')
+    #    model_list.append(f'res/trianed_models-cycle2_5_outline3/{i}_final_model.pt')
+       model_list.append(f'res/trianed_models-cycle2_5/{i}_final_model.pt')
     #    model_list.append(f'res/trianed_models-droupout-0.8/{i}_final_model.pt')
         # model_list.append(f'res/trianed_models-cycle_per_2_norm/{i}_final_model.pt')
         # model_list.append(f'res/trianed_models-cycle2_5/{i}_final_model.pt')

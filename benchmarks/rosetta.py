@@ -23,6 +23,64 @@ def split_string(s):
     split_segments = [split_segment(segment) for segment in segments]
     return split_segments
 
+def ddg_ensemble(pdb_file, mutations):
+    # Load the PDB file
+    pose = pose_from_pdb(pdb_file)
+    
+    # Set up the score function
+    scorefxn = pyrosetta.get_fa_scorefxn()
+    scorefxn.set_weight(rosetta.core.scoring.cart_bonded, 1.0)
+    
+    # Relax the native structure and record its score
+    native_scores = []
+    for _ in range(5):  # Number of iterations for ensemble averaging
+        pose_copy = pose.clone()
+        relax = rosetta.protocols.relax.FastRelax()
+        relax.set_scorefxn(scorefxn)
+        relax.cartesian(True)
+        relax.min_type("lbfgs_armijo_nonmonotone")
+        relax.apply(pose_copy)
+        native_scores.append(scorefxn(pose_copy))
+    # Calculate the average score of the native structure
+    s0_avg = sum(native_scores) / len(native_scores)    
+    
+    
+    for _ in range(5):  # Number of iterations for ensemble averaging
+        pose_copy = pose.clone()
+        mutator = mutators.MutateResidue()
+        mutator.set_residue('mutation_position', 'new_amino_acid')
+        mutator.apply(pose_copy)
+        relax = rosetta.protocols.relax.FastRelax()
+        relax.set_scorefxn(scorefxn)
+        relax.cartesian(True)
+        relax.min_type("lbfgs_armijo_nonmonotone")
+        relax.apply(pose_copy)
+        mutated_scores.append(scorefxn(pose_copy))
+        
+        
+    # Mutate the residue and relax the mutated structure
+    mutated_scores = []
+    for _ in range(5):  # Number of iterations for ensemble averaging
+        pose_copy = pose.clone()
+        mutator = mutators.MutateResidue()
+        # Apply mutations
+        for old_amino_acif, residue_number, new_amino_acid in mutations:
+            mutate_residue(pose_copy, int(residue_number), new_amino_acid)
+        relax = rosetta.protocols.relax.FastRelax()
+        relax.set_scorefxn(scorefxn)
+        relax.cartesian(True)
+        relax.min_type("lbfgs_armijo_nonmonotone")
+        relax.apply(pose_copy)
+        mutated_scores.append(scorefxn(pose_copy))
+
+    # Calculate the average score of the mutated structure
+    s1_avg = sum(mutated_scores) / len(mutated_scores)
+
+    # Calculate the ΔΔG
+    ddg = s1_avg - s0_avg
+    
+    return s0_avg, s1_avg, ddg
+
 def calculate_delta_g(pdb_file, mutations):
     # Load the PDB file
     pose = pose_from_pdb(pdb_file)
@@ -40,7 +98,7 @@ def calculate_delta_g(pdb_file, mutations):
     # Calculate the final free energy
     final_score = scorefxn(pose)
     
-    # Compute ΔG
+    # Compute ΔΔG
     delta_g = final_score - initial_score
     
     return initial_score, final_score, delta_g
@@ -78,7 +136,8 @@ def validate_deltaG(quarter):
         # Check only for mutations
         if (item['mut_type'] != 'wt' and item['mut_type'][:3] != "ins" and item['mut_type'][:3] != "del"):
             mutations = split_string(item['mut_type'])
-            initial_score, final_score, delta_g = calculate_delta_g(pdb_file, mutations)
+            # initial_score, final_score, delta_g = calculate_delta_g(pdb_file, mutations)
+            initial_score, final_score, delta_g = ddg_ensemble(pdb_file, mutations)
             df_results.loc[i] = [item['name'], item['pdb_path'], item['mut_type'], initial_score, final_score, delta_g, item['deltaG']]
             if(delta_g != 0):
                 print(f"Protein: {pdb_file}, Initial Score: {initial_score}, Final Score: {final_score},  RosettaΔΔG: {delta_g}, ΔG: {item['deltaG']}")
@@ -87,7 +146,7 @@ def validate_deltaG(quarter):
     # Add correlation metrics
     df_results["pearson"] = df_results["rosetta_deltaG"].corr(df_results["deltaG"], method='pearson')
     df_results["spearman"] = df_results["rosetta_deltaG"].corr(df_results["deltaG"], method='spearman')
-    df_results.to_csv(f"./data/Processed_K50_dG_datasets/rosetta_valid_{quarter}.csv", index=False)
+    df_results.to_csv(f"./data/Processed_K50_dG_datasets/rosetta_avg_{quarter}.csv", index=False)
 
 if __name__ == "__main__":
     # test_calculate_delta_g()asdasddas

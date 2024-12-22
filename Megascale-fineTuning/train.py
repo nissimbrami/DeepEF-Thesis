@@ -44,7 +44,7 @@ TRAINED_MODEL_PATH = "./res/trianed_models-cycle2_5/25_final_model.pt"
 # TRAINED_MODEL_PATH = "./res/trianed_models-2cycle_drop/25_final_model.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
-MODEL_NAME += 'kf'
+MODEL_NAME += 'kf_pnas' # pnas data clearning
 PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
 LR = 1e-4
@@ -101,6 +101,7 @@ class AllProteinValidationDataset(Dataset):
         self.mutations_root_dir = mutations_root_dir
         self.protein_dirs = [protein for i, protein in enumerate(os.listdir(self.tensor_root_dir))]
         self.one_mut = one_mut # remove the mutations with more than one mutation
+        self.unstable_mut = False
         # remove TM proteins 
         tm_proteins = pd.read_csv(TM_PATH)
         tm_proteins = tm_proteins['name'].apply(lambda x: x.split(".")[0]).unique().tolist()
@@ -139,13 +140,20 @@ class AllProteinValidationDataset(Dataset):
         one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT),weights_only=True)
         embedding_tensor = self.load_embedding_tensor(os.path.join(protein_dir, PROTT5_EMBEDDINGS))
         
+        indexes = set(mutations.index)
+        # remove unstable mut
+        if not self.unstable_mut:
+            indexes -= set(mutations[mutations['ddG_ML'] == '-'].index)
+                 
         # remove the mutations with more than one mutation
         if self.one_mut:
-            one_mut_index = mutations[~mutations['mut_type'].str.contains(':')]
-            mutations = mutations.loc[one_mut_index.index]
-            delta_g_tensor = delta_g_tensor[one_mut_index.index]
-            one_hot_tensor = one_hot_tensor[one_mut_index.index]
-            embedding_tensor = embedding_tensor[one_mut_index.index]
+            indexes -= set(mutations[mutations['mut_type'].str.contains(':')].index)
+       
+        indexes = list(indexes)
+        mutations = mutations.loc[indexes]
+        delta_g_tensor = delta_g_tensor[indexes]
+        one_hot_tensor = one_hot_tensor[indexes]
+        embedding_tensor = embedding_tensor[indexes]
         
         mutations_data = {
             'name': self.test_protein[idx],
@@ -172,13 +180,20 @@ class AllProteinValidationDataset(Dataset):
         one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT),weights_only=True)
         embedding_tensor = self.load_embedding_tensor(os.path.join(protein_dir, PROTT5_EMBEDDINGS))
         
+        indexes = set(mutations.index)
+        # remove unstable mut
+        if not self.unstable_mut:
+            indexes -= set(mutations[mutations['ddG_ML'] == '-'].index)
+                 
         # remove the mutations with more than one mutation
         if self.one_mut:
-            one_mut_index = mutations[~mutations['mut_type'].str.contains(':')]
-            mutations = mutations.loc[one_mut_index.index]
-            delta_g_tensor = delta_g_tensor[one_mut_index.index]
-            one_hot_tensor = one_hot_tensor[one_mut_index.index]
-            embedding_tensor = embedding_tensor[one_mut_index.index]
+            indexes -= set(mutations[mutations['mut_type'].str.contains(':')].index)
+       
+        inedxes = list(indexes)
+        mutations = mutations.loc[indexes]
+        delta_g_tensor = delta_g_tensor[indexes]
+        one_hot_tensor = one_hot_tensor[indexes]
+        embedding_tensor = embedding_tensor[indexes]
             
         mutations_data = {
             'name': self.protein_dirs[idx],

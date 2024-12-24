@@ -33,11 +33,11 @@ VAL_RATIO = 0.2
 RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG  = False
-EPOCHS = 30 if not DEBUG else 1
+EPOCHS = 50 if not DEBUG else 1
 FREEZE_LAYERS = True
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
-MINI_BATCH_SIZE = 256
+MINI_BATCH_SIZE = 64
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
 # TRAINED_MODEL_PATH = "./res/trianed_models-cycle_per_norm_SM/13_final_model.pt"
 TRAINED_MODEL_PATH = "./res/trianed_models-cycle2_5/25_final_model.pt"
@@ -49,7 +49,8 @@ PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
 LR = 1e-4
 DROP_OUT = 0.2
-REG_LAMBDA = 0.01
+REG_LAMBDA = 0
+E_REG_LAMBDA = 0.01
 
 # config wandb
 config = {
@@ -72,7 +73,8 @@ config = {
     'pretrained': PRETRAINED,
     'lr': LR,
     'dropout': DROP_OUT,
-    'reg_lambda': REG_LAMBDA
+    'reg_lambda': REG_LAMBDA,
+    'e_reg_lambda': E_REG_LAMBDA
 }
 
 if not os.path.exists(os.path.join(MODEL_PATH, MODEL_NAME)):
@@ -189,7 +191,7 @@ class AllProteinValidationDataset(Dataset):
         if self.one_mut:
             indexes -= set(mutations[mutations['mut_type'].str.contains(':')].index)
        
-        inedxes = list(indexes)
+        indexes = list(indexes)
         mutations = mutations.loc[indexes]
         delta_g_tensor = delta_g_tensor[indexes]
         one_hot_tensor = one_hot_tensor[indexes]
@@ -271,7 +273,7 @@ class Trainer():
                     else:
                         reg_loss = REG_LAMBDA * sum([F.mse_loss(param,torch.zeros_like(param)) for param in self.model.parameters()])
                     energys = torch.cat((u_energy,f_energy),dim=0)
-                    energy_reg = REG_LAMBDA * (F.mse_loss(energys,torch.zeros_like(energys)))
+                    energy_reg = E_REG_LAMBDA * (F.mse_loss(energys,torch.zeros_like(energys)))
                     loss = l1_loss + reg_loss +energy_reg
                     loss.backward()
                     self.optimizer.step()
@@ -320,7 +322,7 @@ class Trainer():
                     delta_g = batch['delta_g'][0, j: j + self.mini_batch_size].to(self.device)
                     loss = self.criterion(output,delta_g)
                     energys = torch.cat((u_energy,f_energy),dim=0)
-                    energy_reg = REG_LAMBDA * (F.mse_loss(energys,torch.zeros_like(energys)))
+                    energy_reg = E_REG_LAMBDA * (F.mse_loss(energys,torch.zeros_like(energys)))
                     loss += energy_reg
                     batch_loss += loss.item()
                     val_dg = torch.cat((val_dg, delta_g), dim=0)

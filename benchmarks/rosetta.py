@@ -4,6 +4,8 @@ pyrosetta.init()
 import sys
 from pyrosetta import pose_from_pdb
 from pyrosetta.toolbox.mutants import mutate_residue
+from pyrosetta.rosetta import *
+from pyrosetta.toolbox import *
 from dataset import benckmark_datasets
 import re
 from tqdm import tqdm

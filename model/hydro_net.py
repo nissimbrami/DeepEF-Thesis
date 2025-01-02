@@ -269,7 +269,7 @@ class ProteinEnergyNet(nn.Module):
 class PEM(torch.nn.Module):
     """Protein energy model"""
   
-    def __init__(self, layers, gaussian_coef,dropout_rate = 0.2):
+    def __init__(self, layers, gaussian_coef,dropout_rate = 0.2, light_attention=False):
         super().__init__()
         # GCN layers
         gcn_dim_in = 36
@@ -313,6 +313,10 @@ class PEM(torch.nn.Module):
         self.B = 0
         self.N = 0
         
+        # light attention machanism
+        self.light_attention = light_attention
+        if self.light_attention:
+            self.LA = LightAttention(embeddings_dim=1096)
         
     
     def forward(self,x,f_type = 'Default'):
@@ -348,6 +352,13 @@ class PEM(torch.nn.Module):
         x = x.reshape(self.B * self.N,-1)
         # Add LLM features
         x = torch.cat((x,x_emb_features),dim=-1) # B*N,72+1024->B*N,1096
+        # Light attention machanism
+        if self.light_attention:
+            x = x.reshape(self.B, self.N,-1) # B*N,1096->B,N,1096
+            x = x.swapaxes(1,2) # B,N,1096->B,1096,N
+            x = self.LA(x) # B,1096,N
+            x = x.swapaxes(1,2) 
+            x = x.reshape(self.B * self.N,-1) # B,1096,N->B*N,1096
         # fc layers
         x  = self.fc1(x) # B*N,1096->B*N,128
         x = F.relu(x)
@@ -596,3 +607,36 @@ class Normalization_layer(torch.nn.Module):
         # use layer norm
         # x = self.layer_norm(x)
         return x
+    
+class LightAttention(nn.Module):
+    """Source:
+    Hannes Stark et al. 2022
+    https://github.com/HannesStark/protein-localization/blob/master/models/light_attention.py
+    """
+    def __init__(self, embeddings_dim=1024, output_dim=11, dropout=0.25, kernel_size=9, conv_dropout: float = 0.25):
+        super(LightAttention, self).__init__()
+
+        self.feature_convolution = nn.Conv1d(embeddings_dim, embeddings_dim, kernel_size, stride=1,
+                                                padding=kernel_size // 2)
+        self.attention_convolution = nn.Conv1d(embeddings_dim, embeddings_dim, kernel_size, stride=1,
+                                                padding=kernel_size // 2)
+
+        self.softmax = nn.Softmax(dim=-1)
+        self.dropout = nn.Dropout(conv_dropout)
+
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+        """
+        Args:
+            x: [batch_size, embeddings_dim, sequence_length] embedding tensor that should be classified
+            mask: [batch_size, sequence_length] mask corresponding to the zero padding used for the shorter sequecnes in the batch. All values corresponding to padding are False and the rest is True.
+        Returns:
+            classification: [batch_size,output_dim] tensor with logits
+        """
+        o = self.feature_convolution(x)  # [batch_size, embeddings_dim, sequence_length]
+        
+        o = self.dropout(o)  # [batch_gsize, embeddings_dim, sequence_length]
+
+        attention = self.attention_convolution(x)  # [batch_size, embeddings_dim, sequence_length]
+        
+        o1 = o * self.softmax(attention)
+        return torch.squeeze(o1)

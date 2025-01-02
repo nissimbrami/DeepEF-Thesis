@@ -7,7 +7,7 @@ import pandas as pd
 import sys
 
 # Path to FoldX executable
-foldx_path = "/cs/casp15/Shahar/foldx/foldx_20241231"
+foldx_path = "/cs/casp15/Shahar/foldx/foldx_20251231"
 base_path = '/cs/casp15/Shahar/DeepPEF'
 DEBUG = False
 
@@ -126,10 +126,25 @@ def create_summery(fraction):
         summery_df = pd.concat([summery_df, df])
     summery_df.to_csv(f'{foldx_ds_path}/foldx_summery_{fraction}.csv', index=False)
 
+def missing_proteins(path):
+    """Run FoldX stability analysis for missing proteins"""
+    missing_protein_df = pd.read_csv(path)
+    foldx_ds_path = base_path + "/data/Processed_K50_dG_datasets/foldx"
+    pdb_path = base_path + "/data/Processed_K50_dG_datasets/AlphaFold_model_PDBs"
+    foldx_ds = os.listdir(foldx_ds_path)
+    
+    for protein in tqdm(missing_protein_df['protein_name']):
+        print(f"Running FoldX for {protein}")
+        run_foldx(protein, foldx_ds_path, pdb_path)
+        
+    print("Missing proteins are done")
+    
+
 if __name__ == "__main__":
-    # test_foldx()
-    fraction = int(sys.argv[1])
-    start_offset = int(sys.argv[2])
-    print(fraction)
-    validate_foldx(fraction,start_offset)
-    create_summery(fraction)
+    # # test_foldx()
+    # fraction = int(sys.argv[1])
+    # start_offset = int(sys.argv[2])
+    # print(fraction)
+    # validate_foldx(fraction,start_offset)
+    # create_summery(fraction)
+    missing_proteins('./benchmarks/missing_proteins.csv')

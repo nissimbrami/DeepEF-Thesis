@@ -19,7 +19,7 @@ import wandb
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
-CFG.debug = True
+# CFG.debug = True
 # CFG.clip_grad_norm = True
 # Set wandb
 if not CFG.debug:
@@ -434,5 +434,5 @@ if __name__ == '__main__':
     # CFG.data_path = './data/casp12_data_30/'
     CFG.dropout_rate = 0.3
     CFG.gaussian_coef = -0.08
-    CFG.reg_alpha = 0.1
+    CFG.reg_alpha = 0.5
     main()

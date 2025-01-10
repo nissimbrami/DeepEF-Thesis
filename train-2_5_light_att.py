@@ -374,8 +374,8 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2, Ecy3, Ecy4):
                       loss_decoy(Eju, Ecd).unsqueeze(0)[None,:], loss_decoy(Ejf, Eju).unsqueeze(0)[None,:], 
                       loss_decoy(Ejf, Ecy1).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy2).unsqueeze(0)[None,:],
                       loss_decoy(Ejf, Ecy3).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy4).unsqueeze(0)[None,:]])
-    # loss = torch.mean(loss)
-    loss = torch.sum(loss)
+    loss = torch.mean(loss)
+    # loss = torch.sum(loss)
     return loss
 
     
@@ -417,7 +417,7 @@ def main():
                 CFG.num_layers,CFG.dropout_rate,CFG.precision)
     # Run training
     print('***Start training***')
-    epoch = 0
+    epoch = 13
     trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
     return 1
 
@@ -429,10 +429,10 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-light_attention/'
+        CFG.model_path = './res/trianed_models-light_attention_reg/'
         CFG.results_path = './res/results-emb/'
     # CFG.data_path = './data/casp12_data_30/'
     CFG.dropout_rate = 0.3
     CFG.gaussian_coef = -0.08
-    CFG.reg_alpha = 0.5
+    CFG.reg_alpha = 0.1
     main()

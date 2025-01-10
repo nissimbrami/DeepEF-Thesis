@@ -90,7 +90,7 @@ def run_validation(root_dir, mode='evaluation', model_path=CFG.model_path, mini_
     protein_dataset = AllProteinValidationDataset(tensor_root_dir, mutations_root_dir)
     if mode == 'evaluation':
         if model is None:
-            model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef).to(CFG.device)
+            model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,light_attention=CFG.light_attention).to(CFG.device)
             try:
                 model.load_state_dict(torch.load(model_path)['model_state_dict'])
             except:

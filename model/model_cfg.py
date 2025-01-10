@@ -31,8 +31,8 @@ class CFG:
     num_layers = 3
     dropout_rate = 0.2
     model_path = "./res/trianed_models-newDecoys/"
-    
-    gaussian_coef = -0.008*1e1
+    light_attention = True
+    gaussian_coef = -0.08
     #training parameters
     lr = 0.0001
     wd = 0.00001

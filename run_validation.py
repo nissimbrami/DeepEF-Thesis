@@ -59,6 +59,16 @@ def print_stat(model_path):
     print(f"pearson coorelation dG {results[['inferred_dG', 'deltaG']].corr(method='pearson').iloc[0,1]}")
     print(f"spearman coorelation dG {results[['inferred_dG', 'deltaG']].corr(method='spearman').iloc[0,1]}")
     print(f"RMSE dG {np.sqrt(np.mean((results['inferred_dG'] - results['deltaG'])**2))}")
+    # Group by protein
+    print('Group by protein')
+    protein_results = results.groupby('protein_name').agg({'inferred_ddG': 'mean', 'ddG': 'mean'}).reset_index()
+    print(f"pearson coorelation DDG {protein_results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1]}")   
+    print(f"spearman coorelation DDG {protein_results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1]}") 
+    print(f"RMSE DDG {np.sqrt(np.mean((protein_results['inferred_ddG'] - protein_results['ddG'])**2))}")
+    print(f"pearson coorelation dG {protein_results[['inferred_dG', 'deltaG']].corr(method='pearson').iloc[0,1]}")
+    print(f"spearman coorelation dG {protein_results[['inferred_dG', 'deltaG']].corr(method='spearman').iloc[0,1]}")
+    print(f"RMSE dG {np.sqrt(np.mean((protein_results['inferred_dG'] - protein_results['deltaG'])**2))}")
+    
     
     TM_proteins = get_TMprotein()
     TM_results = results[results['name'].isin(TM_proteins)]
@@ -73,7 +83,7 @@ def print_stat(model_path):
 
 def main():
     model_list = []
-    for i in range(1 , 11):
+    for i in range(14 , 17):
     #    model_list.append(f'res/trianed_models-cycle2_5_outline2/{i}_final_model.pt')
     #    model_list.append(f'res/trianed_models-cycle2_5_outline3/{i}_final_model.pt')
        model_list.append(f"./res/trianed_models-light_attention/{i}_final_model.pt")

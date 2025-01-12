@@ -429,7 +429,7 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-light_attention_reg/'
+        CFG.model_path = './res/trianed_models-light_attention/'
         CFG.results_path = './res/results-emb/'
     # CFG.data_path = './data/casp12_data_30/'
     CFG.dropout_rate = 0.3

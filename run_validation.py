@@ -7,7 +7,15 @@ import numpy as np
 from tqdm import tqdm
 from validation.validation import run_validation
 from analysis.analysis_runner import run_analysis
+import wandb
 
+DEBUG = False
+BASE_MODEL = './res/trianed_models-light_attention'
+
+
+if not DEBUG:
+    wandb.init(project="MS validation",name = BASE_MODEL.split('/')[-1])
+    # Add config
 
 def get_TMprotein():
     TM_path = "./data/ThermoMPNN/mega_test.csv"
@@ -53,21 +61,39 @@ def print_stat(model_path):
     results = get_reults(model_res_dir=model_res_dir)
     print('results: ', len(results))
     # pc, sp and RMSE
-    print(f"pearson coorelation DDG {results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1]}")
-    print(f"spearman coorelation DDG {results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1]}")
-    print(f"RMSE DDG {np.sqrt(np.mean((results['inferred_ddG'] - results['ddG'])**2))}")
-    print(f"pearson coorelation dG {results[['inferred_dG', 'deltaG']].corr(method='pearson').iloc[0,1]}")
-    print(f"spearman coorelation dG {results[['inferred_dG', 'deltaG']].corr(method='spearman').iloc[0,1]}")
-    print(f"RMSE dG {np.sqrt(np.mean((results['inferred_dG'] - results['deltaG'])**2))}")
+    ddg_pearson = results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1]
+    ddg_spearman = results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1]
+    ddg_rmse = np.sqrt(np.mean((results['inferred_ddG'] - results['ddG'])**2))
+    dG_pearson = results[['inferred_dG', 'deltaG']].corr(method='pearson').iloc[0,1]
+    dG_spearman = results[['inferred_dG', 'deltaG']].corr(method='spearman').iloc[0,1]
+    dG_rmse = np.sqrt(np.mean(results['inferred_dG'] - results['deltaG'])**2)
+    # log stats
+    if not DEBUG:
+        wandb.log({'ddg_pearson': ddg_pearson, 'ddg_spearman': ddg_spearman, 'ddg_rmse': ddg_rmse, 'dG_pearson': dG_pearson, 'dG_spearman': dG_spearman, 'dG_rmse': dG_rmse})
+    print(f"pearson coorelation DDG {ddg_pearson}")
+    print(f"spearman coorelation DDG {ddg_spearman}")
+    print(f"RMSE DDG {ddg_rmse}")
+    print(f"pearson coorelation dG {dG_pearson}")
+    print(f"spearman coorelation dG {dG_spearman}")
+    print(f"RMSE dG {dG_rmse}")
     # Group by protein
     print('Group by protein')
-    protein_results = results.groupby('protein_name').agg({'inferred_ddG': 'mean', 'ddG': 'mean'}).reset_index()
-    print(f"pearson coorelation DDG {protein_results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1]}")   
-    print(f"spearman coorelation DDG {protein_results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1]}") 
-    print(f"RMSE DDG {np.sqrt(np.mean((protein_results['inferred_ddG'] - protein_results['ddG'])**2))}")
-    print(f"pearson coorelation dG {protein_results[['inferred_dG', 'deltaG']].corr(method='pearson').iloc[0,1]}")
-    print(f"spearman coorelation dG {protein_results[['inferred_dG', 'deltaG']].corr(method='spearman').iloc[0,1]}")
-    print(f"RMSE dG {np.sqrt(np.mean((protein_results['inferred_dG'] - protein_results['deltaG'])**2))}")
+    protein_results = results.groupby('protein_name')
+    protein_ddg_pearson = protein_results.apply(lambda x: x['inferred_ddG'].corr(x['ddG'], method='pearson')).mean()
+    protein_ddg_spearman = protein_results.apply(lambda x: x['inferred_ddG'].corr(x['ddG'], method='spearman')).mean()
+    protein_ddg_rmse = protein_results.apply(lambda x: np.sqrt(np.mean((x['inferred_ddG'] - x['ddG'])**2))).mean()
+    protein_dG_pearson = protein_results.apply(lambda x: x['inferred_dG'].corr(x['deltaG'], method='pearson')).mean()
+    protein_dG_spearman = protein_results.apply(lambda x: x['inferred_dG'].corr(x['deltaG'], method='spearman')).mean()
+    protein_dG_rmse = protein_results.apply(lambda x: np.sqrt(np.mean((x['inferred_dG'] - x['deltaG'])**2))).mean()
+    # log stats
+    if not DEBUG:
+        wandb.log({'protein_ddg_pearson': protein_ddg_pearson, 'protein_ddg_spearman': protein_ddg_spearman, 'protein_ddg_rmse': protein_ddg_rmse, 'protein_dG_pearson': protein_dG_pearson, 'protein_dG_spearman': protein_dG_spearman, 'protein_dG_rmse': protein_dG_rmse})
+    print(f"pearson coorelation DDG {protein_ddg_pearson}")
+    print(f"spearman coorelation DDG {protein_ddg_spearman}")
+    print(f"RMSE DDG {protein_ddg_rmse}")
+    print(f"pearson coorelation dG {protein_dG_pearson}")
+    print(f"spearman coorelation dG {protein_dG_spearman}")
+    print(f"RMSE dG {protein_dG_rmse}")
     
     
     TM_proteins = get_TMprotein()
@@ -78,6 +104,9 @@ def print_stat(model_path):
     print(f"pearson coorelation DDG {TM_results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1]}")
     print(f"spearman coorelation DDG {TM_results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1]}")
     print(f"RMSE DDG {np.sqrt(np.mean((TM_results['inferred_ddG'] - TM_results['ddG'])**2))}")
+    # log stats
+    if not DEBUG:
+        wandb.log({'TM_ddg_pearson': TM_results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1], 'TM_ddg_spearman': TM_results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1], 'TM_ddg_rmse': np.sqrt(np.mean((TM_results['inferred_ddG'] - TM_results['ddG'])**2))})
     
 
 
@@ -86,7 +115,7 @@ def main():
     for i in range(14 , 17):
     #    model_list.append(f'res/trianed_models-cycle2_5_outline2/{i}_final_model.pt')
     #    model_list.append(f'res/trianed_models-cycle2_5_outline3/{i}_final_model.pt')
-       model_list.append(f"./res/trianed_models-light_attention/{i}_final_model.pt")
+       model_list.append(BASE_MODEL+f"/{i}_final_model.pt")
     #    model_list.append(f'res/trianed_models-droupout-0.8/{i}_final_model.pt')
         # model_list.append(f'res/trianed_models-cycle_per_2_norm/{i}_final_model.pt')
         # model_list.append(f'res/trianed_models-cycle2_5/{i}_final_model.pt')

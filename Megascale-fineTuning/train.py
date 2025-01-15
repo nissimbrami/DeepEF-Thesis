@@ -40,7 +40,7 @@ MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 64
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
 # TRAINED_MODEL_PATH = "./res/trianed_models-cycle_per_norm_SM/13_final_model.pt"
-TRAINED_MODEL_PATH = "./res/trianed_models-cycle2_5/25_final_model.pt"
+TRAINED_MODEL_PATH = "./res/trianed_models-light_attention/20_final_model.pt"
 # TRAINED_MODEL_PATH = "./res/trianed_models-2cycle_drop/25_final_model.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
@@ -51,6 +51,7 @@ LR = 1e-4
 DROP_OUT = 0.2
 REG_LAMBDA = 0
 E_REG_LAMBDA = 0.01
+UNSTABLE_MUT = True
 
 # config wandb
 config = {
@@ -75,6 +76,7 @@ config = {
     'dropout': DROP_OUT,
     'reg_lambda': REG_LAMBDA,
     'e_reg_lambda': E_REG_LAMBDA
+    'unstable_mut': UNSTABLE_MUT
 }
 
 if not os.path.exists(os.path.join(MODEL_PATH, MODEL_NAME)):
@@ -103,7 +105,7 @@ class AllProteinValidationDataset(Dataset):
         self.mutations_root_dir = mutations_root_dir
         self.protein_dirs = [protein for i, protein in enumerate(os.listdir(self.tensor_root_dir))]
         self.one_mut = one_mut # remove the mutations with more than one mutation
-        self.unstable_mut = False
+        self.unstable_mut = UNSTABLE_MUT
         # remove TM proteins 
         tm_proteins = pd.read_csv(TM_PATH)
         tm_proteins = tm_proteins['name'].apply(lambda x: x.split(".")[0]).unique().tolist()
@@ -385,7 +387,8 @@ def train_fold(fold, model = None):
     print('--------------------------------')
     if model is None:
         # Create the model
-        model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate).to(DEVICE)
+        model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate,
+                    light_attention=True).to(DEVICE)
         if PRETRAINED: 
             try:
                 model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
@@ -438,7 +441,7 @@ def run_training():
         val_ds = DataLoader(test_subsampler, batch_size=1, shuffle=False)
     
         # Create the model
-        model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate).to(DEVICE)
+        model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate,).to(DEVICE)
         if PRETRAINED: 
             try:
                 model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)

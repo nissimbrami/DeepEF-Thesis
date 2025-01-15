@@ -58,6 +58,7 @@ def get_reults(base_pred_dir='./data/Processed_K50_dG_datasets/', experiment_dir
 def print_stat(model_path):
     
     model_res_dir = './data/Processed_K50_dG_datasets/mutation_outputs/' + ('/').join(model_path.split('/')[-2:]) + '/'
+    epoch = int(model_path.split('/')[-1].split('_')[0])
     results = get_reults(model_res_dir=model_res_dir)
     print('results: ', len(results))
     # pc, sp and RMSE
@@ -69,7 +70,7 @@ def print_stat(model_path):
     dG_rmse = np.sqrt(np.mean(results['inferred_dG'] - results['deltaG'])**2)
     # log stats
     if not DEBUG:
-        wandb.log({'ddg_pearson': ddg_pearson, 'ddg_spearman': ddg_spearman, 'ddg_rmse': ddg_rmse, 'dG_pearson': dG_pearson, 'dG_spearman': dG_spearman, 'dG_rmse': dG_rmse})
+        wandb.log({'epoch':epoch, 'ddg_pearson': ddg_pearson, 'ddg_spearman': ddg_spearman, 'ddg_rmse': ddg_rmse, 'dG_pearson': dG_pearson, 'dG_spearman': dG_spearman, 'dG_rmse': dG_rmse})
     print(f"pearson coorelation DDG {ddg_pearson}")
     print(f"spearman coorelation DDG {ddg_spearman}")
     print(f"RMSE DDG {ddg_rmse}")
@@ -106,13 +107,13 @@ def print_stat(model_path):
     print(f"RMSE DDG {np.sqrt(np.mean((TM_results['inferred_ddG'] - TM_results['ddG'])**2))}")
     # log stats
     if not DEBUG:
-        wandb.log({'TM_ddg_pearson': TM_results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1], 'TM_ddg_spearman': TM_results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1], 'TM_ddg_rmse': np.sqrt(np.mean((TM_results['inferred_ddG'] - TM_results['ddG'])**2))})
+        wandb.log({'epoch':epoch, 'TM_ddg_pearson': TM_results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1], 'TM_ddg_spearman': TM_results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1], 'TM_ddg_rmse': np.sqrt(np.mean((TM_results['inferred_ddG'] - TM_results['ddG'])**2))})
     
 
 
 def main():
     model_list = []
-    for i in range(14 , 17):
+    for i in range(16 , 18):
     #    model_list.append(f'res/trianed_models-cycle2_5_outline2/{i}_final_model.pt')
     #    model_list.append(f'res/trianed_models-cycle2_5_outline3/{i}_final_model.pt')
        model_list.append(BASE_MODEL+f"/{i}_final_model.pt")

@@ -44,14 +44,15 @@ TRAINED_MODEL_PATH = "./res/trianed_models-light_attention/20_final_model.pt"
 # TRAINED_MODEL_PATH = "./res/trianed_models-2cycle_drop/25_final_model.pt"
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = 'PEM_fine_tuned-'+BASE_MODEL_NAME if FREEZE_LAYERS else 'PEM_full_trained-'+BASE_MODEL_NAME
-MODEL_NAME += 'kf_pnas' # pnas data clearning
+MODEL_NAME += 'kf' # pnas data clearning
 PRETRAINED = True
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
 LR = 1e-4
 DROP_OUT = 0.2
 REG_LAMBDA = 0
-E_REG_LAMBDA = 0.01
+E_REG_LAMBDA = 0.001
 UNSTABLE_MUT = True
+LIGHT_ATTENTION = True
 
 # config wandb
 config = {
@@ -75,8 +76,9 @@ config = {
     'lr': LR,
     'dropout': DROP_OUT,
     'reg_lambda': REG_LAMBDA,
-    'e_reg_lambda': E_REG_LAMBDA
-    'unstable_mut': UNSTABLE_MUT
+    'e_reg_lambda': E_REG_LAMBDA,
+    'unstable_mut': UNSTABLE_MUT,
+    'light_attention': LIGHT_ATTENTION
 }
 
 if not os.path.exists(os.path.join(MODEL_PATH, MODEL_NAME)):
@@ -257,6 +259,9 @@ class Trainer():
                 param.requires_grad = True
             for param in self.model.fc1.parameters():
                 param.requires_grad = True
+            if LIGHT_ATTENTION:
+                for param in self.model.LA.parameters():
+                    param.requires_grad = True
         running_loss = 0
         wandb_step = 0
         for epoch in range(epochs):
@@ -279,9 +284,12 @@ class Trainer():
                     loss = l1_loss + reg_loss +energy_reg
                     loss.backward()
                     self.optimizer.step()
+                    train_pc_corr = torch.corrcoef(torch.cat((output[None,:],delta_g[None,:])))[0, 1]
                     batch_loss += loss.item()
                     wandb_step += 1
-                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i,'l1_loss': l1_loss.item(), 'reg_loss': reg_loss.item(), 'energy_reg': energy_reg.item(), 'wandb_step': wandb_step},run)
+                    wandb_log({'loss': loss.item(), 'epoch': epoch, 'batch': i,'l1_loss': l1_loss.item(), 'reg_loss': reg_loss.item(), 
+                               'energy_reg': energy_reg.item(), 'wandb_step': wandb_step,
+                               'train_pc_corr': train_pc_corr},run)
                 batch_loss /= batch_idx
                 running_loss += batch_loss
                 if (i+1) % 100 == 0:
@@ -388,7 +396,7 @@ def train_fold(fold, model = None):
     if model is None:
         # Create the model
         model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate,
-                    light_attention=True).to(DEVICE)
+                    light_attention=LIGHT_ATTENTION).to(DEVICE)
         if PRETRAINED: 
             try:
                 model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)

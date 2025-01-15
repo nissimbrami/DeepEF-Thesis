@@ -346,7 +346,7 @@ class Trainer():
         print(f'Validation Loss: {val_loss}')
         pc_corr = torch.corrcoef(torch.cat((val_dg[None,:],val_dg_pred[None,:])))[0, 1]
         if not test:
-            wandb_log({'val_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr},run)
+            wandb_log({'val_loss': val_loss,'epoch': epoch, 'val_pc_corr': pc_corr},run)
         else:
             wandb_log({'test_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr},run)
         return pc_corr, val_loss
@@ -449,7 +449,8 @@ def run_training():
         val_ds = DataLoader(test_subsampler, batch_size=1, shuffle=False)
     
         # Create the model
-        model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate,).to(DEVICE)
+        model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef,dropout_rate = CFG.dropout_rate,
+                    light_attention=LIGHT_ATTENTION).to(DEVICE)
         if PRETRAINED: 
             try:
                 model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
@@ -480,10 +481,10 @@ if __name__ == '__main__':
     tensor_root_dir = r'./data/Processed_K50_dG_datasets/training_data'
     mutations_root_dir = r'./data/Processed_K50_dG_datasets/mutation_datasets'
     CFG.dropout_rate = DROP_OUT
-    # run_training()
-    model, pc_corr = train_fold(4)
-    test_fold(4, model)
-    wandb.finish()
+    run_training()
+    # model, pc_corr = train_fold(4)
+    # test_fold(4, model)
+    # wandb.finish()
     # After training the last layer, train the whole model with lower learning rate
     FREEZE_LAYERS = False
     LR = 1e-5

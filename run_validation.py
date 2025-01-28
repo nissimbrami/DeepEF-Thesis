@@ -10,7 +10,7 @@ from analysis.analysis_runner import run_analysis
 import wandb
 
 DEBUG = False
-BASE_MODEL = './res/trianed_models-light_attention-finetuned'
+BASE_MODEL = './res/trianed_models-light_attention'
 
 
 if not DEBUG:
@@ -105,9 +105,16 @@ def print_stat(model_path):
     print(f"pearson coorelation DDG {TM_results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1]}")
     print(f"spearman coorelation DDG {TM_results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1]}")
     print(f"RMSE DDG {np.sqrt(np.mean((TM_results['inferred_ddG'] - TM_results['ddG'])**2))}")
+    # Group by protein
+    print('Group by protein')
+    protein_results = TM_results.groupby('protein_name')
+    print(f"pearson coorelation DDG {protein_results.apply(lambda x: x['inferred_ddG'].corr(x['ddG'], method='pearson')).mean()}")
+    print(f"spearman coorelation DDG {protein_results.apply(lambda x: x['inferred_ddG'].corr(x['ddG'], method='spearman')).mean()}")
+    print(f"RMSE DDG {protein_results.apply(lambda x: np.sqrt(np.mean((x['inferred_ddG'] - x['ddG'])**2))).mean()}")
     # log stats
     if not DEBUG:
         wandb.log({'epoch':epoch, 'TM_ddg_pearson': TM_results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1], 'TM_ddg_spearman': TM_results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1], 'TM_ddg_rmse': np.sqrt(np.mean((TM_results['inferred_ddG'] - TM_results['ddG'])**2))})
+        wandb.log({'TM_protein_ddg_pearson': protein_results.apply(lambda x: x['inferred_ddG'].corr(x['ddG'], method='pearson')).mean(), 'TM_protein_ddg_spearman': protein_results.apply(lambda x: x['inferred_ddG'].corr(x['ddG'], method='spearman')).mean(), 'TM_protein_ddg_rmse': protein_results.apply(lambda x: np.sqrt(np.mean((x['inferred_ddG'] - x['ddG'])**2)).mean()})
     
 
 
@@ -116,8 +123,8 @@ def main():
     for i in range(0 , 1):
     #    model_list.append(f'res/trianed_models-cycle2_5_outline2/{i}_final_model.pt')
     #    model_list.append(f'res/trianed_models-cycle2_5_outline3/{i}_final_model.pt')
-    #    model_list.append(BASE_MODEL+f"/{i}_final_model.pt")
-        model_list.append(f'Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-light_attentionkf/kf_4_epoch_49.pt')
+       model_list.append(BASE_MODEL+f"/{i}_final_model.pt")
+        # model_list.append(f'Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-light_attentionkf/kf_4_epoch_49.pt')
     #    model_list.append(f'res/trianed_models-droupout-0.8/{i}_final_model.pt')
         # model_list.append(f'res/trianed_models-cycle_per_2_norm/{i}_final_model.pt')
         # model_list.append(f'res/trianed_models-cycle2_5/{i}_final_model.pt')

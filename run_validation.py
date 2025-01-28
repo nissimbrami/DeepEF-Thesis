@@ -114,7 +114,7 @@ def print_stat(model_path):
     # log stats
     if not DEBUG:
         wandb.log({'epoch':epoch, 'TM_ddg_pearson': TM_results[['inferred_ddG', 'ddG']].corr(method='pearson').iloc[0,1], 'TM_ddg_spearman': TM_results[['inferred_ddG', 'ddG']].corr(method='spearman').iloc[0,1], 'TM_ddg_rmse': np.sqrt(np.mean((TM_results['inferred_ddG'] - TM_results['ddG'])**2))})
-        wandb.log({'TM_protein_ddg_pearson': protein_results.apply(lambda x: x['inferred_ddG'].corr(x['ddG'], method='pearson')).mean(), 'TM_protein_ddg_spearman': protein_results.apply(lambda x: x['inferred_ddG'].corr(x['ddG'], method='spearman')).mean(), 'TM_protein_ddg_rmse': protein_results.apply(lambda x: np.sqrt(np.mean((x['inferred_ddG'] - x['ddG'])**2)).mean()})
+        wandb.log({'TM_protein_ddg_pearson': protein_results.apply(lambda x: x['inferred_ddG'].corr(x['ddG'], method='pearson')).mean(), 'TM_protein_ddg_spearman': protein_results.apply(lambda x: x['inferred_ddG'].corr(x['ddG'], method='spearman')).mean(), 'TM_protein_ddg_rmse': protein_results.apply(lambda x: np.sqrt(np.mean((x['inferred_ddG'] - x['ddG'])**2))).mean()})
     
 
 
@@ -162,4 +162,3 @@ def main():
 if __name__ == "__main__":
     
     main()
-

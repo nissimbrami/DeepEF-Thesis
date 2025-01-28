@@ -10,7 +10,7 @@ from analysis.analysis_runner import run_analysis
 import wandb
 
 DEBUG = False
-BASE_MODEL = './res/trianed_models-light_attention'
+BASE_MODEL = './res/trianed_models-light_attention-finetuned'
 
 
 if not DEBUG:
@@ -113,10 +113,11 @@ def print_stat(model_path):
 
 def main():
     model_list = []
-    for i in range(20 , 23):
+    for i in range(0 , 1):
     #    model_list.append(f'res/trianed_models-cycle2_5_outline2/{i}_final_model.pt')
     #    model_list.append(f'res/trianed_models-cycle2_5_outline3/{i}_final_model.pt')
-       model_list.append(BASE_MODEL+f"/{i}_final_model.pt")
+    #    model_list.append(BASE_MODEL+f"/{i}_final_model.pt")
+        model_list.append(f'Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-light_attentionkf/kf_4_epoch_49.pt')
     #    model_list.append(f'res/trianed_models-droupout-0.8/{i}_final_model.pt')
         # model_list.append(f'res/trianed_models-cycle_per_2_norm/{i}_final_model.pt')
         # model_list.append(f'res/trianed_models-cycle2_5/{i}_final_model.pt')

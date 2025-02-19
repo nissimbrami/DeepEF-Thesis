@@ -176,9 +176,9 @@ class AllProteinValidationDataset(Dataset):
         
         # If dG_ml is check save the threshold of -1 and 5
         if self.dG_ml:
-            threshold = [-1,5]
-            mutations['delta_g'] = mutations['delta_g'].apply(lambda x: threshold[0] if x < threshold[0] else 
-                                                              threshold[1] if x > threshold[1] else x)
+            threshold = [-1.0,5.0]
+            delta_g_tensor = torch.where(delta_g_tensor < threshold[0], delta_g_tensor, threshold[0])
+            delta_g_tensor = torch.where(delta_g_tensor > threshold[1], delta_g_tensor, threshold[1])
         
         indexes = set(mutations.index)
         # remove unstable mut
@@ -227,8 +227,8 @@ class AllProteinValidationDataset(Dataset):
         # Check if deltaG thershold is set and apply it to the mutations dataframe
         if self.dG_ml:
             threshold = [-1,5]
-            mutations['delta_g'] = mutations['delta_g'].apply(lambda x: threshold[0] if x < threshold[0] else 
-                                                              threshold[1] if x > threshold[1] else x)
+            delta_g_tensor = torch.where(delta_g_tensor < threshold[0], delta_g_tensor, threshold[0])
+            delta_g_tensor = torch.where(delta_g_tensor > threshold[1], delta_g_tensor, threshold[1])
         
         indexes = set(mutations.index)
         # remove unstable mut

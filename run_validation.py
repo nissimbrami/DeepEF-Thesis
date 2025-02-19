@@ -120,7 +120,7 @@ def print_stat(model_path):
 
 def main():
     model_list = []
-    for i in range(0 , 1):
+    for i in range(32 , 37):
     #    model_list.append(f'res/trianed_models-cycle2_5_outline2/{i}_final_model.pt')
     #    model_list.append(f'res/trianed_models-cycle2_5_outline3/{i}_final_model.pt')
        model_list.append(BASE_MODEL+f"/{i}_final_model.pt")

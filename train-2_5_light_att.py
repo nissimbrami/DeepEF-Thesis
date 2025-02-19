@@ -20,7 +20,7 @@ import wandb
 torch.set_default_dtype(CFG.torch_default_dtype)
 # torch.autograd.set_detect_anomaly(True)
 # CFG.debug = True
-# CFG.clip_grad_norm = True
+# CFG.clip_grad_norm = True 
 # Set wandb
 if not CFG.debug:
     wandb.init(project="Thermodynamic+decoy",name = 'epoch 36 light attention')

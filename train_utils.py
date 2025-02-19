@@ -190,7 +190,16 @@ def diff_data(model, optimizer, dataloader, device,epoch,N,valid_loader):
         torch.save(all_Xn,"./all_Xn_padded.pt")
 
 def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
-    """Get graph representation of protein"""
+    """Get graph representation of protein 
+    Args:
+        x (torch.Tensor): Input tensor representing the coordinates of atoms in the protein structure. Shape: [N, 4,3].
+        one_hot (torch.Tensor): One-hot encoded tensor representing additional categorical features for each atom. Shape: [N, 20].
+        emb (torch.Tensor): Tensor representing learned embedding features for each atom. Shape: [N, E].
+        mask (torch.Tensor): Binary mask tensor indicating which atoms should be considered in the graph. 0 indicates masked out, 1 indicates active. Shape: [N].
+        gaussian_coef (float, optional): Coefficient used in the Gaussian kernel to compute distances between atoms. Default value is taken from configuration (CFG.gaussian_coef).
+    Returns:
+        torch.Tensor: Concatenated tensor containing distance matrix features, bonded features, embedding features, and one-hot encoded features. Shape: [N, 16 + 32 + emb_size].
+    """
     D = get_dist_matrix(x) # N,N,16
     D = torch.relu(torch.exp(gaussian_coef*D**2))
     # remove masks values
@@ -199,7 +208,7 @@ def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     D[:,mask_index[0],:] = 0
     # get bonded features
     Fb = get_bonded_features(D) # N,32
-    # sum over the atoms,
+    # sum over the atoms
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
     emb = F.normalize(emb,p=2,dim=0)

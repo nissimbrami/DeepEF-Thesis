@@ -31,6 +31,8 @@ parser.add_argument('--model_name', type=str, default='PEM_fine_tuned', help='Mo
 parser.add_argument('--dataset_type', type=str, default='pnas', help='Dataset type')
 parser.add_argument('--unstable_mut', action='store_true', help='Save the unstable mutations')
 parser.add_argument('--one_mut', action='store_true', help='Remove the multiple mutations when fine-tuning')
+parser.add_argument('--freeze_layers',action = 'store_true', help ='Freeze model layers except mlp and LA')
+parser.add_argument('--trained_model_path',type=str,default = "./res/trianed_models-light_attention/43_final_model.pt",help='Trained model path')
 
 args = parser.parse_args()
 
@@ -45,12 +47,12 @@ RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG  = args.debug
 EPOCHS = 30 if not DEBUG else 1
-FREEZE_LAYERS = True
+FREEZE_LAYERS = args.freeze_layers
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 64
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
-TRAINED_MODEL_PATH = "./res/trianed_models-light_attention/43_final_model.pt"
+TRAINED_MODEL_PATH = args.trained_model_path
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = args.model_name
 PRETRAINED = True
@@ -454,6 +456,7 @@ def run_training():
     LR = 1e-5
     
     print('Training the whole model with lower learning rate')
+    trainer = Trainer(model, train_ds, test_ds)
     model, pc_corr = trainer.train(epochs=EPOCHS, s_epoch=EPOCHS)
     wandb.finish()
     

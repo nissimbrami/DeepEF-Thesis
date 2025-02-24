@@ -33,6 +33,7 @@ parser.add_argument('--unstable_mut', action='store_true', help='Save the unstab
 parser.add_argument('--one_mut', action='store_true', help='Remove the multiple mutations when fine-tuning')
 parser.add_argument('--freeze_layers',action = 'store_true', help ='Freeze model layers except mlp and LA')
 parser.add_argument('--trained_model_path',type=str,default = "./res/trianed_models-light_attention/43_final_model.pt",help='Trained model path')
+parser.add_argument('--dg_ml', action='store_true', help='Change deltaG threshold to [-1,5]')
 
 args = parser.parse_args()
 
@@ -67,7 +68,7 @@ UNSTABLE_MUT = args.unstable_mut
 DS_TYPE = args.dataset_type
 LIGHT_ATTENTION = True
 ONE_MUT =  args.one_mut
-DG_ML = True
+DG_ML = args.dg_ml
 
 # config wandb
 config = {
@@ -351,7 +352,7 @@ class Trainer():
                 # save the model
                 torch.save(self.model.state_dict(), os.path.join(MODEL_PATH, MODEL_NAME, f'epoch_{epoch}.pt'))
             
-            pc_corr, val_loss = self.validate(epoch,run)
+            pc_corr, val_loss, _ = self.validate(epoch,run)
             self.model.train()
             # update the learning rate
             self.scheduler.step(pc_corr)
@@ -372,6 +373,7 @@ class Trainer():
         val_loss = 0
         val_dg = torch.tensor([],device=self.device)
         val_dg_pred = torch.tensor([],device=self.device)
+        val_df = pd.DataFrame([],columns=['protein','deltaG','pred_deltaG'])
         with torch.no_grad():
             for i, batch in enumerate(tqdm(self.val_ds,desc=f'Validation Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
@@ -388,6 +390,11 @@ class Trainer():
                     batch_loss += loss.item()
                     val_dg = torch.cat((val_dg, delta_g), dim=0)
                     val_dg_pred = torch.cat((val_dg_pred, output), dim=0)
+                    batch_df = pd.DataFrame([],columns=['protein','deltaG','pred_deltaG'])
+                    batch_df['deltaG'] = delta_g.cpu().numpy()
+                    batch_df['pred_deltaG']  = output.cpu().numpy()
+                    batch_df['protein'] = [batch['name'][0] for i in range(len(delta_g))]
+                    val_df = pd.concat([val_df,batch_df])
                     # clear memory
                     torch.cuda.empty_cache()
                     gc.collect()
@@ -400,7 +407,10 @@ class Trainer():
             wandb_log({'val_loss': val_loss,'epoch': epoch, 'val_pc_corr': pc_corr},run)
         else:
             wandb_log({'test_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr},run)
-        return pc_corr, val_loss
+        
+        # Save datafeame
+        # val_df.to_csv("val_df.csv",index=False)
+        return pc_corr, val_loss, val_df
         
     def get_deltaG(self, batch, i):
         # move all to the same device
@@ -474,11 +484,34 @@ def get_valid_proteins(val_ds):
     df.to_csv('validation_proteins_mutations.csv', index=False)
     
     return df
+
+def run_validation_metrics():
+    """"Rum metrics for validations sets"""
+    train_ds = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+                                          mutations_root_dir=mutations_root_dir, train=True)
+    
+    test_ds = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+                                            mutations_root_dir=mutations_root_dir, train=False)
+    
+     # Create the dataloaders
+    train_ds = DataLoader(train_ds, batch_size=1, shuffle=True)
+    test_ds = DataLoader(test_ds, batch_size=1, shuffle=True)
+    # Create the model
+    model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
+                light_attention=LIGHT_ATTENTION).to(DEVICE)
+    if PRETRAINED: 
+        try:
+            model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
+        except:
+            model.load_state_dict(torch.load(TRAINED_MODEL_PATH))
+    # Train the model
+    trainer = Trainer(model, train_ds, test_ds)
+    model, pc_corr,val_df = trainer.validate(0)
+    val_df.to_csv("./"+MODEL_NAME+".csv",index=False)
+    
 if __name__ == '__main__':
     tensor_root_dir = r'./data/Processed_K50_dG_datasets/training_data'
     mutations_root_dir = r'./data/Processed_K50_dG_datasets/mutation_datasets'
     CFG.dropout_rate = DROP_OUT
     run_training()
-    FREEZE_LAYERS = False
-    LR = 1e-5
-   
+    # run_validation_metrics()

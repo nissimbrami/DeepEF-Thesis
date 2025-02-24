@@ -120,10 +120,13 @@ def print_stat(model_path):
 
 def main():
     model_list = []
-    for i in range(32 , 37):
+    for i in range(58 , 59):
     #    model_list.append(f'res/trianed_models-cycle2_5_outline2/{i}_final_model.pt')
     #    model_list.append(f'res/trianed_models-cycle2_5_outline3/{i}_final_model.pt')
-       model_list.append(BASE_MODEL+f"/{i}_final_model.pt")
+    #    model_list.append(BASE_MODEL+f"/{i}_final_model.pt")
+        model_list.append("./Megascale-fineTuning/models/deepef2_ds_model/epoch_83.pt")
+        model_list.append("./Megascale-fineTuning/models/deepef1_ds_model/epoch_83.pt")
+        model_list.append("./Megascale-fineTuning/models/pnas_ds_model/epoch_83.pt")
         # model_list.append(f'Megascale-fineTuning/models/PEM_fine_tuned-trianed_models-light_attentionkf/kf_4_epoch_49.pt')
     #    model_list.append(f'res/trianed_models-droupout-0.8/{i}_final_model.pt')
         # model_list.append(f'res/trianed_models-cycle_per_2_norm/{i}_final_model.pt')

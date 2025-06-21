@@ -171,30 +171,34 @@ class AllProteinValidationDataset(Dataset):
         mutations = pd.read_csv(mutations_path)
         mutations = mutations[~mutations['mut_type'].str.contains('ins|del')].reset_index(drop=True)
         # Load and preprocess the data for each protein
-        coords_tensor = torch.load(os.path.join(protein_dir, COORDS),weights_only=True)
-        delta_g_tensor = torch.load(os.path.join(protein_dir, DELTA_G),weights_only=True)
-        mask_tensor = torch.load(os.path.join(protein_dir, MASKS),weights_only=True)
-        one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT),weights_only=True)
+        coords_tensor = torch.load(os.path.join(protein_dir, COORDS), weights_only=True)
+        delta_g_tensor = torch.load(os.path.join(protein_dir, DELTA_G), weights_only=True)
+        mask_tensor = torch.load(os.path.join(protein_dir, MASKS), weights_only=True)
+        one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT), weights_only=True)
         embedding_tensor = self.load_embedding_tensor(os.path.join(protein_dir, PROTT5_EMBEDDINGS))
         
         # If dG_ml is check save the threshold of -1 and 5
         if self.dG_ml:
-            threshold = [-1.0,5.0]
+            threshold = [-1.0, 5.0]
             delta_g_tensor = torch.where(delta_g_tensor > threshold[0], delta_g_tensor, threshold[0])
             delta_g_tensor = torch.where(delta_g_tensor < threshold[1], delta_g_tensor, threshold[1])
         
         indexes = set(mutations.index)
+        
         # remove unstable mut
         if not self.unstable_mut:
             indexes -= set(mutations[mutations['ddG_ML'] == '-'].index)
-                 
+             
         # remove the mutations with more than one mutation
         if self.one_mut:
             indexes -= set(mutations[mutations['mut_type'].str.contains(':')].index)
         
-        if self.ds_type in ('pnas','deepef1') :
+        if self.ds_type in ('pnas', 'deepef1'):
             # get the pnas mutations indexes
             indexes -= set(mutations[~mutations['name'].isin(self.test_mutations['name'])].index)
+        
+        # Ensure iloc[0] is not removed by adding it as the first index for ddg calc
+        indexes.insert(0, 0)
         
         indexes = list(indexes)
         mutations = mutations.loc[indexes]
@@ -246,6 +250,9 @@ class AllProteinValidationDataset(Dataset):
             # get the pnas mutations indexes
             indexes -= set(mutations[~mutations['name'].isin(self.pnas_mutations['name'])].index)
        
+        # Ensure iloc[0] is not removed by adding it as the first index for ddg calc
+        indexes.insert(0, 0)
+        
         indexes = list(indexes)
         mutations = mutations.loc[indexes]
         delta_g_tensor = delta_g_tensor[indexes]

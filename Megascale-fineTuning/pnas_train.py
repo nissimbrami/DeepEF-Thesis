@@ -23,9 +23,11 @@ import gc
 import pandas as pd
 # parser
 import argparse
+# import the new dataset
+from new_dataset import MSDataset
 
 parser = argparse.ArgumentParser(description='Train the model with the mega-scale data')
-parser.add_argument('--debug', action='store_true', help='Debug mode')
+parser.add_argument('--debug',default=False, action='store_true', help='Debug mode')
 parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
 parser.add_argument('--model_name', type=str, default='PEM_fine_tuned', help='Model name')
 parser.add_argument('--dataset_type', type=str, default='pnas', help='Dataset type')
@@ -47,7 +49,8 @@ VAL_RATIO = 0.2
 RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG  = args.debug
-EPOCHS = 30 if not DEBUG else 1
+EPOCHS_FREEZE = 20 if not DEBUG else 1
+EPOCHS_NO_FREEZE = 60 if not DEBUG else 1
 FREEZE_LAYERS = args.freeze_layers
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
@@ -81,7 +84,7 @@ config = {
     'random_seed': RANDOM_SEED,
     'nano_to_angstrom': NANO_TO_ANGSTROM,
     'debug': DEBUG,
-    'epochs': EPOCHS,
+    'epochs': EPOCHS_FREEZE,
     'freeze_layers': FREEZE_LAYERS,
     'model_path': MODEL_PATH,
     'model_name': MODEL_NAME,
@@ -328,7 +331,9 @@ class Trainer():
         for epoch in range(s_epoch, s_epoch + epochs):
             self.model.train()
             for i, batch in enumerate(tqdm(self.train_ds, desc=f'Training Epoch: {epoch}')):
-                batch = normalize_batch(batch, True)
+                # batch = normalize_batch(batch, True)
+                if batch['delta_g'].size(1) == 1:
+                    continue
                 batch_loss = 0
                 batch_idx = 1
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
@@ -383,7 +388,7 @@ class Trainer():
         val_df = pd.DataFrame([],columns=['protein','deltaG','pred_deltaG'])
         with torch.no_grad():
             for i, batch in enumerate(tqdm(self.val_ds,desc=f'Validation Epoch: {epoch}')):
-                batch = normalize_batch(batch, True)
+                # batch = normalize_batch(batch, True)
                 batch_loss = 0
                 batch_idx = 1
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
@@ -409,12 +414,51 @@ class Trainer():
             val_loss += batch_loss
         val_loss /= len(self.val_ds)
         print(f'Validation Loss: {val_loss}')
-        pc_corr = torch.corrcoef(torch.cat((val_dg[None,:],val_dg_pred[None,:])))[0, 1]
+        # ddG calculation (difference from wildtype, which is the first value)
+        dg_wt = val_dg[0].item() if val_dg.numel() > 0 else 0.0
+        dg_pred_wt = val_dg_pred[0].item() if val_dg_pred.numel() > 0 else 0.0
+        ddg_true = (val_dg - dg_wt).cpu().numpy()
+        ddg_pred = (val_dg_pred - dg_pred_wt).cpu().numpy()
+        # Pearson correlation (deltaG)
+        pc_corr = torch.corrcoef(torch.cat((val_dg[None,:],val_dg_pred[None,:])))[0, 1].item()
+        # Spearman correlation (deltaG)
+        try:
+            from scipy.stats import spearmanr
+            sp_corr, _ = spearmanr(val_dg.cpu().numpy(), val_dg_pred.cpu().numpy())
+            ddg_pc_corr, _ = spearmanr(ddg_true, ddg_pred)
+        except ImportError:
+            sp_corr = float('nan')
+            ddg_pc_corr = float('nan')
+        # RMSE (deltaG)
+        rmse = float(torch.sqrt(F.mse_loss(val_dg_pred, val_dg)).item())
+        # ddG metrics
+        from sklearn.metrics import mean_squared_error
+        ddg_rmse = mean_squared_error(ddg_true, ddg_pred, squared=False) if len(ddg_true) > 1 else float('nan')
+        # Pearson for ddG
+        try:
+            from scipy.stats import pearsonr
+            ddg_pearson_corr, _ = pearsonr(ddg_true, ddg_pred)
+        except ImportError:
+            ddg_pearson_corr = float('nan')
+        # Log all metrics
         if not test:
-            wandb_log({'val_loss': val_loss,'epoch': epoch, 'val_pc_corr': pc_corr},run)
+            wandb_log({'val_loss': val_loss,
+                       'epoch': epoch,
+                       'val_pc_corr': pc_corr,
+                       'val_sp_corr': sp_corr,
+                       'val_rmse': rmse,
+                       'val_ddg_pc_corr': ddg_pearson_corr,
+                       'val_ddg_sp_corr': ddg_pc_corr,
+                       'val_ddg_rmse': ddg_rmse}, run)
         else:
-            wandb_log({'test_loss': val_loss,'epoch': epoch, 'pc_corr': pc_corr},run)
-        
+            wandb_log({'test_loss': val_loss,
+                       'epoch': epoch,
+                       'pc_corr': pc_corr,
+                       'sp_corr': sp_corr,
+                       'rmse': rmse,
+                       'ddg_pc_corr': ddg_pearson_corr,
+                       'ddg_sp_corr': ddg_pc_corr,
+                       'ddg_rmse': ddg_rmse}, run)
         # Save datafeame
         # val_df.to_csv("val_df.csv",index=False)
         return pc_corr, val_loss, val_df
@@ -444,10 +488,10 @@ class Trainer():
 
 def run_training():
     """Run the training for all the proteins"""
-    train_ds = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+    train_ds = MSDataset(tensor_root_dir=tensor_root_dir,
                                           mutations_root_dir=mutations_root_dir, train=True)
     
-    test_ds = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+    test_ds = MSDataset(tensor_root_dir=tensor_root_dir,
                                             mutations_root_dir=mutations_root_dir, train=False)
     
      # Create the dataloaders
@@ -465,7 +509,7 @@ def run_training():
     
     # Train the model
     trainer = Trainer(model, train_ds, test_ds)
-    model, pc_corr = trainer.train(epochs=EPOCHS)
+    model, pc_corr = trainer.train(epochs=EPOCHS_FREEZE)
     
     # Unfreeze the layers and train the model with lower learning rate
     global FREEZE_LAYERS, LR
@@ -474,7 +518,7 @@ def run_training():
     
     print('Training the whole model with lower learning rate')
     trainer = Trainer(model, train_ds, test_ds)
-    model, pc_corr = trainer.train(epochs=EPOCHS, s_epoch=EPOCHS)
+    model, pc_corr = trainer.train(epochs=EPOCHS_NO_FREEZE, s_epoch=EPOCHS_NO_FREEZE)
     wandb.finish()
     
     print(f'Training completed with Pearson Correlation: {pc_corr}')
@@ -494,10 +538,10 @@ def get_valid_proteins(val_ds):
 
 def run_validation_metrics():
     """"Rum metrics for validations sets"""
-    train_ds = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+    train_ds = MSDataset(tensor_root_dir=tensor_root_dir,
                                           mutations_root_dir=mutations_root_dir, train=True)
     
-    test_ds = AllProteinValidationDataset(tensor_root_dir=tensor_root_dir,
+    test_ds = MSDataset(tensor_root_dir=tensor_root_dir,
                                             mutations_root_dir=mutations_root_dir, train=False)
     
      # Create the dataloaders
@@ -517,8 +561,8 @@ def run_validation_metrics():
     val_df.to_csv("./"+MODEL_NAME+".csv",index=False)
     
 if __name__ == '__main__':
-    tensor_root_dir = r'./data/Processed_K50_dG_datasets/training_data'
-    mutations_root_dir = r'./data/Processed_K50_dG_datasets/mutation_datasets'
+    tensor_root_dir = r'./data/MsDs/training_data'
+    mutations_root_dir = r'./data/MsDs/mutation_files'
     CFG.dropout_rate = DROP_OUT
     run_training()
     # run_validation_metrics()

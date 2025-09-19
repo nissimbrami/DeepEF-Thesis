@@ -63,21 +63,21 @@ class SidChainDS(Dataset):
         while decoy_path == item_path:
             decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]
         # load data
-        id = torch.load(item_path + '/id.pt', weights_only=True)
-        crd_backbone = torch.tensor(torch.load(item_path + '/crd_backbone.pt', weights_only=True),dtype=torch.get_default_dtype()) #backbone coordinates N,Calpha,C
-        crd_decoy = torch.tensor(torch.load(decoy_path + '/crd_backbone.pt', weights_only=True),dtype=torch.get_default_dtype()) #backbone coordinates N,Calpha,C
+        id = torch.load(item_path + '/id.pt', weights_only=False)
+        crd_backbone = torch.tensor(torch.load(item_path + '/crd_backbone.pt', weights_only=False),dtype=torch.get_default_dtype()) #backbone coordinates N,Calpha,C
+        crd_decoy = torch.tensor(torch.load(decoy_path + '/crd_backbone.pt', weights_only=False),dtype=torch.get_default_dtype()) #backbone coordinates N,Calpha,C
         
-        mask = torch.load(item_path + '/mask.pt', weights_only=True)
-        mask_decoy = torch.load(decoy_path + '/mask.pt', weights_only=True)
+        mask = torch.load(item_path + '/mask.pt', weights_only=False)
+        mask_decoy = torch.load(decoy_path + '/mask.pt', weights_only=False)
         # change to 1,0 mask
         mask = torch.tensor(np.where(np.array(list(mask))=='+',1,0))
         mask_decoy = torch.tensor(np.where(np.array(list(mask_decoy))=='+',1,0))
         # one hot encoding of the sequence
-        seq_one_hot = torch.load(item_path + '/seq_one_hot.pt', weights_only=True)
-        seq = torch.load(item_path + '/seq.pt', weights_only=True)
-        seq_decoy = torch.load(decoy_path + '/seq.pt', weights_only=True)
+        seq_one_hot = torch.load(item_path + '/seq_one_hot.pt', weights_only=False)
+        seq = torch.load(item_path + '/seq.pt', weights_only=False)
+        seq_decoy = torch.load(decoy_path + '/seq.pt', weights_only=False)
         # proT5_emb = torch.zeros((len(seq),1024)) # for testing
-        ang = torch.tensor(torch.load(item_path + '/ang.pt', weights_only=True))
+        ang = torch.tensor(torch.load(item_path + '/ang.pt', weights_only=False))
         ang_backbone = torch.clone(ang)[:,:3] #angles for the backbone phi, psi, omega
         # Add Cbeta atom to the coordinates
         crd_backbone = self.add_cb(crd_backbone)
@@ -87,21 +87,21 @@ class SidChainDS(Dataset):
         crd_decoy = crd_decoy * C.NANO_TO_ANGSTROM 
         
         # ProT5 embedding for protein mutation
-        seq_mut =  torch.load(item_path + '/seq_mut.pt', weights_only=True)
+        seq_mut =  torch.load(item_path + '/seq_mut.pt', weights_only=False)
         # proT5_mut = torch.zeros((len(seq),1024)) # for testing
         # seq_mut = seq # for testing
         if self.LLM_EMB:
-            proT5_mut = torch.load(item_path + '/proT5_emb_mut.pt', weights_only=True)
-            proT5_emb = torch.load(item_path + '/proT5_emb.pt', weights_only=True)
+            proT5_mut = torch.load(item_path + '/proT5_emb_mut.pt', weights_only=False)
+            proT5_emb = torch.load(item_path + '/proT5_emb.pt', weights_only=False)
             try:
-                proT5_cycle1 = torch.load(item_path + '/proT5_emb_cycle1.pt', weights_only=True)
+                proT5_cycle1 = torch.load(item_path + '/proT5_emb_cycle1.pt', weights_only=False)
             except:
-                proT5_cycle1 = torch.load(item_path + '/proT5_emb_cycle.pt', weights_only=True)
-            proT5_cycle2 = torch.load(item_path + '/proT5_emb_cycle2.pt', weights_only=True)
-            proT5_cycle3 = torch.load(item_path + '/proT5_emb_cycle3.pt', weights_only=True)
-            proT5_cycle4 = torch.load(item_path + '/proT5_emb_cycle4.pt', weights_only=True)
-            proT5_cycle5 = torch.load(item_path + '/proT5_emb_cycle5.pt', weights_only=True)
-            proT5_cycle6 = torch.load(item_path + '/proT5_emb_cycle6.pt', weights_only=True)
+                proT5_cycle1 = torch.load(item_path + '/proT5_emb_cycle.pt', weights_only=False)
+            proT5_cycle2 = torch.load(item_path + '/proT5_emb_cycle2.pt', weights_only=False)
+            proT5_cycle3 = torch.load(item_path + '/proT5_emb_cycle3.pt', weights_only=False)
+            proT5_cycle4 = torch.load(item_path + '/proT5_emb_cycle4.pt', weights_only=False)
+            proT5_cycle5 = torch.load(item_path + '/proT5_emb_cycle5.pt', weights_only=False)
+            proT5_cycle6 = torch.load(item_path + '/proT5_emb_cycle6.pt', weights_only=False)
         else:
             proT5_emb = torch.zeros((len(seq),1024))
             proT5_mut = torch.zeros((len(seq),1024))

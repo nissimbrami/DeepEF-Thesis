@@ -23,7 +23,7 @@ torch.set_default_dtype(CFG.torch_default_dtype)
 # CFG.clip_grad_norm = True 
 # Set wandb
 if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 light attention fix')
+    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 light attention GCN new')
 if CFG.debug:
    CFG.model_path = "./res/debug/"
    CFG.results_path = './res/results-debug/'
@@ -429,7 +429,7 @@ def print_par(model):
    
 if __name__ == '__main__':
     if not CFG.debug:
-        CFG.model_path = './res/trianed_models-light_attention_fix/'
+        CFG.model_path = './res/trianed_models-light_attention_newGCN/'
         CFG.results_path = './res/results-emb/'
     # CFG.data_path = './data/casp12_data_30/'
     CFG.dropout_rate = 0.3

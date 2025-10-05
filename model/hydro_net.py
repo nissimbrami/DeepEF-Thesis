@@ -338,7 +338,7 @@ class PEM(torch.nn.Module):
         self.B,self.N,_ = x.shape
         x = x.reshape(self.B * self.N,-1)
         # split features to 2 graphs, bonded and non-bonded
-        x_gcn = torch.cat((x[:,self.non_bonded_index+ self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
+        x_gcn = torch.cat((x[:,:self.non_bonded_index+ self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
         x_gat = torch.cat((x[:,:self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,36
         x_emb_features = x[:,self.llm_index:self.one_hot_index] # B*N,1024
         # forward pass through the graph attention and convolution layers

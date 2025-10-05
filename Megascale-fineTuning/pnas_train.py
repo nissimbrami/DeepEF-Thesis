@@ -518,7 +518,7 @@ def run_training():
     
     print('Training the whole model with lower learning rate')
     trainer = Trainer(model, train_ds, test_ds)
-    model, pc_corr = trainer.train(epochs=EPOCHS_NO_FREEZE, s_epoch=EPOCHS_NO_FREEZE)
+    model, pc_corr = trainer.train(epochs=EPOCHS_NO_FREEZE, s_epoch=EPOCHS_FREEZE)
     wandb.finish()
     
     print(f'Training completed with Pearson Correlation: {pc_corr}')

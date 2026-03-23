@@ -13,21 +13,37 @@ from tqdm import tqdm
 import gc
 import time
 import sys
+import os
 import pandas as pd
 import wandb
 
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
+
+# Device-aware helpers for mixed precision and cache clearing
+def _empty_cache():
+    if CFG.device.type == "cuda":
+        torch.cuda.empty_cache()
+    elif CFG.device.type == "mps":
+        torch.mps.empty_cache()
+
+def _autocast():
+    """Return autocast context manager for the active device."""
+    if CFG.device.type == "cuda":
+        return torch.amp.autocast(device_type="cuda", dtype=CFG.precision)
+    # MPS/CPU: no-op context manager (autocast not well supported)
+    return torch.amp.autocast(device_type="cpu", enabled=False)
+
+def _make_scaler():
+    """GradScaler only works on CUDA. Return a dummy on other devices."""
+    if CFG.device.type == "cuda":
+        return torch.cuda.amp.GradScaler()
+    # On MPS/CPU: return a scaler that passes through (scale=1, no-op)
+    return torch.amp.GradScaler(enabled=False)
 # torch.autograd.set_detect_anomaly(True)
 # CFG.debug = True
 # CFG.clip_grad_norm = True 
-# Set wandb
-if not CFG.debug:
-    wandb.init(project="Thermodynamic+decoy",name = 'epoch 0 light attention GCN new')
-if CFG.debug:
-   CFG.model_path = "./res/debug/"
-   CFG.results_path = './res/results-debug/'
-   print('**** Debug mode ****')
+# wandb and debug mode are configured in main() after parsing args
 
 
 
@@ -110,6 +126,28 @@ def get_noised_proteins(data,device):
     return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6
     
 # define validation function
+def compute_metrics(Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4):
+    """Compute ranking and energy gap metrics from energy values."""
+    ejf = Ejf.item()
+    eju, exd, ecd = Eju.item(), Exd.item(), Ecd.item()
+    exdu = Exdu.item()
+    ecy1, ecy2, ecy3, ecy4 = Ecy1.item(), Ecy2.item(), Ecy3.item(), Ecy4.item()
+    all_energies = [ejf, eju, exd, ecd, exdu, ecy1, ecy2, ecy3, ecy4]
+    return {
+        # Ranking (1 if correct, 0 if wrong)
+        "rank_Ejf_lt_Exd": 1.0 if ejf < exd else 0.0,
+        "rank_Ejf_lt_Ecd": 1.0 if ejf < ecd else 0.0,
+        "rank_Eju_lt_Ecd": 1.0 if eju < ecd else 0.0,
+        "rank_Ejf_lowest": 1.0 if ejf == min(all_energies) else 0.0,
+        # Energy gaps (positive = correct ranking)
+        "gap_Exd_Ejf": exd - ejf,
+        "gap_Ecd_Ejf": ecd - ejf,
+        "gap_Ecd_Eju": ecd - eju,
+        # Stability
+        "energy_mean": sum(all_energies) / len(all_energies),
+        "energy_std": float(torch.std(torch.tensor(all_energies)).item()),
+    }
+
 def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     """
     Validation function for the model.
@@ -119,53 +157,64 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     valid_lossg = 0
     valid_lossc = 0
     n_skips = 0
-    model.eval() # cant use eval because of the loss function calculation
+    val_metrics_accum = {}
+    model.eval()
     with tqdm(dataloader, unit="batch") as tepoch:
         # set progress bar description
         tepoch.set_description(f"Validation: Epoch {epoch}")
         for index, data in (enumerate(tepoch)):
             # Clean the GPU cache
-            if(device.type == "cuda" or device.type == "mps"):    
-                torch.cuda.empty_cache()
+            if(device.type == "cuda" or device.type == "mps"):
+                _empty_cache()
             gc.collect()
             # zero the parameter gradients
             optimizer.zero_grad()
             Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6 = get_noised_proteins(data,device)
+            if Xjf is None:
+                n_skips += 1
+                continue
             X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4),dim=0)
-            
+
             with torch.no_grad():
                 # half precision validation
-                with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+                with _autocast():
                     # calculate the energy for the folded unfolded and decoy structure
                     E = model(X)
                     Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4 = E[0], E[1], E[2], E[3], E[4], E[5], E[6], E[7], E[8]
-                    # calculate the loss   
+                    # calculate the loss
                     loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = False)
-                
+
             # Denoising score matching (replaces gradient penalty)
-            Ejf_grad = torch.tensor(0.0).to(device)
             if CFG.gradient_penalty:
                 # zero the parameter gradients
                 optimizer.zero_grad()
-                torch.cuda.empty_cache()
+                _empty_cache()
                 gc.collect()
-                with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
-                    lossg = denoising_score_matching(model, Xjf, sigma=CFG.sigma)
+                with _autocast():
+                    lossg, _ = denoising_score_matching(model, Xjf, sigma=CFG.sigma)
 
                 loss += lossg
-            
-            valid_loss += loss.item() 
+
+            valid_loss += loss.item()
             valid_lossd += lossd.item()
             valid_lossg += lossg.item()
             valid_lossc += lossc.item()
-            
-            torch.cuda.empty_cache()
+
+            # Accumulate ranking/gap metrics
+            metrics = compute_metrics(Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4)
+            for k, v in metrics.items():
+                val_metrics_accum.setdefault(k, []).append(v)
+
+            _empty_cache()
             gc.collect()
             # update the progress bar
             if index % 1000 == 999:
                 print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}, n_skips: {n_skips}")
-            
-    return valid_loss/len(dataloader),valid_lossd/len(dataloader),valid_lossg/len(dataloader),valid_lossc/len(dataloader)
+
+    n = len(dataloader) - n_skips if len(dataloader) > n_skips else len(dataloader)
+    # Average validation metrics
+    val_metrics_avg = {f"val_{k}": sum(v) / len(v) for k, v in val_metrics_accum.items()}
+    return valid_loss/n, valid_lossd/n, valid_lossg/n, valid_lossc/n, val_metrics_avg
 
 def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None,scaler=None):
     """
@@ -182,7 +231,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         tepoch.set_description(f"Epoch {epoch}")
         for index, data in enumerate(tepoch):
             # Clean the GPU cache
-            torch.cuda.empty_cache()
+            _empty_cache()
             gc.collect()
              # zero the parameter gradients
             optimizer.zero_grad()
@@ -193,7 +242,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4),dim=0)
             
             # half precision training
-            with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
+            with _autocast():
                 # calculate the energy for the folded unfolded and decoy structure
                 E = model(X)
                 Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4 = E[0], E[1], E[2], E[3], E[4], E[5], E[6], E[7], E[8]
@@ -216,20 +265,30 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             scaler.update()
 
             # Denoising score matching (replaces gradient penalty)
-            Ejf_grad = torch.tensor(0.0).to(device)
+            dsm_raw_val = torch.tensor(0.0)
             if CFG.gradient_penalty:
                 # zero the parameter gradients
                 optimizer.zero_grad()
-                torch.cuda.empty_cache()
+                _empty_cache()
                 gc.collect()
                 # half precision training
-                with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
-                    lossg = denoising_score_matching(model, Xjf, sigma=CFG.sigma)
+                with _autocast():
+                    lossg, dsm_raw_val = denoising_score_matching(model, Xjf, sigma=CFG.sigma)
                 # Scales the loss, and calls backward()
                 scaler.scale(lossg).backward()
                 scaler.step(optimizer)
                 scaler.update()
                 loss += lossg
+
+            # Compute ranking/gap metrics
+            metrics = compute_metrics(Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4)
+
+            # Gradient norm for monitoring stability
+            grad_norm = 0.0
+            for p in model.parameters():
+                if p.grad is not None:
+                    grad_norm += p.grad.data.norm(2).item() ** 2
+            grad_norm = grad_norm ** 0.5
 
             # print statistics
             running_loss += loss.item()
@@ -241,23 +300,45 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                     wandb.log({"epoch": epoch,"running_loss": running_loss/1000,"running_lossIndex":ds_length*epoch+index})
                 running_loss = 0.0
 
-            torch.cuda.empty_cache()
+            _empty_cache()
             gc.collect()
             # update the progress bar
-            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"lossc":round(lossc.item(),3),"sequence_len": Xjf.shape[1]})
+            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"sequence_len": Xjf.shape[1]})
             # Log metrics
             if not CFG.debug:
-                wandb.log({"epoch": epoch, "loss": loss.item(),"lossc":lossc.item(),"lossd":lossd.item(),"lossg":lossg.item(), "sequence_len": Xjf.shape[1],
-                           "Exd":Exd.item(),"Eju": Eju.item(), "Ejf":Ejf.item(), "Ecd":Ecd.item(),
-                           "step": ds_length*epoch+index,"Ejf_grad":Ejf_grad.item(), "Exdu":Exdu.item(),"Ecy1":Ecy1.item(),"Ecy2":Ecy2.item(),"Ecy3":Ecy3.item(),"Ecy4":Ecy4.item()})
+                step = ds_length*epoch+index
+                wandb.log({
+                    "epoch": epoch, "step": step, "sequence_len": Xjf.shape[1],
+                    # Losses
+                    "loss": loss.item(), "lossd": lossd.item(), "lossg": lossg.item(),
+                    # Energies
+                    "Ejf": Ejf.item(), "Eju": Eju.item(), "Exd": Exd.item(),
+                    "Ecd": Ecd.item(), "Exdu": Exdu.item(),
+                    "Ecy1": Ecy1.item(), "Ecy2": Ecy2.item(),
+                    "Ecy3": Ecy3.item(), "Ecy4": Ecy4.item(),
+                    # Ranking (per-sample)
+                    **{f"train_{k}": v for k, v in metrics.items()},
+                    # Stability
+                    "grad_norm": grad_norm,
+                    "dsm_raw": dsm_raw_val.item(),
+                })
             
         print(f"skipped {n_skips}")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
         # evaluate the model
-        val_loss, val_lossd,val_lossg,valid_lossc = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
+        val_loss, val_lossd, val_lossg, valid_lossc, val_metrics = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
          # update wandb metrics
         if not CFG.debug:
-            wandb.log({"epoch" : epoch ,"validation loss": val_loss, "learning rate": optimizer.param_groups[0]["lr"], "validation lossd": val_lossd, "validation lossg": val_lossg, "validation lossc": valid_lossc})
+            wandb.log({
+                "epoch": epoch,
+                "learning rate": optimizer.param_groups[0]["lr"],
+                # Validation losses
+                "validation loss": val_loss,
+                "validation lossd": val_lossd,
+                "validation lossg": val_lossg,
+                # Validation ranking & gaps (averaged over all val samples)
+                **val_metrics,
+            })
          # Update the learning rate based on the validation loss
         scheduler.step()
         print (f"validation loss: {val_loss}")
@@ -284,11 +365,11 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         epoch (int): The current epoch
     """
     # setup half precision training
-    scaler = torch.cuda.amp.GradScaler()
+    scaler = _make_scaler()
     for epoch in (range(EPOCH,CFG.num_epochs+EPOCH)):  # loop over the dataset multiple times
 
         
-        torch.cuda.empty_cache()
+        _empty_cache()
         gc.collect()
         model.train()
         model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss, scheduler,scaler)
@@ -342,8 +423,10 @@ def denoising_score_matching(model, X_native, sigma=CFG.sigma):
     target_score = -(X_noisy - X_native.detach()) / (sigma ** 2)
 
     # DSM loss: model score should match target score
-    lossg = torch.mean((grad_E + target_score) ** 2)
-    return lossg
+    # Log compression to keep DSM on same scale as ranking loss (as in train-SM.py)
+    dsm_raw = torch.mean((grad_E + target_score) ** 2)
+    lossg = torch.log(dsm_raw + 1)
+    return lossg, dsm_raw.detach()
 
 def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = True , reg_alpha = CFG.reg_alpha):
     """
@@ -416,6 +499,16 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     # diff_data(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
     
 def main():
+    # Set wandb and debug paths
+    if CFG.debug:
+        CFG.model_path = "./res/debug/"
+        CFG.results_path = './res/results-debug/'
+        print('**** Debug mode ****')
+        os.environ['WANDB_MODE'] = 'offline'
+    if not CFG.debug:
+        wandb.init(project="DeepEF-InfoNCE-DSM", name='InfoNCE+DSM light attention GCN')
+    else:
+        wandb.init(project="DeepEF-InfoNCE-DSM", name='debug-run', mode='offline')
     print('***Start main function***')
     print('***load the data with dataloader***')
     d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, 
@@ -447,10 +540,16 @@ def print_par(model):
             print (name, param.data)
    
 if __name__ == '__main__':
+    # Parse --debug flag for quick local testing on MPS/CPU
+    if '--debug' in sys.argv:
+        CFG.debug = True
+        CFG.debug_size = 20
+        CFG.num_epochs = 2
+        CFG.num_workers = 0
+        print(f'**** Debug mode: {CFG.debug_size} proteins, {CFG.num_epochs} epochs, device={CFG.device} ****')
     if not CFG.debug:
         CFG.model_path = './res/trianed_models-light_attention_newGCN/'
         CFG.results_path = './res/results-emb/'
-    # CFG.data_path = './data/casp12_data_30/'
     CFG.dropout_rate = 0.3
     CFG.gaussian_coef = -0.08
     CFG.reg_alpha = 0.1

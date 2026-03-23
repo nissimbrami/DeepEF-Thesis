@@ -40,8 +40,10 @@ class SidChainDS(Dataset):
         # remove the outliners
         if self.outliners_path:
             self.remove_outliners()
-         # remove the mega-scale proteins 
+         # remove the mega-scale proteins
         self.remove_megascale_proteins()
+        # remove proteins with corrupt coordinates
+        self.filter_corrupt_proteins()
     
     def remove_outliners(self):
         """remove the outliners from the dataset"""
@@ -53,12 +55,36 @@ class SidChainDS(Dataset):
         """remove the proteins from the mega-scale dataset"""
         mega_scale = pd.read_csv('./data/megascale_proteins.csv')
         mega_scale_ids = mega_scale['protein_name'].to_list()
-        self.data_dir = [f for f in self.data_dir if not any(f_ms in f for f_ms in mega_scale_ids)]     
-   
+        self.data_dir = [f for f in self.data_dir if not any(f_ms in f for f_ms in mega_scale_ids)]
+
+    def _has_valid_coords(self, path):
+        """Check that coordinates are not fully NaN and no NaN at valid (mask=1) positions."""
+        try:
+            crd = torch.load(path + '/crd_backbone.pt', weights_only=False).float()
+            if torch.isnan(crd).all():
+                return False
+            mask = torch.load(path + '/mask.pt', weights_only=False)
+            mask = torch.tensor(np.where(np.array(list(mask))=='+', 1, 0))
+            nan_residues = torch.isnan(crd).any(dim=-1).any(dim=-1)
+            valid_residues = mask == 1
+            if (nan_residues & valid_residues).any():
+                return False
+            return True
+        except Exception:
+            return False
+
+    def filter_corrupt_proteins(self):
+        """Remove proteins with corrupt coordinates (all NaN or NaN at valid positions)."""
+        before = len(self.data_dir)
+        self.data_dir = [p for p in self.data_dir if self._has_valid_coords(p)]
+        removed = before - len(self.data_dir)
+        if removed > 0:
+            print(f"Filtered {removed} proteins with corrupt coordinates ({len(self.data_dir)} remaining)")
+
     def __getitem__(self, index):
-        
+
         item_path = self.data_dir[index]
-        
+
         decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]
         while decoy_path == item_path:
             decoy_path = self.data_dir[np.random.randint(len(self.data_dir))]

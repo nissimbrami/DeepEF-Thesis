@@ -2,13 +2,10 @@ import torch
 
 
 class CFG:
-    # device =torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")  # Use GPU is avaliable 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu') 
-    if(device.type == "cuda" or device.type == "mps"):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    if device.type == "cuda":
         torch.cuda.empty_cache()
-        cuda = True
-    else:
-        cuda = False
+    cuda = device.type in ("cuda", "mps")
     debug = False
     if debug:
         data_path = './data/casp12_data_30/'

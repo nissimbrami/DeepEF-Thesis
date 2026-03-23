@@ -22,7 +22,7 @@ import re
 from Bio.PDB import PDBParser
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-DATA_DIR = glob.glob('./data/casp12_data_100/train/*')
+DATA_DIR = glob.glob('./data/casp12_data_30/train/*')
 
 def get_protein_emb(seq):
     """
@@ -189,7 +189,7 @@ def print_statistics(E):
 
 def inference_protein():
     """Inference the protein"""
-    item_path = './data/casp12_data_100/train/1A0N_2_B'
+    item_path = './data/casp12_data_30/train/1A0N_2_B'
     new_seq = 'GSTGVTLFVASYDYEARTEDDLSFHKGEKFQILNSSEGDWWEARSLTTGETGYIPSNYVAPVDSIQAEE'
     # get the data
     print(f'Getting the data of the protein {item_path.split("/")[-1]}')

@@ -1,23 +1,39 @@
+# Data
 /data/*
-/experiments/
-/*/__pycache__/*
+sidechainnet_data/
+*.tar.gz
 *.pt
+*.csv
+
+# Trained models
 trianed_models/*
 trianed_models_log_fix/*
 trianed_models_no_const_log_fix/*
 trianed_models_no_const/*
-*.out
-.DS_Store
-*.csv
+
+# Python
+__pycache__/
 *.pyc
-<<<<<<< HEAD
-res/*
-=======
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/launch.json
+
+# Logs & outputs
+*.out
+*.db
+
+# Images
 *.png
+
+# Experiments
 experiments/plots/*
 experiments/.ipynb_checkpoints
-*.sh
->>>>>>> 715964071456497696c39251fc06cd18f059c969
+
+# Results
+res/*
+
+# Tracking
 wandb/*
-.vscode/launch.json
-*.db

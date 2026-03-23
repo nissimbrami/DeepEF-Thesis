@@ -312,6 +312,10 @@ class PEM(torch.nn.Module):
         # batch and node size
         self.B = 0
         self.N = 0
+
+        # edge index cache
+        self._edge_cache_key = None
+        self._edge_cache = None
         
         # light attention machanism
         self.light_attention = light_attention
@@ -419,28 +423,36 @@ class PEM(torch.nn.Module):
         return E
   
     def get_edge_index(self,x):
-        """Return the edge index for the graph convolution and attention layers
+        """Return the edge index for the graph convolution and attention layers.
         The edge index of the gcn is a line from the amino acid to the next amino acid.
-        The edge index of the gat is a full connected graph."""
-        batches = x.shape[0]
-        counter = 0 # counter for the edge index sequence length
-        for i in range(batches):
-            seq_len = x[i].shape[0]
-            combinations = torch.combinations(torch.arange(counter,counter+ seq_len))
-            edge_index_gat = combinations[combinations[:, 0] != combinations[:, 1]]
-            edge_index_gat = edge_index_gat.t().contiguous().to(CFG.device)
+        The edge index of the gat is a full connected graph.
+        Results are cached and reused when input shape matches."""
+        B, N = x.shape[0], x.shape[1]
+        key = (B, N)
+        if self._edge_cache_key == key and self._edge_cache is not None:
+            return self._edge_cache
 
-            edge_index_gcn = torch.tensor([[counter+i,counter+i+1] for i in range(seq_len-1)]).t().contiguous().to(CFG.device)
-            if i == 0:
-                edge_index_gat_all = edge_index_gat
-                edge_index_gcn_all = edge_index_gcn
-            else:
-                edge_index_gat_all = torch.cat((edge_index_gat_all,edge_index_gat),dim=-1)
-                edge_index_gcn_all = torch.cat((edge_index_gcn_all,edge_index_gcn),dim=-1)
-            
-            counter += seq_len
-        
-        return edge_index_gcn_all,edge_index_gat_all
+        total_nodes = B * N
+        # GAT: fully connected within each batch element (vectorized)
+        arange = torch.arange(N)
+        src, dst = torch.meshgrid(arange, arange, indexing='ij')
+        mask = src != dst
+        local_src, local_dst = src[mask], dst[mask]
+        # Replicate for each batch element with offset
+        offsets = torch.arange(B).unsqueeze(1) * N  # [B, 1]
+        gat_src = (local_src.unsqueeze(0) + offsets).reshape(-1)  # [B * edges_per_batch]
+        gat_dst = (local_dst.unsqueeze(0) + offsets).reshape(-1)
+        edge_index_gat_all = torch.stack([gat_src, gat_dst]).to(CFG.device)
+
+        # GCN: sequential edges (i, i+1) within each batch element
+        local_gcn = torch.arange(N - 1)
+        gcn_src = (local_gcn.unsqueeze(0) + offsets).reshape(-1)
+        gcn_dst = gcn_src + 1
+        edge_index_gcn_all = torch.stack([gcn_src, gcn_dst]).to(CFG.device)
+
+        self._edge_cache_key = key
+        self._edge_cache = (edge_index_gcn_all, edge_index_gat_all)
+        return edge_index_gcn_all, edge_index_gat_all
     
 class PEMSM(torch.nn.Module):
   """Score matching Protein energy model"""

@@ -142,21 +142,17 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                     # calculate the loss   
                     loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = False)
                 
-            # Add gradient penalty
+            # Denoising score matching (replaces gradient penalty)
             Ejf_grad = torch.tensor(0.0).to(device)
             if CFG.gradient_penalty:
                 # zero the parameter gradients
                 optimizer.zero_grad()
                 torch.cuda.empty_cache()
-                gc.collect( )
-                # half precision training
+                gc.collect()
                 with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
-                    # calculate the energy for the wild type
-                    Xjf.requires_grad = True
-                    Ejf_grad = model(Xjf)[0]
-                    lossg = gradient_penalty(Xjf, Ejf_grad)
-                    
-                loss += lossg # add the gradient penalty to the loss
+                    lossg = denoising_score_matching(model, Xjf, sigma=CFG.sigma)
+
+                loss += lossg
             
             valid_loss += loss.item() 
             valid_lossd += lossd.item()
@@ -219,31 +215,22 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # Updates the scale for next iteration
             scaler.update()
 
-            # Add gradient penalty
+            # Denoising score matching (replaces gradient penalty)
             Ejf_grad = torch.tensor(0.0).to(device)
             if CFG.gradient_penalty:
                 # zero the parameter gradients
                 optimizer.zero_grad()
                 torch.cuda.empty_cache()
-                gc.collect( )
+                gc.collect()
                 # half precision training
                 with torch.amp.autocast(device_type="cuda", dtype=CFG.precision):
-                    # calculate the energy for the wild type
-                    Xjf.requires_grad = True
-                    Ejf_grad = model(Xjf)[0]
-                    lossg = gradient_penalty(Xjf, Ejf_grad)
+                    lossg = denoising_score_matching(model, Xjf, sigma=CFG.sigma)
                 # Scales the loss, and calls backward()
-                # to create scaled gradients
                 scaler.scale(lossg).backward()
-
-                # Unscales gradients and calls
-                # or skips optimizer.step()
                 scaler.step(optimizer)
-
-                # Updates the scale for next iteration
                 scaler.update()
-                loss += lossg # add the gradient penalty to the loss
-                
+                loss += lossg
+
             # print statistics
             running_loss += loss.item()
             if index % 1000 == 999 :    # print every 1000 mini-batches
@@ -321,62 +308,94 @@ def gradient_penalty(X_native, E_native):
     lossg = torch.mean(partial_dx_native**2)
     return lossg
 
+def denoising_score_matching(model, X_native, sigma=CFG.sigma):
+    """Denoising score matching loss (Vincent 2011).
+
+    Adds Gaussian noise to native graph features, then trains the energy
+    gradient to point from the noisy version back toward the clean native.
+
+    L_DSM = ||∇E(X̃) + (X̃ - X_native)/σ²||²
+
+    This is equivalent to full score matching (Hyvärinen 2005) as σ→0,
+    but avoids computing the Hessian trace.
+
+    Args:
+        model: the energy model
+        X_native: clean graph features [1, N, features]
+        sigma: noise standard deviation
+    Returns:
+        lossg: scalar loss
+    """
+    # Add Gaussian noise to native features
+    noise = torch.randn_like(X_native) * sigma
+    X_noisy = (X_native.detach() + noise).requires_grad_(True)
+
+    # Compute energy of noisy structure
+    E_noisy = model(X_noisy)[0]
+
+    # Compute gradient of energy w.r.t. noisy input
+    grad_E = torch.autograd.grad(outputs=E_noisy, inputs=X_noisy,
+                                  grad_outputs=torch.ones_like(E_noisy),
+                                  create_graph=True, retain_graph=True)[0]
+
+    # Target score: points from noisy back toward native
+    target_score = -(X_noisy - X_native.detach()) / (sigma ** 2)
+
+    # DSM loss: model score should match target score
+    lossg = torch.mean((grad_E + target_score) ** 2)
+    return lossg
+
 def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = True , reg_alpha = CFG.reg_alpha):
     """
-    The loss function for the model corresponds to 3 main losses:
+    The loss function for the model corresponds to 2 main losses:
     1. lossg: the partial derivative of the energy with respect to the native structure
     2. lossd: the energy of the native structure divided by the decoy energy
-    3. lossc: the energy softplus function for the native and mutant structure(unfolded and folded)
     Args:
         Ejf (tensor): The energy of the folded native structure
-        Ekf (tensor): The energy of the folded mutant structure
         Eju (tensor): The energy of the unfolded native structure
-        Eku (tensor): The energy of the unfolded mutant structure
         Exd (tensor): The energy of the decoy sequence
+        X_native (tensor): The native structure coordinates (for gradient penalty)
         Ecd (tensor): The energy of the decoy structure
         Exdu (tensor): The energy of the decoy structure unfolded
-        Ecy1 (tensor): The energy of the cycle permutation structure first amino acid
-        Ecy2 (tensor): The energy of the cycle permutation structure last amino acid
-        Ecy3 (tensor): The energy of the cycle permutation structure last two amino acid
-        Ecy4 (tensor): The energy of the cycle permutation structure last five amino acid
+        Ecy1-Ecy4 (tensor): The energy of cycle permutation structures
     output:
-        loss (tensor): The loss of the model
-        lossd (tensor): The loss of the model due to the energy of the native structure divided by the decoy energy
-        lossg (tensor): The loss of the model due to the partial derivative of the energy with respect to the native structure
-        lossc (tensor): The loss of the model due to the energy softplus function for the native and mutant structure(unfolded and folded)
+        loss (tensor): The total loss
+        lossd (tensor): The ranking loss
+        lossg (tensor): The gradient penalty loss
+        lossc (tensor): Always zero (removed, kept for API compatibility)
     """
     lossg = gradient_penalty(X_native, Ejf) if with_grad else torch.tensor(0.0).to(Ejf.device)
     lossd = lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2, Ecy3, Ecy4)
-    # lossc will be regularization term of sum of squered energys 
-    lossc = (torch.cat([Ejf.unsqueeze(0)[None,:], Eju.unsqueeze(0)[None,:],
-                        Exd.unsqueeze(0)[None,:], Ecd.unsqueeze(0)[None,:],
-                        Exdu.unsqueeze(0)[None,:], Ecy1.unsqueeze(0)[None,:],
-                        Ecy2.unsqueeze(0)[None,:], Ecy3.unsqueeze(0)[None,:],
-                        Ecy4.unsqueeze(0)[None,:]])**2).mean()
-    lossc = reg_alpha * lossc
-    
-    return lossd+lossg+lossc , lossd, lossg, lossc
+    lossc = torch.tensor(0.0).to(Ejf.device)
+
+    return lossd+lossg , lossd, lossg, lossc
   
-def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2, Ecy3, Ecy4):
-    """Decoy loss:
-    - the energy of a decoy sequece is greater than the energy of the wild-type structure (Ejf<Exd)
-    - the energy of a decoy structure is greater than the energy of the wild-type structure (Ejf<Ecd)
-    - the energy of a folded decoy is greater than the energy of an unfolded decoy (Exdu<Exd)
-    - the energy of a decoy structure is greater than the energy of the unfolded native structure (Eju<Ecd)
-    - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy1)
-    - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy2)
-    - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy3)
-    - the energy of the wild-type structure is lower than the energy of the cycle permutation (Ejf<Ecy4)
+def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2, Ecy3, Ecy4, tau=CFG.tau):
+    """Boltzmann contrastive loss (InfoNCE) for energy ranking.
+
+    Two contrastive terms:
+    1. Ejf should have lowest energy among: Ejf, Exd, Ecd, Eju, Ecy1..4
+       (native folded is the most stable state)
+    2. Eju should have lower energy than Ecd
+       (native unfolded is more stable than a decoy structure)
+
+    L = -log( exp(-E_positive/τ) / Σ exp(-Eᵢ/τ) )
+      = E_positive/τ + log(Σ exp(-Eᵢ/τ))
+
+    When the native is already well below decoys, the loss saturates → 0.
+    Temperature τ controls how strict the ranking is.
     """
-    # loss_decoy = lambda x,y: torch.log((x+1) / (y+1) +1)
-    loss_decoy = lambda x,y: x - y
-    loss = torch.cat([loss_decoy(Ejf, Exd).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecd).unsqueeze(0)[None,:], 
-                      loss_decoy(Eju, Ecd).unsqueeze(0)[None,:], loss_decoy(Ejf, Eju).unsqueeze(0)[None,:], 
-                      loss_decoy(Ejf, Ecy1).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy2).unsqueeze(0)[None,:],
-                      loss_decoy(Ejf, Ecy3).unsqueeze(0)[None,:], loss_decoy(Ejf, Ecy4).unsqueeze(0)[None,:]])
-    loss = torch.mean(loss)
-    # loss = torch.sum(loss)
-    return loss
+    # Primary: native folded should be lowest energy
+    energies_primary = torch.stack([Ejf, Exd, Ecd, Eju, Ecy1, Ecy2, Ecy3, Ecy4])
+    log_probs_primary = -energies_primary / tau
+    loss_primary = -log_probs_primary[0] + torch.logsumexp(log_probs_primary, dim=0)
+
+    # Secondary: native unfolded should be lower than decoy structure
+    energies_secondary = torch.stack([Eju, Ecd])
+    log_probs_secondary = -energies_secondary / tau
+    loss_secondary = -log_probs_secondary[0] + torch.logsumexp(log_probs_secondary, dim=0)
+
+    return loss_primary + loss_secondary
 
     
 def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch,scheduler):

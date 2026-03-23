@@ -100,8 +100,9 @@ class SidChainDS(Dataset):
             proT5_cycle2 = torch.load(item_path + '/proT5_emb_cycle2.pt', weights_only=False)
             proT5_cycle3 = torch.load(item_path + '/proT5_emb_cycle3.pt', weights_only=False)
             proT5_cycle4 = torch.load(item_path + '/proT5_emb_cycle4.pt', weights_only=False)
-            proT5_cycle5 = torch.load(item_path + '/proT5_emb_cycle5.pt', weights_only=False)
-            proT5_cycle6 = torch.load(item_path + '/proT5_emb_cycle6.pt', weights_only=False)
+            # cycle5/cycle6 are unused in training (not passed to model or loss)
+            proT5_cycle5 = torch.zeros((len(seq),1024))
+            proT5_cycle6 = torch.zeros((len(seq),1024))
         else:
             proT5_emb = torch.zeros((len(seq),1024))
             proT5_mut = torch.zeros((len(seq),1024))

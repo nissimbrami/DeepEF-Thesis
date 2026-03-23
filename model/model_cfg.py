@@ -10,10 +10,10 @@ class CFG:
     else:
         cuda = False
     debug = False
-    if debug:    
+    if debug:
         data_path = './data/casp12_data_30/'
-    else: 
-        data_path = './data/casp12_data_100/' #'./data/data2'
+    else:
+        data_path = './data/casp12_data_30/'
     inference_path = './data/inference_data'
     results_path = './res/results-emb/'
     seed = 42
@@ -47,6 +47,7 @@ class CFG:
     max_grad_norm = 10.0
     clip_grad_norm = False
     reg_alpha = 0.1
+    tau = 1.0 # temperature for InfoNCE contrastive loss
     # defalut parameters
     torch_default_dtype = torch.float32
     precision = torch.float32

@@ -19,7 +19,7 @@ class CFG:
     constraint = True
     split_train_size = 0.8
     debug_size  = 10
-    sigma = 0.1 # for score matching loss
+    sigma = 0.5 # for score matching loss (DSM on Fb bonded features)
     # Model parameters
     h = 0.1
     coords_emb_size = 48

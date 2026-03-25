@@ -85,7 +85,7 @@ def get_noised_proteins(data,device):
     seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
     
     if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
-        return None,None,None,None,None,None,None,None,None,None,None
+        return None,None,None,None,None,None,None,None,None,None,None,None
     #emb = torch.cat((esm_embed,seq),dim=2)
     emb = seq_one_hot.to(device)
     emb_decoy = seq_decoy.to(device)
@@ -123,7 +123,9 @@ def get_noised_proteins(data,device):
     # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
     Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6 = Xjf.unsqueeze(0),Xju.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0), Xdu.unsqueeze(0),Xcy1.unsqueeze(0),Xcy2.unsqueeze(0),Xcy3.unsqueeze(0),Xcy4.unsqueeze(0),Xcy5.unsqueeze(0),Xcy6.unsqueeze(0)
 
-    return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6
+    # Also return native coords + metadata for DSM (needs to noise distance matrix)
+    native_info = (crd_backbone.squeeze().to(device), emb, proT5_emb, mask)
+    return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info
     
 # define validation function
 def compute_metrics(Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4):
@@ -169,7 +171,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             gc.collect()
             # zero the parameter gradients
             optimizer.zero_grad()
-            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6 = get_noised_proteins(data,device)
+            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info = get_noised_proteins(data,device)
             if Xjf is None:
                 n_skips += 1
                 continue
@@ -191,7 +193,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 _empty_cache()
                 gc.collect()
                 with _autocast():
-                    lossg, _ = denoising_score_matching(model, Xjf, sigma=CFG.sigma)
+                    lossg, _ = denoising_score_matching(model, Xjf, native_info, sigma=CFG.sigma)
 
                 loss += lossg
 
@@ -235,7 +237,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             gc.collect()
              # zero the parameter gradients
             optimizer.zero_grad()
-            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6 = get_noised_proteins(data,device)
+            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info = get_noised_proteins(data,device)
             if Xjf is None:
                 n_skips += 1
                 continue
@@ -273,7 +275,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 gc.collect()
                 # half precision training
                 with _autocast():
-                    lossg, dsm_raw_val = denoising_score_matching(model, Xjf, sigma=CFG.sigma)
+                    lossg, dsm_raw_val = denoising_score_matching(model, Xjf, native_info, sigma=CFG.sigma)
                 # Scales the loss, and calls backward()
                 scaler.scale(lossg).backward()
                 scaler.step(optimizer)
@@ -296,8 +298,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 print(f'[{epoch + 1}, {index + 1:5d}] loss: {running_loss / 1000:.3f}')
                 print(f"skipped {n_skips}")
                 epoch_train_loss.append(running_loss/1000)
-                if not CFG.debug:
-                    wandb.log({"epoch": epoch,"running_loss": running_loss/1000,"running_lossIndex":ds_length*epoch+index})
+                wandb.log({"epoch": epoch,"running_loss": running_loss/1000,"running_lossIndex":ds_length*epoch+index})
                 running_loss = 0.0
 
             _empty_cache()
@@ -305,9 +306,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # update the progress bar
             tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"sequence_len": Xjf.shape[1]})
             # Log metrics
-            if not CFG.debug:
-                step = ds_length*epoch+index
-                wandb.log({
+            step = ds_length*epoch+index
+            wandb.log({
                     "epoch": epoch, "step": step, "sequence_len": Xjf.shape[1],
                     # Losses
                     "loss": loss.item(), "lossd": lossd.item(), "lossg": lossg.item(),
@@ -328,8 +328,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         # evaluate the model
         val_loss, val_lossd, val_lossg, valid_lossc, val_metrics = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
          # update wandb metrics
-        if not CFG.debug:
-            wandb.log({
+        wandb.log({
                 "epoch": epoch,
                 "learning rate": optimizer.param_groups[0]["lr"],
                 # Validation losses
@@ -389,44 +388,94 @@ def gradient_penalty(X_native, E_native):
     lossg = torch.mean(partial_dx_native**2)
     return lossg
 
-def denoising_score_matching(model, X_native, sigma=CFG.sigma):
-    """Denoising score matching loss (Vincent 2011).
+def denoising_score_matching(model, X_native, native_info, sigma=CFG.sigma):
+    """Holistic DSM: noise structure + embeddings + mutate sequence.
 
-    Adds Gaussian noise to native graph features, then trains the energy
-    gradient to point from the noisy version back toward the clean native.
+    Corrupts all graph feature components with appropriate noise:
+    - D + Fb (structure, 48 dims): Gaussian noise with sigma
+    - proT5 embeddings (1024 dims): Gaussian noise with sigma * 0.2
+    - one_hot (sequence, 20 dims): randomly replace ~15% of amino acids
 
-    L_DSM = ||∇E(X̃) + (X̃ - X_native)/σ²||²
-
-    This is equivalent to full score matching (Hyvärinen 2005) as σ→0,
-    but avoids computing the Hessian trace.
+    Per-component losses are averaged equally so no single component dominates.
 
     Args:
         model: the energy model
-        X_native: clean graph features [1, N, features]
-        sigma: noise standard deviation
+        X_native: clean graph features [1, N, features] (unused, kept for API compat)
+        native_info: tuple (coords [N,4,3], emb [N,20], proT5 [N,1024], mask [N])
+        sigma: base noise std (structure features)
     Returns:
         lossg: scalar loss
+        dsm_raw: raw MSE (for logging)
     """
-    # Add Gaussian noise to native features
-    noise = torch.randn_like(X_native) * sigma
-    X_noisy = (X_native.detach() + noise).requires_grad_(True)
+    coords, emb, proT5_emb, mask = native_info
+    N = coords.shape[0]
+    device = coords.device
 
-    # Compute energy of noisy structure
-    E_noisy = model(X_noisy)[0]
+    # --- Build clean graph features (same pipeline as get_graph) ---
+    D_clean = get_dist_matrix(coords)
+    D_clean = torch.relu(torch.exp(CFG.gaussian_coef * D_clean ** 2))
+    mask_index = torch.where(mask == 0)
+    D_clean[mask_index[0], :, :] = 0
+    D_clean[:, mask_index[0], :] = 0
+    Fb = get_bonded_features(D_clean)              # [N, 32]
+    D_sum = D_clean.sum(dim=1)                     # [N, 16]
+    D_norm = F.normalize(D_sum, p=2, dim=0)
+    emb_norm = F.normalize(proT5_emb, p=2, dim=0)  # [N, 1024]
+    X_clean = torch.cat([D_norm, Fb, emb_norm, emb], dim=1)  # [N, F]
 
-    # Compute gradient of energy w.r.t. noisy input
-    grad_E = torch.autograd.grad(outputs=E_noisy, inputs=X_noisy,
+    # Feature layout indices
+    d_fb_end = 16 + 32                          # 48: end of structure features
+    emb_end = d_fb_end + emb_norm.shape[1]      # 48 + 1024 = 1072
+    oh_end = emb_end + emb.shape[1]             # 1072 + 20 = 1092
+
+    # --- Per-component noise ---
+    # Baseline DSM error per component = 1/sigma². Use same sigma for balanced learning.
+    sigma_struct = sigma            # D + Fb
+    sigma_emb = sigma              # proT5 (same sigma → balanced target scores)
+    sigma_oh = 1.0                 # one_hot (scale for AA replacement delta ~sqrt(2))
+
+    noise = torch.zeros_like(X_clean)
+    # Structure noise
+    noise[:, :d_fb_end] = torch.randn(N, d_fb_end, device=device) * sigma_struct
+    # Embedding noise
+    noise[:, d_fb_end:emb_end] = torch.randn(N, emb_norm.shape[1], device=device) * sigma_emb
+    # Sequence: randomly replace ~15% of amino acids
+    oh_dim = emb.shape[1]
+    p_mut = 0.15
+    mut_mask = torch.rand(N, device=device) < p_mut
+    if mut_mask.any():
+        n_mut = mut_mask.sum().item()
+        random_aa = torch.zeros(n_mut, oh_dim, device=device)
+        random_aa[torch.arange(n_mut), torch.randint(0, oh_dim, (n_mut,))] = 1.0
+        noise[mut_mask, emb_end:oh_end] = random_aa - emb[mut_mask]
+    # Non-mutated positions: small Gaussian noise on one_hot
+    non_mut = ~mut_mask
+    if non_mut.any():
+        noise[non_mut, emb_end:oh_end] = torch.randn(non_mut.sum().item(), oh_dim, device=device) * 0.1
+
+    X_noisy = (X_clean.detach() + noise).requires_grad_(True)
+
+    # Forward
+    E_noisy = model(X_noisy.unsqueeze(0))[0]
+
+    # Gradient of energy w.r.t. noisy features [N, F]
+    grad_X = torch.autograd.grad(outputs=E_noisy, inputs=X_noisy,
                                   grad_outputs=torch.ones_like(E_noisy),
                                   create_graph=True, retain_graph=True)[0]
 
-    # Target score: points from noisy back toward native
-    target_score = -(X_noisy - X_native.detach()) / (sigma ** 2)
+    # Per-component target score
+    target = torch.zeros_like(noise)
+    target[:, :d_fb_end] = -noise[:, :d_fb_end] / (sigma_struct ** 2)
+    target[:, d_fb_end:emb_end] = -noise[:, d_fb_end:emb_end] / (sigma_emb ** 2)
+    target[:, emb_end:oh_end] = -noise[:, emb_end:oh_end] / (sigma_oh ** 2)
 
-    # DSM loss: model score should match target score
-    # Log compression to keep DSM on same scale as ranking loss (as in train-SM.py)
-    dsm_raw = torch.mean((grad_E + target_score) ** 2)
-    lossg = torch.log(dsm_raw + 1)
-    return lossg, dsm_raw.detach()
+    # Equal-weight per-component loss (prevents 1024-dim proT5 from dominating)
+    err_struct = torch.mean((grad_X[:, :d_fb_end] + target[:, :d_fb_end]) ** 2)
+    err_emb = torch.mean((grad_X[:, d_fb_end:emb_end] + target[:, d_fb_end:emb_end]) ** 2)
+    err_oh = torch.mean((grad_X[:, emb_end:oh_end] + target[:, emb_end:oh_end]) ** 2)
+    dsm_raw = (err_struct + err_emb + err_oh) / 3.0
+
+    return dsm_raw, dsm_raw.detach()
 
 def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = True , reg_alpha = CFG.reg_alpha):
     """
@@ -504,11 +553,8 @@ def main():
         CFG.model_path = "./res/debug/"
         CFG.results_path = './res/results-debug/'
         print('**** Debug mode ****')
-        os.environ['WANDB_MODE'] = 'offline'
-    if not CFG.debug:
-        wandb.init(project="DeepEF-InfoNCE-DSM", name='InfoNCE+DSM light attention GCN')
-    else:
-        wandb.init(project="DeepEF-InfoNCE-DSM", name='debug-run', mode='offline')
+    wandb.init(project="DeepEF-InfoNCE-DSM",
+               name='InfoNCE+DSM light attention GCN' if not CFG.debug else f'debug-{CFG.debug_size}prot-{CFG.num_epochs}ep')
     print('***Start main function***')
     print('***load the data with dataloader***')
     d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, 
@@ -543,10 +589,11 @@ if __name__ == '__main__':
     # Parse --debug flag for quick local testing on MPS/CPU
     if '--debug' in sys.argv:
         CFG.debug = True
-        CFG.debug_size = 20
-        CFG.num_epochs = 2
+        CFG.debug_size = 100
+        CFG.num_epochs = 20
         CFG.num_workers = 0
-        print(f'**** Debug mode: {CFG.debug_size} proteins, {CFG.num_epochs} epochs, device={CFG.device} ****')
+        CFG.seq_len = 350  # limit protein size for MPS memory
+        print(f'**** Debug mode: {CFG.debug_size} proteins, {CFG.num_epochs} epochs, seq_len<={CFG.seq_len}, device={CFG.device} ****')
     if not CFG.debug:
         CFG.model_path = './res/trianed_models-light_attention_newGCN/'
         CFG.results_path = './res/results-emb/'

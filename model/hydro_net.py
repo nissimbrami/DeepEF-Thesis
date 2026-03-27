@@ -266,20 +266,65 @@ class ProteinEnergyNet(nn.Module):
         return torch.sum(pairwise_differences, axis=-1)
 
 
+class MLPProjection(nn.Module):
+    """MLP projection: 1024 -> hidden -> proj_dim"""
+    def __init__(self, input_dim=1024, hidden_dim=128, output_dim=16, dropout=0.1):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, output_dim),
+        )
+    def forward(self, x):
+        return self.net(x)
+
+
+class LowRankProjection(nn.Module):
+    """Low-rank factored projection: 1024 -> rank -> proj_dim"""
+    def __init__(self, input_dim=1024, rank=4, output_dim=16):
+        super().__init__()
+        self.down = nn.Linear(input_dim, rank, bias=False)
+        self.up = nn.Linear(rank, output_dim)
+    def forward(self, x):
+        return self.up(self.down(x))
+
+
 class PEM(torch.nn.Module):
     """Protein energy model"""
-  
-    def __init__(self, layers, gaussian_coef,dropout_rate = 0.2, light_attention=False):
+
+    def __init__(self, layers, gaussian_coef,dropout_rate = 0.2, light_attention=False, emb_projection="none", gat_cutoff=None):
         super().__init__()
+
+        # Embedding projection config: "none", "mlp", "low_rank"
+        self.emb_projection_type = emb_projection
+        emb_proj_dim = CFG.emb_proj_dim  # 16
+
+        if emb_projection == "mlp":
+            self.emb_projector = MLPProjection(
+                input_dim=CFG.emb_input_dim, hidden_dim=CFG.emb_proj_hidden,
+                output_dim=emb_proj_dim, dropout=dropout_rate)
+        elif emb_projection == "low_rank":
+            self.emb_projector = LowRankProjection(
+                input_dim=CFG.emb_input_dim, rank=CFG.emb_proj_rank,
+                output_dim=emb_proj_dim)
+        else:
+            self.emb_projector = None
+
+        # Dimensions depend on whether embeddings are projected into GNN
+        # When projected: emb_proj_dim added to GNN input, not concatenated after
+        proj_extra = emb_proj_dim if self.emb_projector is not None else 0
+        post_gnn_emb = 0 if self.emb_projector is not None else CFG.emb_input_dim
+
         # GCN layers
-        gcn_dim_in = 36
+        gcn_dim_in = 36 + proj_extra  # 36 or 52
         gcn_dim_h = 64
-        gcn_dim_out = 36
+        gcn_dim_out = 36 + proj_extra
         self.graph_model_gcn = [GCN(gcn_dim_in, gcn_dim_h, gcn_dim_out, dropout_rate) for i in range(layers)]
         # GAT layers
-        gat_dim_in = 36
+        gat_dim_in = 36 + proj_extra  # 36 or 52
         gat_dim_h = 64
-        gat_dim_out = 36
+        gat_dim_out = 36 + proj_extra
         self.graph_model_gat = [GAT(gat_dim_in, gat_dim_h, gat_dim_out, 8, dropout_rate) for i in range(layers)]
         # Gaussian coefficient
         self.gaussian_coef = gaussian_coef
@@ -287,28 +332,28 @@ class PEM(torch.nn.Module):
         self.GAT_layers = torch.nn.ModuleList(self.graph_model_gat)
         self.GCN_layers = torch.nn.ModuleList(self.graph_model_gcn)
         # Fully connected layers - GCN
-        self.fc1_gcn = nn.Linear(52, 64) # 52 = 32(dist) + 20(one-hot)
+        self.fc1_gcn = nn.Linear(52 + proj_extra, 64) # 52 = 32(dist) + 20(one-hot) [+ proj_extra]
         self.fc2_gcn = nn.Linear(64, gcn_dim_in)
         # Fully connected layers - GAT
-        self.fc1_gat = nn.Linear(36, 64) # 36 = 16(dist) + 20(one-hot)
+        self.fc1_gat = nn.Linear(36 + proj_extra, 64) # 36 = 16(dist) + 20(one-hot) [+ proj_extra]
         self.fc2_gat = nn.Linear(64, gat_dim_in)
         # normalization layers
-        self.inst_norm1 = Normalization_layer(36,affine=True)
-        self.inst_norm2 = Normalization_layer(72,affine=True)
+        self.inst_norm1 = Normalization_layer(36 + proj_extra, affine=True)
+        self.inst_norm2 = Normalization_layer(2 * (36 + proj_extra), affine=True)
         # Fc layers for the final output
-        self.fc1 = nn.Linear(1096, 128)
+        fc_in_dim = 2 * (36 + proj_extra) + post_gnn_emb  # 72+1024 (none) or 104+0 (projected)
+        self.fc1 = nn.Linear(fc_in_dim, 128)
         self.fc2 = nn.Linear(128, 1)
-        # self.fc3 = nn.Linear(64, 1)
-        
+
         # energy epsilon
         self.energy_epsilon = 1
-        
+
         # embedding indexes
         self.one_hot_index = -20
         self.bonded_index = 48
         self.non_bonded_index = 16
         self.llm_index = -1044
-        
+
         # batch and node size
         self.B = 0
         self.N = 0
@@ -316,19 +361,23 @@ class PEM(torch.nn.Module):
         # edge index cache
         self._edge_cache_key = None
         self._edge_cache = None
-        
+
+        # GAT distance cutoff (Angstroms); None = fully connected
+        self.gat_cutoff = gat_cutoff
+
         # light attention machanism
         self.light_attention = light_attention
         if self.light_attention:
-            self.LA = LightAttention(embeddings_dim=1096)
+            self.LA = LightAttention(embeddings_dim=fc_in_dim)
         
     
-    def forward(self,x,f_type = 'Default'):
+    def forward(self,x,f_type = 'Default', ca_coords=None):
         """
                 Forward function
              Args:
             x (tensor): [batch, n_nodes, bonded_features+non_bonded_features+LLM_features]
             f_type (str, optional): 'A_inference' or 'defualt', if 'A_inferece' return each amino acid energy . Defaults to 'Default'.
+            ca_coords (tensor, optional): [batch, n_nodes, 3] CA atom coordinates for distance-based GAT edges.
 
         Returns:
             if f_type == 'A_inference':
@@ -337,36 +386,44 @@ class PEM(torch.nn.Module):
             energy: native and decoy energy
         """
         # Get the edge index
-        edge_index_gcn,edge_index_gat = self.get_edge_index(x)
-        # reshape x to [batch_size*n_nodes,1096]
+        edge_index_gcn,edge_index_gat = self.get_edge_index(x, ca_coords=ca_coords)
+        # reshape x to [batch_size*n_nodes,features]
         self.B,self.N,_ = x.shape
         x = x.reshape(self.B * self.N,-1)
         # split features to 2 graphs, bonded and non-bonded
         x_gcn = torch.cat((x[:,:self.non_bonded_index+ self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
         x_gat = torch.cat((x[:,:self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,36
         x_emb_features = x[:,self.llm_index:self.one_hot_index] # B*N,1024
+
+        # Project embeddings and concatenate into GNN input, or keep for post-GNN concat
+        if self.emb_projector is not None:
+            x_proj = self.emb_projector(x_emb_features) # B*N,1024 -> B*N,proj_dim
+            x_gcn = torch.cat((x_gcn, x_proj), dim=-1) # B*N, 52+proj_dim
+            x_gat = torch.cat((x_gat, x_proj), dim=-1) # B*N, 36+proj_dim
+
         # forward pass through the graph attention and convolution layers
-        x1 = self.forward_gcn(x_gcn,edge_index_gcn) # B*N,52->N,36
-        x2 = self.forward_gat(x_gat,edge_index_gat) # B*N,36->N,36
+        x1 = self.forward_gcn(x_gcn,edge_index_gcn) # B*N,gcn_in -> B*N,gcn_out
+        x2 = self.forward_gat(x_gat,edge_index_gat) # B*N,gat_in -> B*N,gat_out
         # concat features
-        x = torch.cat((x1,x2),dim=-1) # B*N,36+36->B*N,72
-        # reshape to use insrance norm
+        x = torch.cat((x1,x2),dim=-1) # B*N, gcn_out+gat_out
+        # reshape to use instance norm
         x = x.reshape(self.B, self.N,-1)
         x = self.inst_norm2(x)
         x = x.reshape(self.B * self.N,-1)
-        # Add LLM features
-        x = torch.cat((x,x_emb_features),dim=-1) # B*N,72+1024->B*N,1096
+        # Add raw LLM features only when no projection (original behavior)
+        if self.emb_projector is None:
+            x = torch.cat((x,x_emb_features),dim=-1) # B*N,72+1024->B*N,1096
         # Light attention machanism
         if self.light_attention:
-            x = x.reshape(self.B, self.N,-1) # B*N,1096->B,N,1096
-            x = x.swapaxes(1,2) # B,N,1096->B,1096,N
-            x = self.LA(x) # B,1096,N
-            x = x.swapaxes(1,2) 
-            x = x.reshape(self.B * self.N,-1) # B,1096,N->B*N,1096
+            x = x.reshape(self.B, self.N,-1)
+            x = x.swapaxes(1,2)
+            x = self.LA(x)
+            x = x.swapaxes(1,2)
+            x = x.reshape(self.B * self.N,-1)
         # fc layers
-        x  = self.fc1(x) # B*N,1096->B*N,128
+        x  = self.fc1(x)
         x = F.relu(x)
-        x = self.fc2(x) # B*N,128->B*N,1
+        x = self.fc2(x) # -> B*N,1
         # x = F.relu(x)
         # x = self.fc3(x) # B*N,64->B*N,1
         # reshape to [batch_size,n_nodes]
@@ -422,36 +479,50 @@ class PEM(torch.nn.Module):
         # E = torch.log(torch.sum(Fh,dim=(1,2)) + self.energy_epsilon)
         return E
   
-    def get_edge_index(self,x):
+    def get_edge_index(self, x, ca_coords=None):
         """Return the edge index for the graph convolution and attention layers.
         The edge index of the gcn is a line from the amino acid to the next amino acid.
-        The edge index of the gat is a full connected graph.
-        Results are cached and reused when input shape matches."""
+        The edge index of the gat uses a distance cutoff on CA atoms when ca_coords
+        is provided and self.gat_cutoff is set; otherwise falls back to fully connected.
+        Results are cached only for the fully-connected (shape-based) case."""
         B, N = x.shape[0], x.shape[1]
-        key = (B, N)
-        if self._edge_cache_key == key and self._edge_cache is not None:
-            return self._edge_cache
 
-        total_nodes = B * N
-        # GAT: fully connected within each batch element (vectorized)
-        arange = torch.arange(N)
-        src, dst = torch.meshgrid(arange, arange, indexing='ij')
-        mask = src != dst
-        local_src, local_dst = src[mask], dst[mask]
-        # Replicate for each batch element with offset
-        offsets = torch.arange(B).unsqueeze(1) * N  # [B, 1]
-        gat_src = (local_src.unsqueeze(0) + offsets).reshape(-1)  # [B * edges_per_batch]
-        gat_dst = (local_dst.unsqueeze(0) + offsets).reshape(-1)
-        edge_index_gat_all = torch.stack([gat_src, gat_dst]).to(CFG.device)
+        # Cache only when edges depend solely on shape (no ca_coords)
+        if ca_coords is None:
+            key = (B, N)
+            if self._edge_cache_key == key and self._edge_cache is not None:
+                return self._edge_cache
 
         # GCN: sequential edges (i, i+1) within each batch element
+        offsets = torch.arange(B).unsqueeze(1) * N  # [B, 1]
         local_gcn = torch.arange(N - 1)
         gcn_src = (local_gcn.unsqueeze(0) + offsets).reshape(-1)
         gcn_dst = gcn_src + 1
         edge_index_gcn_all = torch.stack([gcn_src, gcn_dst]).to(CFG.device)
 
-        self._edge_cache_key = key
-        self._edge_cache = (edge_index_gcn_all, edge_index_gat_all)
+        # GAT: distance-cutoff or fully connected
+        if ca_coords is not None and self.gat_cutoff is not None:
+            # Distance-based edges: connect CA atoms within cutoff radius
+            dists = torch.cdist(ca_coords, ca_coords)  # [B, N, N]
+            mask = (dists < self.gat_cutoff) & (dists > 0)  # exclude self-loops
+            batch_idx, src_idx, dst_idx = torch.where(mask)
+            flat_src = batch_idx * N + src_idx
+            flat_dst = batch_idx * N + dst_idx
+            edge_index_gat_all = torch.stack([flat_src, flat_dst]).to(CFG.device)
+        else:
+            # Fully connected within each batch element (original behavior)
+            arange = torch.arange(N)
+            src, dst = torch.meshgrid(arange, arange, indexing='ij')
+            mask = src != dst
+            local_src, local_dst = src[mask], dst[mask]
+            gat_src = (local_src.unsqueeze(0) + offsets).reshape(-1)
+            gat_dst = (local_dst.unsqueeze(0) + offsets).reshape(-1)
+            edge_index_gat_all = torch.stack([gat_src, gat_dst]).to(CFG.device)
+
+        if ca_coords is None:
+            self._edge_cache_key = (B, N)
+            self._edge_cache = (edge_index_gcn_all, edge_index_gat_all)
+
         return edge_index_gcn_all, edge_index_gat_all
     
 class PEMSM(torch.nn.Module):

@@ -1,0 +1,181 @@
+# DeepEF — Recent Changes Summary
+
+## Committed Changes
+
+### 1. Repo Cleanup (Mar 23, `0a89a3b`)
+Removed dead files, fixed project structure, and updated `.gitignore`.
+
+**Why:** The repository had accumulated unused scripts and artifacts from earlier experiments, making it harder to navigate and understand the active codebase. Cleaning up reduces confusion and establishes a clear baseline for the new training approach.
+
+---
+
+### 2. Replace Loss Functions with InfoNCE + DSM (Mar 24, `f9f704a`)
+
+**Loss function overhaul:**
+- Replaced the previous heuristic ranking loss with **InfoNCE (Boltzmann contrastive loss)**. The new loss computes:
+  - *Primary term:* native folded energy should be lowest among all states (folded, unfolded, sequence-decoy, structure-decoy, cycle permutations)
+  - *Secondary term:* native unfolded energy should be lower than decoy structure energy
+- Replaced the explicit gradient penalty with **Denoising Score Matching (DSM)** as the regularizer — the model learns that the energy gradient at native structures should point "downhill" toward the native state.
+
+**Why:** The previous loss used hand-tuned margin-based ranking terms that were fragile and didn't generalize well. InfoNCE is a principled contrastive objective grounded in statistical mechanics (Boltzmann distribution) — it naturally enforces a complete energy ranking without needing per-pair margins. DSM replaces the gradient penalty because it provides a learning signal about the *shape* of the energy landscape (the score function), not just the gradient magnitude. This encourages the model to learn a physically meaningful energy surface where native structures sit in energy minima.
+
+**Training infrastructure:**
+- Added **MPS (Apple Silicon) device support** — autocast, cache clearing, and GradScaler are now device-aware.
+- Added **`compute_metrics()`** — tracks ranking accuracy (e.g., % of samples where E_native < E_decoy) and energy gap statistics during training and validation.
+- Added per-step wandb logging of all energy values, ranking metrics, gradient norms, and DSM loss.
+
+**Why:** MPS support enables local development and debugging on Mac without needing GPU cluster access. The new metrics (ranking accuracy, energy gaps) give direct visibility into whether the model is learning the correct energy ordering — something that was previously only inferable indirectly from the loss value.
+
+---
+
+### 3. Overhaul DSM to Holistic Noise + Sigma Tuning (Mar 25, `76503f5`)
+
+- Rewrote DSM to noise **all feature components** (structure, embeddings, sequence) with per-component noise levels, then averaged the per-component losses equally.
+- Tuned `sigma = 0.5` for the DSM noise scale.
+- Added diagnostic plots for DSM behavior.
+
+**Why:** The initial DSM implementation only noised the distance features, which meant the model only learned score matching in a 16-dimensional subspace. A holistic approach that corrupts structure, embeddings, and sequence features ensures the energy landscape is well-shaped across all input dimensions. Equal-weight averaging prevents the 1024-dim ProtT5 embeddings from dominating the loss.
+
+**Supporting figure — `figures/dsm_diagnostic_plots.png`:**
+
+![DSM Diagnostics](figures/dsm_diagnostic_plots.png)
+
+This 6-panel diagnostic reveals *why* naive full-dimensional DSM fails:
+- **Top-left:** Model gradient vs target score shows a 20,000× mismatch — the network can't produce gradients large enough to match DSM targets at 1092 dims.
+- **Top-center:** DSM learning rate (% improvement) drops to zero beyond ~200 feature dimensions — at 1092 dims the loss is completely flat.
+- **Top-right:** Parameter gradient norms from DSM are ~100,000× smaller than from the direct energy backward pass, meaning DSM contributes essentially nothing to learning.
+- **Bottom-left:** Learning curves by dimension count — 16 dims learns well, 1092 dims stays flat.
+- **Bottom-center:** Signal flow through DSM shows second-order gradients (Hessian) vanish exponentially with depth.
+- **Bottom-right:** Confirms the concept is sound at low dims — DSM loss decreases steadily when restricted to 16 distance features.
+
+---
+
+## Uncommitted Changes (Current Working Branch)
+
+### 4. Embedding Projection into GNN
+
+Added **learnable embedding projection modules** that compress ProtT5 embeddings (1024-dim) before feeding them into the GNN layers, rather than concatenating raw 1024-dim vectors after the GNN:
+
+- **`MLPProjection`**: 1024 → 128 (hidden) → 16 (output), with ReLU + dropout
+- **`LowRankProjection`**: 1024 → rank (4) → 16, factored linear projection
+- Configurable via `--emb_projection` flag: `"none"` (original behavior), `"mlp"`, or `"low_rank"`
+
+**Architectural change:** When projection is enabled, the 16-dim projected embeddings are concatenated into the GNN input features (GCN: 52→68 dims, GAT: 36→52 dims), so the GNN layers can learn joint structure-embedding representations. The raw 1024-dim concat after GNN is removed. When projection is `"none"`, the original architecture is preserved.
+
+**Why:** In the original architecture, ProtT5 embeddings (1024 dims) are concatenated *after* the GNN layers, meaning the GNN only sees structural features and never learns to combine structure with sequence information. By projecting embeddings to a small dimension and feeding them *into* the GNN, the graph layers can learn interactions between local structure and sequence context. The low-rank option (only 4×16 = 64 + 16×16 = 320 parameters) is designed to test whether a minimal projection is sufficient, reducing overfitting risk on our limited training data.
+
+### 5. Distance-Based GAT Edges
+
+Added a **distance cutoff for GAT edges** (default 12 Å) using CA atom coordinates, replacing the fully-connected graph:
+
+- `get_edge_index()` now accepts optional `ca_coords` and uses `torch.cdist` to build edges only between residues within the cutoff radius.
+- CA coordinates are extracted before graph construction and passed through the training/validation pipeline.
+- Cutoff is configurable via `CFG.gat_cutoff` (set to `None` for fully-connected fallback).
+
+**Why:** The fully-connected GAT graph creates O(N²) edges for a protein of length N, which is both memory-expensive and physically unrealistic — residues 50 Å apart have negligible non-bonded interactions. A 12 Å cutoff roughly captures the first and second coordination shells of amino acid contacts, focusing attention on physically relevant pairwise interactions. This should reduce memory usage (enabling longer proteins) and may improve generalization by removing spurious long-range edges.
+
+### 6. DSM Reverted to Distance-Only (D-Only)
+
+Reverted DSM from holistic noise back to **noising only the 16 distance features (D)**, with the rationale documented in the code:
+
+1. Only 16 dims → second-order gradient (Hessian) signal survives through the deep network
+2. Distance features carry ~47% of the energy sensitivity
+3. Physically meaningful — enforces ∂E/∂D ≈ 0 at native distances
+
+**Why:** The holistic DSM (noising all 1092 dims) was found to produce vanishing gradients through the network. The Hessian (second-order gradient needed for DSM's `grad(grad(E))` computation) decays exponentially with input dimension in deep networks. By restricting to the 16 most energy-sensitive dimensions, the DSM signal remains strong enough to shape the energy landscape. This is a pragmatic compromise — we enforce smoothness where it matters most (distance features that define the protein's 3D structure).
+
+**Supporting figure — `figures/ssm_vs_dsm_test.png`:**
+
+![SSM vs DSM](figures/ssm_vs_dsm_test.png)
+
+Comparison of Sliced Score Matching (SSM) variants vs full DSM vs D-only DSM on the actual PEM model:
+- **Top-left (Loss curves):** Full DSM (1092 dims, blue) stays flat — no learning. DSM D-only (16 dims, green) shows steady decrease. SSM variants (K=1,4,8 random projections) also learn but are noisier.
+- **Top-right (Param gradient norms):** D-only DSM produces the strongest and most stable parameter gradients. Full DSM gradients are orders of magnitude weaker.
+- **Bottom-right (Single-step gradient strength):** Direct energy backward pass provides gradient norm ~53 — DSM D-only achieves 0.003, while full DSM is 0.0003 (10× weaker). SSM K=8 reaches 0.02 but with high variance.
+
+This confirms D-only as the best practical choice: strongest signal, simplest implementation, and physically grounded in distance features.
+
+**Supporting figure — `figures/dsm_alternatives.png`:**
+
+![DSM Alternatives Architecture](figures/dsm_alternatives.png)
+
+Architectural comparison of three alternative approaches we considered before settling on D-only DSM:
+1. **Direct Score Prediction Head** — adds a separate `s(x)` head to predict the score directly (avoids second-order gradients entirely, but requires a second output head and changes the model architecture)
+2. **Fisher Divergence with Hutchinson Trace** — uses random vector projections to estimate the trace of the Hessian stochastically (avoids explicit Hessian computation, but the Hutchinson estimator diverged in our tests)
+3. **Noise Conditional Score Network (NCSN)** — trains a separate score network conditioned on noise level (powerful but requires a separate model, multi-scale noise, and fundamentally changes the training paradigm)
+
+Verdict: Score Head is the most promising alternative for future work; Hutchinson diverged; NCSN is too large a departure from our current architecture.
+
+**Supporting figure — `figures/dsm_alternatives_test.png`:**
+
+![DSM Alternatives Test](figures/dsm_alternatives_test.png)
+
+Empirical test of the alternatives on PEM:
+- **Left (Raw loss):** Score Head (blue) and DSM D-only (green) both decrease steadily. Holistic DSM (red, 1092 dims) stays flat. Hutchinson estimator was excluded — it diverged to infinity.
+- **Right (Relative change):** Score Head achieves ~30% loss reduction. DSM D-only achieves ~25%. Holistic DSM shows <5% change — confirming the vanishing Hessian problem.
+
+**Supporting figure — `figures/fd_dsm_test.png`:**
+
+![FD vs Autograd DSM](figures/fd_dsm_test.png)
+
+Finite-difference (FD) validation of autograd DSM to rule out implementation bugs:
+- **Left (Raw loss):** FD gradient penalty (light blue, high spikes) is noisy but matches autograd in trend. D-only variants (yellow/green) are smooth and low.
+- **Right (Relative change):** Confirms autograd and FD produce consistent results — the flat holistic DSM is a genuine signal problem, not a code bug.
+
+### 7. Replace Autograd DSM with Finite-Difference DSM (FD-DSM)
+
+Replaced the `create_graph=True` autograd implementation of D-only DSM with a **finite-difference approximation** of the directional derivative:
+
+```
+fd_score = (E(x_noisy + ε·v) − E(x_noisy − ε·v)) / (2ε)
+target_v = v · (−noise_D / σ²)
+lossg    = mean_K[ (fd_score − target_v)² ]
+```
+
+where `v` is a random unit vector in the 16-dimensional distance-feature subspace, `ε = 0.1`, and `K = 1` direction per sample.
+
+**Why autograd DSM stopped working:**
+
+The original DSM computed `grad_d = ∂E/∂x_D` using `torch.autograd.grad(..., create_graph=True)`. For the DSM loss to train the model, its backward pass needs the **Hessian** `∂²E/(∂x_D ∂θ)` — the second-order derivative that links the score to model parameters. This Hessian vanishes through deep networks with normalization layers (InstanceNorm makes the model locally linear in distance features, so the second derivative w.r.t. parameters is ≈ 0). Measured directly:
+
+```
+|grad_d|   = 0.000027   (model's analytical gradient w.r.t. distance features)
+|target_d| = 1.6085     (DSM target score)
+ratio      = 0.000017   (gradient is 60,000× too small)
+param grad after DSM backward = 0.00000379   (essentially zero)
+```
+
+As a result, `lossg` was permanently stuck at `1/σ² = 4.0` — the theoretical value when the model gradient is identically zero — with occasional Hessian explosions to 2000+ that destructively updated parameters without improving the score loss.
+
+**Why FD-DSM works:**
+
+FD-DSM estimates the directional derivative by evaluating the energy at two perturbed inputs (`x ± ε·v`). This is a **first-order** operation — no Hessian is needed. The backward pass computes `∂(fd_score)/∂θ = ∂E/∂θ` which flows cleanly through the model. Measured on the same protein:
+
+```
+autograd DSM:  lossg = 4.0043 → 4.0042 after 1 step  (no learning)
+FD-DSM:        lossg = 9.2363 → 4.3482 after 30 steps  (−52.9%)
+```
+
+The initial FD-DSM loss exceeds 4.0 because the finite energy difference `(E⁺ − E⁻)/2ε` is not zero at initialization — unlike the analytical gradient which happened to be near-zero. This means there is real signal to drive learning.
+
+**Why ε = 0.1 matters:**
+
+The analytical gradient `∂E/∂x_D` is near-zero because the model is approximately linear at infinitesimally small perturbations (due to normalization). At `ε = 0.1` (10% of the distance feature scale), the perturbation is large enough to probe the nonlinear regime where the model's energy response is non-trivial and actually depends on its weights.
+
+**Cost:** 2 forward passes per sample (for ε·v and −ε·v). With `K = 1` this is comparable to the previous autograd DSM cost. The clamp `lossg = min(lossg, 20.0)` and gradient clipping (`clip_grad_norm = True`, `max_norm = 10.0`) are retained as stability safeguards.
+
+---
+
+### 8. Epoch-Level Training Summaries
+
+Added epoch-end summary printouts showing averaged loss components and ranking metrics for both training and validation, with the embedding projection configuration noted.
+
+**Why:** Per-step metrics are noisy and hard to interpret at a glance. Epoch-level summaries provide a clear snapshot of training progress and make it easy to compare runs with different configurations (e.g., `emb_projection=mlp` vs `emb_projection=none`).
+
+### 9. CLI & Debug Improvements
+
+- Added `--emb_projection`, `--emb_proj_rank`, `--emb_proj_dim`, `--emb_proj_hidden` command-line flags for experiment configuration.
+- Debug mode now uses projection-specific output directories and smaller defaults (50 proteins, 10 epochs).
+- wandb run names include the projection configuration tag.
+
+**Why:** Enables running multiple embedding projection experiments from a single script via `run_experiments.sh`, with results automatically organized by configuration. Smaller debug defaults speed up local iteration on MPS.

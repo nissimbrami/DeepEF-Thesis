@@ -85,7 +85,7 @@ def get_noised_proteins(data,device):
     seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
     
     if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
-        return None,None,None,None,None,None,None,None,None,None,None,None
+        return None,None,None,None,None,None,None,None,None,None,None,None,None
     #emb = torch.cat((esm_embed,seq),dim=2)
     emb = seq_one_hot.to(device)
     emb_decoy = seq_decoy.to(device)
@@ -106,7 +106,10 @@ def get_noised_proteins(data,device):
     mask_decoy, mask, mask_crd_decoy= mask_decoy.squeeze(), mask.squeeze(), mask_crd_decoy.squeeze()
     proT5_emb_decoy, proT5_emb = proT5_emb_decoy.squeeze(), proT5_emb.squeeze()
     proT5_cycle1, proT5_cycle2, proT5_cycle3, proT5_cycle4, proT5_cycle5, proT5_cycle6 = proT5_cycle1.squeeze(), proT5_cycle2.squeeze(), proT5_cycle3.squeeze(), proT5_cycle4.squeeze(), proT5_cycle5.squeeze(), proT5_cycle6.squeeze()
-    # get folded graph  
+    # Extract CA coordinates (atom index 1) before get_graph consumes 3D coords
+    ca_native = Xjf[:, 1, :].clone()   # [N, 3]
+    ca_decoy = Xcd[:, 1, :].clone()    # [N, 3]
+    # get folded graph
     Xjf = get_graph(Xjf, emb, proT5_emb, mask)
     # get unfolded graph
     Xju = get_unfolded_graph(Xju, emb, proT5_emb, mask)
@@ -125,7 +128,12 @@ def get_noised_proteins(data,device):
 
     # Also return native coords + metadata for DSM (needs to noise distance matrix)
     native_info = (crd_backbone.squeeze().to(device), emb, proT5_emb, mask)
-    return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info
+    # Build CA coords batch [9, N, 3] matching X = cat(Xjf,Xju,Xd,Xcd,Xdu,Xcy1..4)
+    ca_n = ca_native.unsqueeze(0)  # [1, N, 3]
+    ca_d = ca_decoy.unsqueeze(0)   # [1, N, 3]
+    ca_coords = torch.cat([ca_n, ca_n, ca_n, ca_d, ca_n,
+                            ca_n, ca_n, ca_n, ca_n], dim=0)  # [9, N, 3]
+    return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info, ca_coords
     
 # define validation function
 def compute_metrics(Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4):
@@ -171,7 +179,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             gc.collect()
             # zero the parameter gradients
             optimizer.zero_grad()
-            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info = get_noised_proteins(data,device)
+            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info, ca_coords = get_noised_proteins(data,device)
             if Xjf is None:
                 n_skips += 1
                 continue
@@ -181,7 +189,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 # half precision validation
                 with _autocast():
                     # calculate the energy for the folded unfolded and decoy structure
-                    E = model(X)
+                    E = model(X, ca_coords=ca_coords)
                     Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4 = E[0], E[1], E[2], E[3], E[4], E[5], E[6], E[7], E[8]
                     # calculate the loss
                     loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = False)
@@ -228,6 +236,11 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
     running_loss = 0.0
     n_skips = 0
     ds_length = len(dataloader)
+    # Epoch-level accumulators
+    epoch_loss_sum, epoch_lossd_sum, epoch_lossg_sum = 0.0, 0.0, 0.0
+    epoch_metrics_accum = {}
+    epoch_n_samples = 0
+    denoising_score_matching._logged_this_epoch = False  # reset per-epoch FD-DSM diagnostic
     with tqdm(dataloader, unit="batch") as tepoch:
         # set progress bar description
         tepoch.set_description(f"Epoch {epoch}")
@@ -237,53 +250,49 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             gc.collect()
              # zero the parameter gradients
             optimizer.zero_grad()
-            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info = get_noised_proteins(data,device)
+            Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info, ca_coords = get_noised_proteins(data,device)
             if Xjf is None:
                 n_skips += 1
                 continue
             X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4),dim=0)
-            
+
             # half precision training
             with _autocast():
                 # calculate the energy for the folded unfolded and decoy structure
-                E = model(X)
+                E = model(X, ca_coords=ca_coords)
                 Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4 = E[0], E[1], E[2], E[3], E[4], E[5], E[6], E[7], E[8]
-                # calculate the loss   
+                # calculate the loss
                 loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = False)
-            
-            # Scales the loss, and calls backward()
-            # to create scaled gradients
-            scaler.scale(loss).backward()
 
-            # Clip gradients to a maximum norm of max_grad_norm to prevent exploding gradients
-            if CFG.clip_grad_norm:
-                clip_grad_norm(model.parameters(), CFG.max_grad_norm)
-            
-            # Unscales gradients and calls
-            # or skips optimizer.step()
-            scaler.step(optimizer)
-
-            # Updates the scale for next iteration
-            scaler.update()
-
-            # Denoising score matching (replaces gradient penalty)
+            # Denoising score matching — combined with InfoNCE in single backward
             dsm_raw_val = torch.tensor(0.0)
             if CFG.gradient_penalty:
-                # zero the parameter gradients
-                optimizer.zero_grad()
-                _empty_cache()
-                gc.collect()
-                # half precision training
                 with _autocast():
                     lossg, dsm_raw_val = denoising_score_matching(model, Xjf, native_info, sigma=CFG.sigma)
-                # Scales the loss, and calls backward()
-                scaler.scale(lossg).backward()
-                scaler.step(optimizer)
-                scaler.update()
-                loss += lossg
+                # Clip DSM loss to prevent Hessian explosions (observed spikes to 2000+)
+                lossg = torch.clamp(lossg, max=20.0)
+                loss = lossd + lossg
+
+            # Single backward pass — both losses contribute to Adam state together
+            scaler.scale(loss).backward()
+
+            # Clip gradients to prevent exploding gradients
+            if CFG.clip_grad_norm:
+                clip_grad_norm(model.parameters(), CFG.max_grad_norm)
+
+            scaler.step(optimizer)
+            scaler.update()
 
             # Compute ranking/gap metrics
             metrics = compute_metrics(Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4)
+
+            # Accumulate epoch-level stats
+            epoch_loss_sum += loss.item()
+            epoch_lossd_sum += lossd.item()
+            epoch_lossg_sum += lossg.item()
+            for k, v in metrics.items():
+                epoch_metrics_accum.setdefault(k, []).append(v)
+            epoch_n_samples += 1
 
             # Gradient norm for monitoring stability
             grad_norm = 0.0
@@ -324,6 +333,18 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 })
             
         print(f"skipped {n_skips}")
+        # ---- Epoch summary (train) ----
+        if epoch_n_samples > 0:
+            avg_loss = epoch_loss_sum / epoch_n_samples
+            avg_lossd = epoch_lossd_sum / epoch_n_samples
+            avg_lossg = epoch_lossg_sum / epoch_n_samples
+            avg_metrics = {k: sum(v)/len(v) for k, v in epoch_metrics_accum.items()}
+            print(f"\n{'='*60}")
+            print(f"EPOCH {epoch} TRAIN SUMMARY  (emb_projection={CFG.emb_projection})")
+            print(f"  loss={avg_loss:.4f}  lossd={avg_lossd:.4f}  lossg={avg_lossg:.4f}")
+            print(f"  rank_Ejf<Exd={avg_metrics.get('rank_Ejf_lt_Exd',0):.2%}  rank_Ejf<Ecd={avg_metrics.get('rank_Ejf_lt_Ecd',0):.2%}  rank_Ejf_lowest={avg_metrics.get('rank_Ejf_lowest',0):.2%}")
+            print(f"  gap(Exd-Ejf)={avg_metrics.get('gap_Exd_Ejf',0):.4f}  gap(Ecd-Ejf)={avg_metrics.get('gap_Ecd_Ejf',0):.4f}")
+            print(f"{'='*60}\n")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
         # evaluate the model
         val_loss, val_lossd, val_lossg, valid_lossc, val_metrics = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
@@ -340,7 +361,13 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             })
          # Update the learning rate based on the validation loss
         scheduler.step()
-        print (f"validation loss: {val_loss}")
+        print(f"\n{'='*60}")
+        print(f"EPOCH {epoch} VALIDATION SUMMARY  (emb_projection={CFG.emb_projection})")
+        print(f"  val_loss={val_loss:.4f}  val_lossd={val_lossd:.4f}  val_lossg={val_lossg:.4f}")
+        vr = val_metrics
+        print(f"  rank_Ejf<Exd={vr.get('val_rank_Ejf_lt_Exd',0):.2%}  rank_Ejf<Ecd={vr.get('val_rank_Ejf_lt_Ecd',0):.2%}  rank_Ejf_lowest={vr.get('val_rank_Ejf_lowest',0):.2%}")
+        print(f"  gap(Exd-Ejf)={vr.get('val_gap_Exd_Ejf',0):.4f}  gap(Ecd-Ejf)={vr.get('val_gap_Ecd_Ejf',0):.4f}")
+        print(f"{'='*60}\n")
         if val_loss<best_val:
             print('saving model with valid loss: ',val_loss)
             save_checkpoint(epoch, model, optimizer, loss,val_loss,CFG.model_path+"best_model.pt")
@@ -372,8 +399,7 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         gc.collect()
         model.train()
         model,epoch_train_loss,valid_loss = train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,valid_loss, scheduler,scaler)
-        
-        
+
     print('Finished Training')
 
 
@@ -388,94 +414,74 @@ def gradient_penalty(X_native, E_native):
     lossg = torch.mean(partial_dx_native**2)
     return lossg
 
-def denoising_score_matching(model, X_native, native_info, sigma=CFG.sigma):
-    """Holistic DSM: noise structure + embeddings + mutate sequence.
+def denoising_score_matching(model, X_native, native_info, sigma=CFG.sigma, K=1, epsilon=0.1):
+    """FD-DSM on distance features only (D, 16 dims per residue).
 
-    Corrupts all graph feature components with appropriate noise:
-    - D + Fb (structure, 48 dims): Gaussian noise with sigma
-    - proT5 embeddings (1024 dims): Gaussian noise with sigma * 0.2
-    - one_hot (sequence, 20 dims): randomly replace ~15% of amino acids
+    Uses finite-difference to estimate ∂E/∂x_D instead of autograd with
+    create_graph=True. This avoids the vanishing Hessian problem:
+      - Autograd DSM: needs ∂²E/(∂x_D ∂θ) — vanishes through norm layers → no learning
+      - FD-DSM:       needs only ∂E/∂θ       — first-order, healthy gradients
 
-    Per-component losses are averaged equally so no single component dominates.
+    FD approximation: v·∇E ≈ (E(x+εv) - E(x-εv)) / 2ε
+    DSM target:       v·score = v·(-noise/σ²)
+    Loss:             mean_K[ (FD_score - target_v)² ]
 
     Args:
         model: the energy model
-        X_native: clean graph features [1, N, features] (unused, kept for API compat)
-        native_info: tuple (coords [N,4,3], emb [N,20], proT5 [N,1024], mask [N])
-        sigma: base noise std (structure features)
+        X_native: clean graph features [1, N, features]
+        native_info: tuple (coords, emb, proT5, mask)
+        sigma: noise std for distance features
+        K: number of random FD directions per sample
+        epsilon: finite-difference step size
     Returns:
-        lossg: scalar loss
-        dsm_raw: raw MSE (for logging)
+        lossg: scalar FD-DSM loss
+        dsm_raw: detached raw value for logging
     """
-    coords, emb, proT5_emb, mask = native_info
-    N = coords.shape[0]
-    device = coords.device
+    D_DIM = 16
+    X_clean = X_native.squeeze(0).detach()  # [N, F]
+    N = X_clean.shape[0]
+    device = X_clean.device
 
-    # --- Build clean graph features (same pipeline as get_graph) ---
-    D_clean = get_dist_matrix(coords)
-    D_clean = torch.relu(torch.exp(CFG.gaussian_coef * D_clean ** 2))
-    mask_index = torch.where(mask == 0)
-    D_clean[mask_index[0], :, :] = 0
-    D_clean[:, mask_index[0], :] = 0
-    Fb = get_bonded_features(D_clean)              # [N, 32]
-    D_sum = D_clean.sum(dim=1)                     # [N, 16]
-    D_norm = F.normalize(D_sum, p=2, dim=0)
-    emb_norm = F.normalize(proT5_emb, p=2, dim=0)  # [N, 1024]
-    X_clean = torch.cat([D_norm, Fb, emb_norm, emb], dim=1)  # [N, F]
+    # Noise only D features (first 16 dims)
+    noise_d = torch.randn(N, D_DIM, device=device) * sigma
+    X_noisy = X_clean.clone()
+    X_noisy[:, :D_DIM] = X_clean[:, :D_DIM] + noise_d
 
-    # Feature layout indices
-    d_fb_end = 16 + 32                          # 48: end of structure features
-    emb_end = d_fb_end + emb_norm.shape[1]      # 48 + 1024 = 1072
-    oh_end = emb_end + emb.shape[1]             # 1072 + 20 = 1092
+    # Extract CA coords for distance-based GAT edges
+    crd_backbone = native_info[0]  # [N, 4, 3]
+    ca_single = crd_backbone[:, 1, :].unsqueeze(0)  # [1, N, 3]
 
-    # --- Per-component noise ---
-    # Baseline DSM error per component = 1/sigma². Use same sigma for balanced learning.
-    sigma_struct = sigma            # D + Fb
-    sigma_emb = sigma              # proT5 (same sigma → balanced target scores)
-    sigma_oh = 1.0                 # one_hot (scale for AA replacement delta ~sqrt(2))
+    loss = torch.tensor(0.0, device=device)
+    fd_scores = []
+    for _ in range(K):
+        # Random unit direction in D-space only
+        v = torch.zeros_like(X_clean)
+        v_d = torch.randn(N, D_DIM, device=device)
+        v_d = v_d / (v_d.norm() + 1e-8)
+        v[:, :D_DIM] = v_d
 
-    noise = torch.zeros_like(X_clean)
-    # Structure noise
-    noise[:, :d_fb_end] = torch.randn(N, d_fb_end, device=device) * sigma_struct
-    # Embedding noise
-    noise[:, d_fb_end:emb_end] = torch.randn(N, emb_norm.shape[1], device=device) * sigma_emb
-    # Sequence: randomly replace ~15% of amino acids
-    oh_dim = emb.shape[1]
-    p_mut = 0.15
-    mut_mask = torch.rand(N, device=device) < p_mut
-    if mut_mask.any():
-        n_mut = mut_mask.sum().item()
-        random_aa = torch.zeros(n_mut, oh_dim, device=device)
-        random_aa[torch.arange(n_mut), torch.randint(0, oh_dim, (n_mut,))] = 1.0
-        noise[mut_mask, emb_end:oh_end] = random_aa - emb[mut_mask]
-    # Non-mutated positions: small Gaussian noise on one_hot
-    non_mut = ~mut_mask
-    if non_mut.any():
-        noise[non_mut, emb_end:oh_end] = torch.randn(non_mut.sum().item(), oh_dim, device=device) * 0.1
+        # Two forward passes: no create_graph needed
+        E_plus  = model((X_noisy + epsilon * v).unsqueeze(0), ca_coords=ca_single)[0]
+        E_minus = model((X_noisy - epsilon * v).unsqueeze(0), ca_coords=ca_single)[0]
+        fd_score = (E_plus - E_minus) / (2 * epsilon)  # scalar: v·∇E
 
-    X_noisy = (X_clean.detach() + noise).requires_grad_(True)
+        # Target: v·score = v·(-noise/σ²), only D dims contribute since v=0 elsewhere
+        target_v = -torch.sum(v_d * noise_d) / (sigma ** 2)
+        loss = loss + (fd_score - target_v) ** 2
+        fd_scores.append(fd_score.detach().abs().item())
 
-    # Forward
-    E_noisy = model(X_noisy.unsqueeze(0))[0]
+    lossg = loss / K
 
-    # Gradient of energy w.r.t. noisy features [N, F]
-    grad_X = torch.autograd.grad(outputs=E_noisy, inputs=X_noisy,
-                                  grad_outputs=torch.ones_like(E_noisy),
-                                  create_graph=True, retain_graph=True)[0]
+    # Diagnostic: print once per epoch
+    if not denoising_score_matching._logged_this_epoch:
+        denoising_score_matching._logged_this_epoch = True
+        target_mag = (noise_d.abs() / sigma**2).mean().item()
+        print(f"  FD-DSM diag: |fd_score|={sum(fd_scores)/len(fd_scores):.4f}  |target|≈{target_mag:.4f}  lossg={lossg.item():.4f}")
 
-    # Per-component target score
-    target = torch.zeros_like(noise)
-    target[:, :d_fb_end] = -noise[:, :d_fb_end] / (sigma_struct ** 2)
-    target[:, d_fb_end:emb_end] = -noise[:, d_fb_end:emb_end] / (sigma_emb ** 2)
-    target[:, emb_end:oh_end] = -noise[:, emb_end:oh_end] / (sigma_oh ** 2)
+    return lossg, lossg.detach()
 
-    # Equal-weight per-component loss (prevents 1024-dim proT5 from dominating)
-    err_struct = torch.mean((grad_X[:, :d_fb_end] + target[:, :d_fb_end]) ** 2)
-    err_emb = torch.mean((grad_X[:, d_fb_end:emb_end] + target[:, d_fb_end:emb_end]) ** 2)
-    err_oh = torch.mean((grad_X[:, emb_end:oh_end] + target[:, emb_end:oh_end]) ** 2)
-    dsm_raw = (err_struct + err_emb + err_oh) / 3.0
 
-    return dsm_raw, dsm_raw.detach()
+denoising_score_matching._logged_this_epoch = False
 
 def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = True , reg_alpha = CFG.reg_alpha):
     """
@@ -550,11 +556,18 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
 def main():
     # Set wandb and debug paths
     if CFG.debug:
-        CFG.model_path = "./res/debug/"
-        CFG.results_path = './res/results-debug/'
+        CFG.model_path = f"./res/debug-{CFG.emb_projection}/"
+        CFG.results_path = f'./res/results-debug-{CFG.emb_projection}/'
+        os.makedirs(CFG.model_path, exist_ok=True)
+        os.makedirs(CFG.results_path, exist_ok=True)
         print('**** Debug mode ****')
+    proj_tag = f"emb-{CFG.emb_projection}" if CFG.emb_projection != "none" else "no-proj"
+    if CFG.emb_projection == "low_rank":
+        proj_tag += f"-r{CFG.emb_proj_rank}"
+    if CFG.emb_projection == "mlp":
+        proj_tag += f"-d{CFG.emb_proj_dim}"
     wandb.init(project="DeepEF-InfoNCE-DSM",
-               name='InfoNCE+DSM light attention GCN' if not CFG.debug else f'debug-{CFG.debug_size}prot-{CFG.num_epochs}ep')
+               name=f'InfoNCE+DSM light attention GCN ({proj_tag})' if not CFG.debug else f'debug-{CFG.debug_size}prot-{CFG.num_epochs}ep-{proj_tag}')
     print('***Start main function***')
     print('***load the data with dataloader***')
     d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, 
@@ -563,7 +576,9 @@ def main():
     # Build the model
     print('***Build the model***')
     model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef,
-                dropout_rate=CFG.dropout_rate, light_attention=True).to(CFG.device)
+                dropout_rate=CFG.dropout_rate, light_attention=True,
+                emb_projection=CFG.emb_projection,
+                gat_cutoff=CFG.gat_cutoff).to(CFG.device)
     model.name = "PEM-With LLM embedding"
     model.energy_epsilon = 1e-6
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
@@ -586,14 +601,24 @@ def print_par(model):
             print (name, param.data)
    
 if __name__ == '__main__':
+    # Parse --emb_projection flag
+    for i, arg in enumerate(sys.argv):
+        if arg == '--emb_projection' and i + 1 < len(sys.argv):
+            CFG.emb_projection = sys.argv[i + 1]
+        if arg == '--emb_proj_rank' and i + 1 < len(sys.argv):
+            CFG.emb_proj_rank = int(sys.argv[i + 1])
+        if arg == '--emb_proj_dim' and i + 1 < len(sys.argv):
+            CFG.emb_proj_dim = int(sys.argv[i + 1])
+        if arg == '--emb_proj_hidden' and i + 1 < len(sys.argv):
+            CFG.emb_proj_hidden = int(sys.argv[i + 1])
     # Parse --debug flag for quick local testing on MPS/CPU
     if '--debug' in sys.argv:
         CFG.debug = True
-        CFG.debug_size = 100
-        CFG.num_epochs = 20
+        CFG.debug_size = 50
+        CFG.num_epochs = 10
         CFG.num_workers = 0
         CFG.seq_len = 350  # limit protein size for MPS memory
-        print(f'**** Debug mode: {CFG.debug_size} proteins, {CFG.num_epochs} epochs, seq_len<={CFG.seq_len}, device={CFG.device} ****')
+        print(f'**** Debug mode: {CFG.debug_size} proteins, {CFG.num_epochs} epochs, seq_len<={CFG.seq_len}, emb_projection={CFG.emb_projection}, device={CFG.device} ****')
     if not CFG.debug:
         CFG.model_path = './res/trianed_models-light_attention_newGCN/'
         CFG.results_path = './res/results-emb/'

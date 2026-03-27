@@ -19,7 +19,7 @@ class CFG:
     constraint = True
     split_train_size = 0.8
     debug_size  = 10
-    sigma = 0.5 # for score matching loss (DSM on Fb bonded features)
+    sigma = 0.5 # for score matching loss (DSM D-only, 16 distance dims)
     # Model parameters
     h = 0.1
     coords_emb_size = 48
@@ -30,6 +30,12 @@ class CFG:
     model_path = "./res/trianed_models-newDecoys/"
     light_attention = True
     gaussian_coef = -0.08
+    # Embedding projection: "none", "mlp", "low_rank"
+    emb_projection = "none"
+    emb_proj_dim = 16        # output dim of projection (integrated into GNN)
+    emb_proj_hidden = 128    # hidden dim for MLP projection
+    emb_proj_rank = 4        # bottleneck rank for low_rank projection
+    emb_input_dim = 1024     # LLM embedding dimension
     #training parameters
     lr = 0.0001
     wd = 0.00001
@@ -42,9 +48,10 @@ class CFG:
     gradient_penalty = True
     decoy_threshold = 20
     max_grad_norm = 10.0
-    clip_grad_norm = False
+    clip_grad_norm = True
     reg_alpha = 0.1
     tau = 1.0 # temperature for InfoNCE contrastive loss
+    gat_cutoff = 12.0 # Angstroms, distance cutoff for GAT edges (None = fully connected)
     # defalut parameters
     torch_default_dtype = torch.float32
     precision = torch.float32

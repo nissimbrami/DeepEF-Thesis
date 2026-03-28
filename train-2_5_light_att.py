@@ -460,10 +460,12 @@ def denoising_score_matching(model, X_native, native_info, sigma=CFG.sigma, K=1,
         v_d = v_d / (v_d.norm() + 1e-8)
         v[:, :D_DIM] = v_d
 
-        # Two forward passes: no create_graph needed
-        E_plus  = model((X_noisy + epsilon * v).unsqueeze(0), ca_coords=ca_single)[0]
-        E_minus = model((X_noisy - epsilon * v).unsqueeze(0), ca_coords=ca_single)[0]
-        fd_score = (E_plus - E_minus) / (2 * epsilon)  # scalar: v·∇E
+        # Single batched forward pass: E+ and E- share the same dropout mask
+        model.eval()
+        X_pair = torch.stack([X_noisy + epsilon * v, X_noisy - epsilon * v], dim=0)  # [2, N, F]
+        E = model(X_pair, ca_coords=ca_single.expand(2, -1, -1))
+        model.train()
+        fd_score = (E[0] - E[1]) / (2 * epsilon)  # scalar: v·∇E
 
         # Target: v·score = v·(-noise/σ²), only D dims contribute since v=0 elsewhere
         target_v = -torch.sum(v_d * noise_d) / (sigma ** 2)

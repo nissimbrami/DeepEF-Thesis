@@ -190,6 +190,49 @@ fd_score = (E[0] - E[1]) / (2 * epsilon)
 
 ---
 
+### 11. Gradient-Norm Scaling for DSM vs InfoNCE
+
+Added automatic per-step scaling of the DSM loss so its gradient contribution always matches InfoNCE's, replacing the fixed `reg_alpha` weight.
+
+**The problem:** The unweighted combination `loss = lossd + lossg` let DSM gradients dominate or be drowned out unpredictably. Without scaling, `dsm_alpha` would need to be hand-tuned per experiment. Worse, when the DSM gradient norm is near-zero (small proteins, flat energy landscape early in training), naïve scaling exploded to millions — destabilizing training completely.
+
+**The fix:**
+
+1. **Two backward passes, no third:** `lossd.backward()` and `lossg.backward()` are each run once to measure their gradient norms. The final parameter gradient is then assembled manually as `grad_d + alpha * grad_g` — no third backward needed.
+2. **Alpha clamped to [0.01, 10]:** Prevents explosion when `grad_norm_g ≈ 0` while ensuring DSM always contributes at least 1% of InfoNCE's gradient.
+3. **Alpha logged per step and averaged per epoch** alongside `lossd`, `lossg`, and `fd_score`.
+
+```python
+dsm_alpha = torch.clamp(grad_norm_d / (grad_norm_g + 1e-8), min=0.01, max=10.0).detach()
+# Manually combine gradients — no third backward
+for n, p in model.named_parameters():
+    if p.grad is not None and n in grads_d:
+        p.grad.mul_(dsm_alpha).add_(grads_d[n])
+```
+
+**Observed:** `dsm_alpha` stabilises around 3–5 across epochs, confirming the two losses are naturally ~3–5x mismatched in gradient norm without scaling.
+
+---
+
+### 12. fd_score Averaged Over All Proteins per Epoch
+
+**Why `fd_score` is a better training signal than `lossg`:**
+
+`lossg = (fd_score - target_v)²` where `target_v = -v·noise/σ²` is resampled randomly every step. Even if the model is learning perfectly, `lossg` will not decrease visibly because the target changes with every sample — it measures "how well did you answer this random question?" when the question changes each time.
+
+`fd_score = (E(x+εv) - E(x-εv)) / 2ε ≈ v·∇E(x_noisy)` measures whether the model's energy function has developed a gradient in the direction of the noise. A model with `∇E ≈ 0` everywhere gives `fd_score ≈ 0`. A model that has learned the score function gives `fd_score ≈ target_v`. So **growing `fd_score` magnitude is the direct signal that DSM is working**, independent of the random noise draw.
+
+Expected `lossg` for a model with a given `fd_score`:
+```
+E[lossg] = Var(target_v) + Var(fd_score) - 2·Cov(fd_score, target_v)
+         ≈ 4  (when fd_score ≈ 0, i.e. early training)
+```
+`lossg` only starts dropping when `fd_score` reaches the same order of magnitude as `target_v` (~2), which requires much more than 20 epochs on 50 proteins.
+
+**The fix:** `denoising_score_matching()` now returns `avg_fd_score` (the mean `|fd_score|` across K directions), accumulated across all proteins in the epoch and printed in the TRAIN SUMMARY alongside the other metrics. Previously it was logged for one random protein per epoch, making cross-epoch comparison meaningless.
+
+---
+
 ### 8. Epoch-Level Training Summaries
 
 Added epoch-end summary printouts showing averaged loss components and ranking metrics for both training and validation, with the embedding projection configuration noted.

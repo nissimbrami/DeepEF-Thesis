@@ -167,7 +167,6 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     valid_lossg = 0
     valid_lossc = 0
     n_skips = 0
-    val_metrics_accum = {}
     model.eval()
     with tqdm(dataloader, unit="batch") as tepoch:
         # set progress bar description
@@ -201,7 +200,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 _empty_cache()
                 gc.collect()
                 with _autocast():
-                    lossg, _ = denoising_score_matching(model, Xjf, native_info, sigma=CFG.sigma)
+                    lossg, _, _fd = denoising_score_matching(model, Xjf, native_info, sigma=CFG.sigma)
 
                 loss += lossg
 
@@ -210,11 +209,6 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             valid_lossg += lossg.item()
             valid_lossc += lossc.item()
 
-            # Accumulate ranking/gap metrics
-            metrics = compute_metrics(Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4)
-            for k, v in metrics.items():
-                val_metrics_accum.setdefault(k, []).append(v)
-
             _empty_cache()
             gc.collect()
             # update the progress bar
@@ -222,9 +216,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}, n_skips: {n_skips}")
 
     n = len(dataloader) - n_skips if len(dataloader) > n_skips else len(dataloader)
-    # Average validation metrics
-    val_metrics_avg = {f"val_{k}": sum(v) / len(v) for k, v in val_metrics_accum.items()}
-    return valid_loss/n, valid_lossd/n, valid_lossg/n, valid_lossc/n, val_metrics_avg
+    return valid_loss/n, valid_lossd/n, valid_lossg/n, valid_lossc/n
 
 def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None,scaler=None):
     """
@@ -237,10 +229,9 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
     n_skips = 0
     ds_length = len(dataloader)
     # Epoch-level accumulators
-    epoch_loss_sum, epoch_lossd_sum, epoch_lossg_sum = 0.0, 0.0, 0.0
-    epoch_metrics_accum = {}
+    epoch_loss_sum, epoch_lossd_sum, epoch_lossg_sum, epoch_dsm_alpha_sum, epoch_fd_score_sum = 0.0, 0.0, 0.0, 0.0, 0.0
+    epoch_energy_accum = {"Ejf": [], "Eju": [], "Exd": [], "Ecd": [], "Exdu": [], "Ecy1": [], "Ecy2": [], "Ecy3": [], "Ecy4": []}
     epoch_n_samples = 0
-    denoising_score_matching._logged_this_epoch = False  # reset per-epoch FD-DSM diagnostic
     with tqdm(dataloader, unit="batch") as tepoch:
         # set progress bar description
         tepoch.set_description(f"Epoch {epoch}")
@@ -264,17 +255,42 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 # calculate the loss
                 loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = False)
 
-            # Denoising score matching — combined with InfoNCE in single backward
+            # Denoising score matching with gradient-norm scaling
             dsm_raw_val = torch.tensor(0.0)
+            dsm_alpha = torch.tensor(1.0)
+            grad_norm_d = torch.tensor(0.0)
+            grad_norm_g = torch.tensor(0.0)
+            fd_score_val = 0.0
             if CFG.gradient_penalty:
                 with _autocast():
-                    lossg, dsm_raw_val = denoising_score_matching(model, Xjf, native_info, sigma=CFG.sigma)
-                # Clip DSM loss to prevent Hessian explosions (observed spikes to 2000+)
+                    lossg, dsm_raw_val, fd_score_val = denoising_score_matching(model, Xjf, native_info, sigma=CFG.sigma)
                 lossg = torch.clamp(lossg, max=20.0)
-                loss = lossd + lossg
 
-            # Single backward pass — both losses contribute to Adam state together
-            scaler.scale(loss).backward()
+                # Pass 1: backward on lossd — accumulates ∂lossd/∂θ
+                scaler.scale(lossd).backward(retain_graph=True)
+                grad_norm_d = sum(p.grad.norm()**2 for p in model.parameters() if p.grad is not None) ** 0.5
+                # Snapshot lossd grads before zeroing
+                grads_d = {n: p.grad.clone() for n, p in model.named_parameters() if p.grad is not None}
+                optimizer.zero_grad()
+
+                # Pass 2: backward on lossg — accumulates ∂lossg/∂θ
+                scaler.scale(lossg).backward()
+                grad_norm_g = sum(p.grad.norm()**2 for p in model.parameters() if p.grad is not None) ** 0.5
+
+                # Alpha scales DSM so its gradient norm matches InfoNCE.
+                # Clamp to [0.01, 10] — prevents explosion when grad_norm_g ≈ 0
+                dsm_alpha = torch.clamp(grad_norm_d / (grad_norm_g + 1e-8), min=0.01, max=10.0).detach()
+
+                # Manually combine: final grad = grad_d + alpha * grad_g (no third backward)
+                for n, p in model.named_parameters():
+                    if p.grad is not None and n in grads_d:
+                        p.grad.mul_(dsm_alpha).add_(grads_d[n])
+                    elif n in grads_d:
+                        p.grad = grads_d[n]
+                loss = lossd + dsm_alpha * lossg  # for logging only
+            else:
+                # No DSM: single backward on InfoNCE loss
+                scaler.scale(loss).backward()
 
             # Clip gradients to prevent exploding gradients
             if CFG.clip_grad_norm:
@@ -283,15 +299,15 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             scaler.step(optimizer)
             scaler.update()
 
-            # Compute ranking/gap metrics
-            metrics = compute_metrics(Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4)
-
             # Accumulate epoch-level stats
             epoch_loss_sum += loss.item()
             epoch_lossd_sum += lossd.item()
             epoch_lossg_sum += lossg.item()
-            for k, v in metrics.items():
-                epoch_metrics_accum.setdefault(k, []).append(v)
+            epoch_dsm_alpha_sum += dsm_alpha.item()
+            epoch_fd_score_sum += fd_score_val
+            for key, val in zip(["Ejf","Eju","Exd","Ecd","Exdu","Ecy1","Ecy2","Ecy3","Ecy4"],
+                                 [Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4]):
+                epoch_energy_accum[key].append(val.item())
             epoch_n_samples += 1
 
             # Gradient norm for monitoring stability
@@ -313,23 +329,15 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             _empty_cache()
             gc.collect()
             # update the progress bar
-            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"sequence_len": Xjf.shape[1]})
+            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"dsm_α":round(dsm_alpha.item(),3),"sequence_len": Xjf.shape[1]})
             # Log metrics
             step = ds_length*epoch+index
             wandb.log({
                     "epoch": epoch, "step": step, "sequence_len": Xjf.shape[1],
-                    # Losses
                     "loss": loss.item(), "lossd": lossd.item(), "lossg": lossg.item(),
-                    # Energies
-                    "Ejf": Ejf.item(), "Eju": Eju.item(), "Exd": Exd.item(),
-                    "Ecd": Ecd.item(), "Exdu": Exdu.item(),
-                    "Ecy1": Ecy1.item(), "Ecy2": Ecy2.item(),
-                    "Ecy3": Ecy3.item(), "Ecy4": Ecy4.item(),
-                    # Ranking (per-sample)
-                    **{f"train_{k}": v for k, v in metrics.items()},
-                    # Stability
                     "grad_norm": grad_norm,
-                    "dsm_raw": dsm_raw_val.item(),
+                    "dsm_alpha": dsm_alpha.item(),
+                    "fd_score": fd_score_val,
                 })
             
         print(f"skipped {n_skips}")
@@ -338,35 +346,34 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             avg_loss = epoch_loss_sum / epoch_n_samples
             avg_lossd = epoch_lossd_sum / epoch_n_samples
             avg_lossg = epoch_lossg_sum / epoch_n_samples
-            avg_metrics = {k: sum(v)/len(v) for k, v in epoch_metrics_accum.items()}
+            avg_dsm_alpha = epoch_dsm_alpha_sum / epoch_n_samples
+            avg_fd_score = epoch_fd_score_sum / epoch_n_samples
+            mean_energies = {f"train_mean_{k}": sum(v)/len(v) for k, v in epoch_energy_accum.items() if v}
             print(f"\n{'='*60}")
             print(f"EPOCH {epoch} TRAIN SUMMARY  (emb_projection={CFG.emb_projection})")
-            print(f"  loss={avg_loss:.4f}  lossd={avg_lossd:.4f}  lossg={avg_lossg:.4f}")
-            print(f"  rank_Ejf<Exd={avg_metrics.get('rank_Ejf_lt_Exd',0):.2%}  rank_Ejf<Ecd={avg_metrics.get('rank_Ejf_lt_Ecd',0):.2%}  rank_Ejf_lowest={avg_metrics.get('rank_Ejf_lowest',0):.2%}")
-            print(f"  gap(Exd-Ejf)={avg_metrics.get('gap_Exd_Ejf',0):.4f}  gap(Ecd-Ejf)={avg_metrics.get('gap_Ecd_Ejf',0):.4f}")
+            print(f"  loss={avg_loss:.4f}  lossd={avg_lossd:.4f}  lossg={avg_lossg:.4f}  dsm_alpha={avg_dsm_alpha:.4f}  fd_score={avg_fd_score:.4f}")
             print(f"{'='*60}\n")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
         # evaluate the model
-        val_loss, val_lossd, val_lossg, valid_lossc, val_metrics = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
-         # update wandb metrics
+        val_loss, val_lossd, val_lossg, valid_lossc = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
+        # update wandb metrics (train epoch summary + validation)
         wandb.log({
                 "epoch": epoch,
                 "learning rate": optimizer.param_groups[0]["lr"],
+                # Train epoch averages
+                "train_avg_loss": avg_loss, "train_avg_lossd": avg_lossd,
+                "train_avg_lossg": avg_lossg, "train_avg_dsm_alpha": avg_dsm_alpha,
+                **mean_energies,
                 # Validation losses
                 "validation loss": val_loss,
                 "validation lossd": val_lossd,
                 "validation lossg": val_lossg,
-                # Validation ranking & gaps (averaged over all val samples)
-                **val_metrics,
             })
-         # Update the learning rate based on the validation loss
+        # Update the learning rate based on the validation loss
         scheduler.step()
         print(f"\n{'='*60}")
         print(f"EPOCH {epoch} VALIDATION SUMMARY  (emb_projection={CFG.emb_projection})")
         print(f"  val_loss={val_loss:.4f}  val_lossd={val_lossd:.4f}  val_lossg={val_lossg:.4f}")
-        vr = val_metrics
-        print(f"  rank_Ejf<Exd={vr.get('val_rank_Ejf_lt_Exd',0):.2%}  rank_Ejf<Ecd={vr.get('val_rank_Ejf_lt_Ecd',0):.2%}  rank_Ejf_lowest={vr.get('val_rank_Ejf_lowest',0):.2%}")
-        print(f"  gap(Exd-Ejf)={vr.get('val_gap_Exd_Ejf',0):.4f}  gap(Ecd-Ejf)={vr.get('val_gap_Ecd_Ejf',0):.4f}")
         print(f"{'='*60}\n")
         if val_loss<best_val:
             print('saving model with valid loss: ',val_loss)
@@ -473,17 +480,10 @@ def denoising_score_matching(model, X_native, native_info, sigma=CFG.sigma, K=1,
         fd_scores.append(fd_score.detach().abs().item())
 
     lossg = loss / K
+    avg_fd_score = sum(fd_scores) / len(fd_scores)
 
-    # Diagnostic: print once per epoch
-    if not denoising_score_matching._logged_this_epoch:
-        denoising_score_matching._logged_this_epoch = True
-        target_mag = (noise_d.abs() / sigma**2).mean().item()
-        print(f"  FD-DSM diag: |fd_score|={sum(fd_scores)/len(fd_scores):.4f}  |target|≈{target_mag:.4f}  lossg={lossg.item():.4f}")
+    return lossg, lossg.detach(), avg_fd_score
 
-    return lossg, lossg.detach()
-
-
-denoising_score_matching._logged_this_epoch = False
 
 def criterion(Ejf, Eju, Exd, X_native, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = True , reg_alpha = CFG.reg_alpha):
     """
@@ -617,7 +617,7 @@ if __name__ == '__main__':
     if '--debug' in sys.argv:
         CFG.debug = True
         CFG.debug_size = 50
-        CFG.num_epochs = 10
+        CFG.num_epochs = 20
         CFG.num_workers = 0
         CFG.seq_len = 350  # limit protein size for MPS memory
         print(f'**** Debug mode: {CFG.debug_size} proteins, {CFG.num_epochs} epochs, seq_len<={CFG.seq_len}, emb_projection={CFG.emb_projection}, device={CFG.device} ****')

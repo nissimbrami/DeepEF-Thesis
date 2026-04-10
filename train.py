@@ -14,8 +14,62 @@ import gc
 import time
 import sys
 import os
+import csv
+import datetime
+import pathlib
 import pandas as pd
 import wandb
+
+
+# ---------------------------------------------------------------------------
+# Run logger: writes per-step + per-epoch CSVs locally; wandb gets only the
+# curated per-epoch summary so trends are clear.
+# ---------------------------------------------------------------------------
+class RunLogger:
+    def __init__(self, root="logs", run_name=None):
+        ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        run_name = run_name or ts
+        self.dir = pathlib.Path(root) / f"{ts}_{run_name}"
+        self.dir.mkdir(parents=True, exist_ok=True)
+        self.steps_path = self.dir / "steps.csv"
+        self.epochs_path = self.dir / "epochs.csv"
+        self._steps_fh = None
+        self._steps_writer = None
+        self._epochs_fh = None
+        self._epochs_writer = None
+        print(f"[RunLogger] writing local logs to {self.dir}")
+
+    def _ensure_writer(self, attr_fh, attr_writer, path, fieldnames):
+        fh = getattr(self, attr_fh)
+        if fh is None:
+            fh = open(path, "w", newline="")
+            writer = csv.DictWriter(fh, fieldnames=fieldnames)
+            writer.writeheader()
+            setattr(self, attr_fh, fh)
+            setattr(self, attr_writer, writer)
+            return writer
+        return getattr(self, attr_writer)
+
+    def log_step(self, row: dict):
+        writer = self._ensure_writer("_steps_fh", "_steps_writer",
+                                     self.steps_path, list(row.keys()))
+        writer.writerow(row)
+        self._steps_fh.flush()
+
+    def log_epoch(self, row: dict):
+        writer = self._ensure_writer("_epochs_fh", "_epochs_writer",
+                                     self.epochs_path, list(row.keys()))
+        writer.writerow(row)
+        self._epochs_fh.flush()
+
+    def close(self):
+        for fh in (self._steps_fh, self._epochs_fh):
+            if fh is not None:
+                fh.close()
+
+
+# Module-level logger; instantiated in main()
+RUN_LOGGER: "RunLogger | None" = None
 
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
@@ -167,6 +221,14 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
     valid_lossg = 0
     valid_lossc = 0
     n_skips = 0
+    metric_accum = {
+        "rank_Ejf_lt_Exd": 0.0, "rank_Ejf_lt_Ecd": 0.0,
+        "rank_Eju_lt_Ecd": 0.0, "rank_Ejf_lowest": 0.0,
+        "gap_Exd_Ejf": 0.0, "gap_Ecd_Ejf": 0.0, "gap_Ecd_Eju": 0.0,
+    }
+    energy_accum = {"Ejf": 0.0, "Eju": 0.0, "Exd": 0.0, "Ecd": 0.0,
+                    "Exdu": 0.0, "Ecy1": 0.0, "Ecy2": 0.0, "Ecy3": 0.0, "Ecy4": 0.0}
+    n_metric = 0
     model.eval()
     with tqdm(dataloader, unit="batch") as tepoch:
         # set progress bar description
@@ -209,6 +271,15 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             valid_lossg += lossg.item()
             valid_lossc += lossc.item()
 
+            # Per-sample EBM ranking + energies
+            m = compute_metrics(Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4)
+            for k in metric_accum:
+                metric_accum[k] += m[k]
+            for k, v in zip(energy_accum.keys(),
+                            [Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4]):
+                energy_accum[k] += v.item()
+            n_metric += 1
+
             _empty_cache()
             gc.collect()
             # update the progress bar
@@ -216,7 +287,9 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}, n_skips: {n_skips}")
 
     n = len(dataloader) - n_skips if len(dataloader) > n_skips else len(dataloader)
-    return valid_loss/n, valid_lossd/n, valid_lossg/n, valid_lossc/n
+    val_metrics = {f"val_{k}": v / max(n_metric, 1) for k, v in metric_accum.items()}
+    val_metrics.update({f"val_mean_{k}": v / max(n_metric, 1) for k, v in energy_accum.items()})
+    return valid_loss/n, valid_lossd/n, valid_lossg/n, valid_lossc/n, val_metrics
 
 def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,best_val=1000,scheduler=None,scaler=None):
     """
@@ -319,25 +392,22 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
 
             # print statistics
             running_loss += loss.item()
-            if index % 1000 == 999 :    # print every 1000 mini-batches
-                print(f'[{epoch + 1}, {index + 1:5d}] loss: {running_loss / 1000:.3f}')
-                print(f"skipped {n_skips}")
-                epoch_train_loss.append(running_loss/1000)
-                wandb.log({"epoch": epoch,"running_loss": running_loss/1000,"running_lossIndex":ds_length*epoch+index})
-                running_loss = 0.0
 
             _empty_cache()
             gc.collect()
             # update the progress bar
-            tepoch.set_postfix({"loss":round(loss.item(),3),"running loss":round(running_loss/(index%1000 + 1),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"dsm_α":round(dsm_alpha.item(),3),"sequence_len": Xjf.shape[1]})
-            # Log metrics
-            step = ds_length*epoch+index
-            wandb.log({
-                    "epoch": epoch, "step": step, "sequence_len": Xjf.shape[1],
+            tepoch.set_postfix({"loss":round(loss.item(),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"dsm_α":round(dsm_alpha.item(),3),"seq_len": Xjf.shape[1]})
+
+            # Local per-step CSV (no wandb spam)
+            if RUN_LOGGER is not None:
+                step = ds_length*epoch+index
+                RUN_LOGGER.log_step({
+                    "epoch": epoch, "step": step, "sequence_len": int(Xjf.shape[1]),
                     "loss": loss.item(), "lossd": lossd.item(), "lossg": lossg.item(),
+                    "dsm_alpha": dsm_alpha.item(), "fd_score": fd_score_val,
                     "grad_norm": grad_norm,
-                    "dsm_alpha": dsm_alpha.item(),
-                    "fd_score": fd_score_val,
+                    "grad_norm_d": float(grad_norm_d) if torch.is_tensor(grad_norm_d) else grad_norm_d,
+                    "grad_norm_g": float(grad_norm_g) if torch.is_tensor(grad_norm_g) else grad_norm_g,
                 })
             
         print(f"skipped {n_skips}")
@@ -355,20 +425,29 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             print(f"{'='*60}\n")
         save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
         # evaluate the model
-        val_loss, val_lossd, val_lossg, valid_lossc = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
-        # update wandb metrics (train epoch summary + validation)
-        wandb.log({
-                "epoch": epoch,
-                "learning rate": optimizer.param_groups[0]["lr"],
-                # Train epoch averages
-                "train_avg_loss": avg_loss, "train_avg_lossd": avg_lossd,
-                "train_avg_lossg": avg_lossg, "train_avg_dsm_alpha": avg_dsm_alpha,
-                **mean_energies,
-                # Validation losses
-                "validation loss": val_loss,
-                "validation lossd": val_lossd,
-                "validation lossg": val_lossg,
-            })
+        val_loss, val_lossd, val_lossg, valid_lossc, val_metrics = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
+
+        # Curated per-epoch summary — single wandb.log call per epoch keeps trends clean
+        epoch_summary = {
+            "epoch": epoch,
+            "lr": optimizer.param_groups[0]["lr"],
+            # Train averages
+            "train_loss": avg_loss,
+            "train_lossd": avg_lossd,
+            "train_lossg": avg_lossg,
+            "train_dsm_alpha": avg_dsm_alpha,
+            "train_fd_score": avg_fd_score,
+            **mean_energies,
+            # Validation losses
+            "val_loss": val_loss,
+            "val_lossd": val_lossd,
+            "val_lossg": val_lossg,
+            # Validation EBM ranking + energies
+            **val_metrics,
+        }
+        wandb.log(epoch_summary)
+        if RUN_LOGGER is not None:
+            RUN_LOGGER.log_epoch(epoch_summary)
         # Update the learning rate based on the validation loss
         scheduler.step()
         print(f"\n{'='*60}")
@@ -568,8 +647,10 @@ def main():
         proj_tag += f"-r{CFG.emb_proj_rank}"
     if CFG.emb_projection == "mlp":
         proj_tag += f"-d{CFG.emb_proj_dim}"
-    wandb.init(project="DeepEF-InfoNCE-DSM",
-               name=f'InfoNCE+DSM light attention GCN ({proj_tag})' if not CFG.debug else f'debug-{CFG.debug_size}prot-{CFG.num_epochs}ep-{proj_tag}')
+    run_name = f'InfoNCE+DSM light attention GCN ({proj_tag})' if not CFG.debug else f'debug-{CFG.debug_size}prot-{CFG.num_epochs}ep-{proj_tag}'
+    wandb.init(project="DeepEF-InfoNCE-DSM", name=run_name)
+    global RUN_LOGGER
+    RUN_LOGGER = RunLogger(root="logs", run_name=run_name.replace(" ", "_").replace("(", "").replace(")", ""))
     print('***Start main function***')
     print('***load the data with dataloader***')
     d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, 

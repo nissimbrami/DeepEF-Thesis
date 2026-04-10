@@ -29,14 +29,14 @@ The core model (PEM — Protein Energy Model) works as follows:
 | `analysis/` | Results analysis and visualization |
 | `validation/` | Validation against experimental data |
 | `experiments/` | Jupyter notebooks (EDA, inference, embedding analysis) |
-| `old/` | Archive of previous training script variants |
-| `sbatch files/` | SLURM job submission scripts for HPC clusters |
+| `tests/` | Experimental validation scripts (DSM variants, convergence tests) |
+| `Megascale-fineTuning/` | Fine-tuning pipeline on the Megascale/PNAS mutation dataset |
 
 ## Key Files (Root Level)
 
 | File | Purpose |
 |------|---------|
-| `train-2_5_light_att.py` | **Main training script** — light attention variant with cycle permutations |
+| `train.py` | **Main training script** — light attention variant with cycle permutations |
 | `train_utils.py` | Shared utilities: checkpointing, graph construction, noise injection, validation plotting |
 | `protein_inference.py` | Single-protein inference using ProtT5 embeddings |
 | `run_validation.py` | Validation pipeline on K50 mutation datasets |
@@ -80,7 +80,7 @@ conda activate esm2_env
 # or: pip install -r requirements.txt
 
 # Training
-python train-2_5_light_att.py
+python train.py
 
 # Supervised fine-tuning on mutations
 python supervised_model/runner.py ../data/Processed_K50_dG_datasets --mode train_single_proteins

@@ -6,10 +6,10 @@ sidechainnet_data/
 *.csv
 
 # Trained models
-trianed_models/*
-trianed_models_log_fix/*
-trianed_models_no_const_log_fix/*
-trianed_models_no_const/*
+trained_models/*
+trained_models_log_fix/*
+trained_models_no_const_log_fix/*
+trained_models_no_const/*
 
 # Python
 __pycache__/
@@ -23,14 +23,20 @@ __pycache__/
 
 # Logs & outputs
 *.out
+*.log
 *.db
+logs/
 
-# Images
-*.png
+# Images (ignore generated plots, keep figures/ PDFs tracked)
+experiments/plots/*.png
+experiments/plots/*.pdf
+experiments/*.png
+experiments/*.pdf
+figures/*.png
 
 # Experiments
-experiments/plots/*
 experiments/.ipynb_checkpoints
+experiments/colab_training.ipynb
 
 # Results
 res/*

@@ -25,4 +25,4 @@ nvidia-smi
 
 module load anaconda ### load anaconda module
 source activate esm2_env ### activating Conda environment, environment must be configured before running the job
-python train-2_5_light_att.py ### execute python script – replace with your own command
+python train.py ### execute python script – replace with your own command

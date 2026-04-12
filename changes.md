@@ -50,9 +50,20 @@ This 6-panel diagnostic reveals *why* naive full-dimensional DSM fails:
 
 ---
 
-## Uncommitted Changes (Current Working Branch)
+---
 
-### 4. Embedding Projection into GNN
+### 13. Repo Cleanup (Apr 12, `cf97f2c`)
+
+- Renamed `train-2_5_light_att.py` → `train.py`; updated all references in `DeePEF_train.sh`, `run_experiments.sh`, `CLAUDE.md`
+- Moved `test_dsm_*.py` to `tests/` directory
+- Fixed `.gitignore`: corrected `trianed_models` typo (×4), added `logs/`, `*.log`, scoped image ignores to `experiments/` and `figures/` dirs instead of globally
+- Updated `CLAUDE.md`: replaced stale `old/` and `sbatch files/` entries with `tests/` and `Megascale-fineTuning/`
+
+---
+
+## Committed Changes (Previously "Uncommitted")
+
+### 4. Embedding Projection into GNN (Mar 26, `da6376e`)
 
 Added **learnable embedding projection modules** that compress ProtT5 embeddings (1024-dim) before feeding them into the GNN layers, rather than concatenating raw 1024-dim vectors after the GNN:
 
@@ -64,7 +75,7 @@ Added **learnable embedding projection modules** that compress ProtT5 embeddings
 
 **Why:** In the original architecture, ProtT5 embeddings (1024 dims) are concatenated *after* the GNN layers, meaning the GNN only sees structural features and never learns to combine structure with sequence information. By projecting embeddings to a small dimension and feeding them *into* the GNN, the graph layers can learn interactions between local structure and sequence context. The low-rank option (only 4×16 = 64 + 16×16 = 320 parameters) is designed to test whether a minimal projection is sufficient, reducing overfitting risk on our limited training data.
 
-### 5. Distance-Based GAT Edges
+### 5. Distance-Based GAT Edges (Mar 26, `da6376e`)
 
 Added a **distance cutoff for GAT edges** (default 12 Å) using CA atom coordinates, replacing the fully-connected graph:
 
@@ -74,7 +85,7 @@ Added a **distance cutoff for GAT edges** (default 12 Å) using CA atom coordina
 
 **Why:** The fully-connected GAT graph creates O(N²) edges for a protein of length N, which is both memory-expensive and physically unrealistic — residues 50 Å apart have negligible non-bonded interactions. A 12 Å cutoff roughly captures the first and second coordination shells of amino acid contacts, focusing attention on physically relevant pairwise interactions. This should reduce memory usage (enabling longer proteins) and may improve generalization by removing spurious long-range edges.
 
-### 6. DSM Reverted to Distance-Only (D-Only)
+### 6. DSM Reverted to Distance-Only (D-Only) (Mar 26, `da6376e`)
 
 Reverted DSM from holistic noise back to **noising only the 16 distance features (D)**, with the rationale documented in the code:
 
@@ -122,7 +133,7 @@ Finite-difference (FD) validation of autograd DSM to rule out implementation bug
 - **Left (Raw loss):** FD gradient penalty (light blue, high spikes) is noisy but matches autograd in trend. D-only variants (yellow/green) are smooth and low.
 - **Right (Relative change):** Confirms autograd and FD produce consistent results — the flat holistic DSM is a genuine signal problem, not a code bug.
 
-### 7. Replace Autograd DSM with Finite-Difference DSM (FD-DSM)
+### 7. Replace Autograd DSM with Finite-Difference DSM (FD-DSM) (Mar 26, `da6376e`)
 
 Replaced the `create_graph=True` autograd implementation of D-only DSM with a **finite-difference approximation** of the directional derivative:
 
@@ -166,7 +177,7 @@ The analytical gradient `∂E/∂x_D` is near-zero because the model is approxim
 
 ---
 
-### 10. FD-DSM Dropout Fix — Batched Forward Pass in eval() Mode
+### 10. FD-DSM Dropout Fix — Batched Forward Pass in eval() Mode (Mar 28, `8fec666`)
 
 Fixed a subtle bug where E⁺ and E⁻ were computed with **different dropout masks**, corrupting the finite-difference estimate.
 
@@ -190,7 +201,7 @@ fd_score = (E[0] - E[1]) / (2 * epsilon)
 
 ---
 
-### 11. Gradient-Norm Scaling for DSM vs InfoNCE
+### 11. Gradient-Norm Scaling for DSM vs InfoNCE (Apr 10, `c7ca019`)
 
 Added automatic per-step scaling of the DSM loss so its gradient contribution always matches InfoNCE's, replacing the fixed `reg_alpha` weight.
 
@@ -214,7 +225,7 @@ for n, p in model.named_parameters():
 
 ---
 
-### 12. fd_score Averaged Over All Proteins per Epoch
+### 12. fd_score Averaged Over All Proteins per Epoch (Apr 10, `c7ca019`)
 
 **Why `fd_score` is a better training signal than `lossg`:**
 
@@ -233,13 +244,13 @@ E[lossg] = Var(target_v) + Var(fd_score) - 2·Cov(fd_score, target_v)
 
 ---
 
-### 8. Epoch-Level Training Summaries
+### 8. Epoch-Level Training Summaries (Apr 10, `c7ca019`)
 
 Added epoch-end summary printouts showing averaged loss components and ranking metrics for both training and validation, with the embedding projection configuration noted.
 
 **Why:** Per-step metrics are noisy and hard to interpret at a glance. Epoch-level summaries provide a clear snapshot of training progress and make it easy to compare runs with different configurations (e.g., `emb_projection=mlp` vs `emb_projection=none`).
 
-### 9. CLI & Debug Improvements
+### 9. CLI & Debug Improvements (Apr 10, `c7ca019`)
 
 - Added `--emb_projection`, `--emb_proj_rank`, `--emb_proj_dim`, `--emb_proj_hidden` command-line flags for experiment configuration.
 - Debug mode now uses projection-specific output directories and smaller defaults (50 proteins, 10 epochs).

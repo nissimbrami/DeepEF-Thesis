@@ -31,7 +31,7 @@ class CFG:
     light_attention = True
     gaussian_coef = -0.08
     # Embedding projection: "none", "mlp", "low_rank"
-    emb_projection = "none"
+    emb_projection = "mlp"
     emb_proj_dim = 16        # output dim of projection (integrated into GNN)
     emb_proj_hidden = 128    # hidden dim for MLP projection
     emb_proj_rank = 4        # bottleneck rank for low_rank projection

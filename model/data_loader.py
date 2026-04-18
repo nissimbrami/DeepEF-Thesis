@@ -74,12 +74,27 @@ class SidChainDS(Dataset):
             return False
 
     def filter_corrupt_proteins(self):
-        """Remove proteins with corrupt coordinates (all NaN or NaN at valid positions)."""
+        """Remove proteins with corrupt coordinates. Caches result to avoid rescanning on every run."""
+        import hashlib, pickle
+        # Cache key: hash of sorted protein paths so cache invalidates if dataset changes
+        key = hashlib.md5("".join(sorted(self.data_dir)).encode()).hexdigest()[:16]
+        cache_path = os.path.join(self.data_path, f".valid_proteins_{self.set_type}_{key}.pkl")
+
+        if os.path.exists(cache_path):
+            with open(cache_path, "rb") as f:
+                self.data_dir = pickle.load(f)
+            print(f"Loaded valid protein list from cache ({len(self.data_dir)} proteins)")
+            return
+
         before = len(self.data_dir)
         self.data_dir = [p for p in self.data_dir if self._has_valid_coords(p)]
         removed = before - len(self.data_dir)
         if removed > 0:
             print(f"Filtered {removed} proteins with corrupt coordinates ({len(self.data_dir)} remaining)")
+
+        with open(cache_path, "wb") as f:
+            pickle.dump(self.data_dir, f)
+        print(f"Saved valid protein list to cache: {cache_path}")
 
     def __getitem__(self, index):
 

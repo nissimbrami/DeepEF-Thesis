@@ -257,3 +257,93 @@ Added epoch-end summary printouts showing averaged loss components and ranking m
 - wandb run names include the projection configuration tag.
 
 **Why:** Enables running multiple embedding projection experiments from a single script via `run_experiments.sh`, with results automatically organized by configuration. Smaller debug defaults speed up local iteration on MPS.
+
+---
+
+## Multi-GPU Training Optimization (Apr 18)
+
+A series of targeted changes to maximize training throughput on the RTX 6000 Ada cluster before adding multi-GPU DDP. The goal was to eliminate CPU/GPU idle time and reduce unnecessary overhead per training step.
+
+---
+
+### 14. Remove Per-Iteration GPU Cache Clearing (Apr 18, `bc39773`)
+
+Removed `torch.cuda.empty_cache()` and `gc.collect()` calls that were running inside the inner training loop on every iteration.
+
+**Why:** `empty_cache()` releases cached (but unused) memory back to the OS — it does not free memory that PyTorch is actively using. Calling it every step forces the CUDA allocator to re-request memory on the next allocation, serializing CPU↔GPU and adding ~10-100 ms of latency per step for no benefit. Similarly, `gc.collect()` at each step is pure overhead. Both were removed from the training loop and the validation loop; `empty_cache()` is still called once at the start of each epoch to reclaim truly idle memory.
+
+---
+
+### 15. Switch Default Embedding Projection to MLP (Apr 18, `433621a`)
+
+Changed `emb_projection = "none"` → `emb_projection = "mlp"` in `model/model_cfg.py`.
+
+**Architectural impact:**
+
+| Mode | LightAttention input | LA params | Total params |
+|------|---------------------|-----------|--------------|
+| `none` | 1096 dims | 21.6M | ~22M |
+| `mlp` | 104 dims | ~195K | ~704K |
+
+With `emb_projection="none"`, the raw 1024-dim ProtT5 embeddings are concatenated after the GNN, making LightAttention `Conv1d(1096, 1096, kernel=9)` — 21.6M parameters in two conv layers alone. With `emb_projection="mlp"`, embeddings are projected 1024→128→16 before the GNN, and the GNN+LA only see 104-dim features — a 31× reduction in LA input width, dropping parameters from 22M to 704K.
+
+**Why:** A 22M-parameter model on 103K training proteins without batching is massively overparameterized and will overfit. The MLP projection also allows the GNN to learn joint structure-sequence representations rather than treating them as independent streams, which is architecturally more principled.
+
+---
+
+### 16. DataLoader Tuning + GradScaler Fix (Apr 18, `6fc4b3f`)
+
+**DataLoader changes (`model/model_cfg.py`, `model/data_loader.py`):**
+- `num_workers`: 2 → 8 (parallel CPU prefetch workers)
+- Added `persistent_workers = True` — keeps worker processes alive between epochs, avoiding fork/init overhead per epoch
+- Added `prefetch_factor = 4` — each worker pre-fetches 4 batches ahead of GPU demand
+- `fetch_dataloader()` refactored to use a `loader_kwargs` dict, with guards to disable `persistent_workers` and `prefetch_factor` when `num_workers=0` (debug mode)
+
+**GradScaler fix (`train.py`):**
+- Changed deprecated `torch.cuda.amp.GradScaler()` → `torch.amp.GradScaler("cuda")` in `_make_scaler()`
+- Changed all `optimizer.zero_grad()` → `optimizer.zero_grad(set_to_none=True)` at 4 call sites — frees gradient memory immediately rather than zeroing in place, reducing memory pressure
+
+**seq_len guard fix (`train_utils.py`):**
+- Changed `if seq_decoy.shape[1] > config.seq_len` → `if Xjf.shape[1] > config.seq_len` — the original check used the decoy sequence tensor shape, which is wrong; the graph tensor `Xjf` is the object that actually stresses GPU memory.
+
+**Why:** With 8 CPU workers and prefetch_factor=4, the DataLoader can prepare 32 batches in parallel while the GPU runs the forward pass — hiding protein loading latency behind GPU compute. `set_to_none=True` avoids writing zeros to gradient tensors (memory bandwidth waste). The GradScaler fix eliminates deprecation warnings that pollute logs.
+
+---
+
+### 17. SLURM: Allocate 8 CPU Cores per Task (Apr 18, `2abff7e`)
+
+Added `#SBATCH --cpus-per-task=8` to `DeePEF_train.sh`.
+
+**Why:** SLURM defaults to 1 CPU per task. With `num_workers=8` in the DataLoader, 8 workers compete for 1 CPU core — they serialize instead of running in parallel, negating the entire benefit of multi-worker loading. Allocating 8 cores gives each worker its own core for full parallel prefetch throughput.
+
+---
+
+### 18. Cache Valid Protein List (Apr 18, `50d1c11`)
+
+`filter_corrupt_proteins()` in `model/data_loader.py` now saves and restores the validated protein list using a pickle cache keyed by an MD5 hash of the sorted protein paths.
+
+**The problem:** On each training restart, `filter_corrupt_proteins()` was scanning all ~103K proteins — loading `crd_backbone.pt` and `mask.pt` for every protein to check for NaN coordinates. With ~206K file reads over a network filesystem, this took 20-40 minutes per startup before training began.
+
+**The fix:**
+```python
+key = hashlib.md5("".join(sorted(self.data_dir)).encode()).hexdigest()[:16]
+cache_path = os.path.join(self.data_path, f".valid_proteins_{self.set_type}_{key}.pkl")
+if os.path.exists(cache_path):
+    with open(cache_path, "rb") as f:
+        self.data_dir = pickle.load(f)
+    return  # skip scan entirely
+```
+The hash changes if proteins are added/removed, invalidating the cache automatically. On cache hit, startup is immediate.
+
+---
+
+### 19. Enable TF32 on Ampere/Ada GPUs (Apr 18, uncommitted)
+
+Added two lines at module load time in `train.py`:
+```python
+if CFG.device.type == "cuda":
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+```
+
+**Why:** RTX 6000 Ada (Ada Lovelace architecture) has dedicated TF32 hardware. TF32 uses the same 8-bit exponent as fp32 but only 10-bit mantissa (vs 23-bit), providing ~1.5–2× matmul throughput at negligible precision loss for neural network training. PyTorch disables TF32 by default since PyTorch 1.12 to avoid surprising precision changes — these two lines opt back in explicitly. The GNN matmuls and LightAttention convolutions are the primary beneficiaries.

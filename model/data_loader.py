@@ -11,6 +11,26 @@ import constants as C
 import pandas as pd
 
 
+def _check_valid_coords(path):
+    """Module-level helper so multiprocessing.Pool can pickle it."""
+    try:
+        crd = torch.load(path + '/crd_backbone.pt', weights_only=False)
+        if not isinstance(crd, torch.Tensor):
+            crd = torch.tensor(crd)
+        crd = crd.float()
+        if torch.isnan(crd).all():
+            return False
+        mask = torch.load(path + '/mask.pt', weights_only=False)
+        mask = torch.tensor(np.where(np.array(list(mask)) == '+', 1, 0))
+        nan_residues = torch.isnan(crd).any(dim=-1).any(dim=-1)
+        valid_residues = mask == 1
+        if (nan_residues & valid_residues).any():
+            return False
+        return True
+    except Exception:
+        return False
+
+
 class SidChainDS(Dataset):
     """Protein dataset."""
     def __init__(self, data_path ,set_type,debug, LLM_EMB=True, outliners_path = None):
@@ -58,27 +78,12 @@ class SidChainDS(Dataset):
         self.data_dir = [f for f in self.data_dir if not any(f_ms in f for f_ms in mega_scale_ids)]
 
     def _has_valid_coords(self, path):
-        """Check that coordinates are not fully NaN and no NaN at valid (mask=1) positions."""
-        try:
-            crd = torch.load(path + '/crd_backbone.pt', weights_only=False)
-            if not isinstance(crd, torch.Tensor):
-                crd = torch.tensor(crd)
-            crd = crd.float()
-            if torch.isnan(crd).all():
-                return False
-            mask = torch.load(path + '/mask.pt', weights_only=False)
-            mask = torch.tensor(np.where(np.array(list(mask))=='+', 1, 0))
-            nan_residues = torch.isnan(crd).any(dim=-1).any(dim=-1)
-            valid_residues = mask == 1
-            if (nan_residues & valid_residues).any():
-                return False
-            return True
-        except Exception:
-            return False
+        return _check_valid_coords(path)
 
     def filter_corrupt_proteins(self):
         """Remove proteins with corrupt coordinates. Caches result to avoid rescanning on every run."""
         import hashlib, pickle
+        from multiprocessing import Pool, cpu_count
         # Cache key: hash of sorted protein paths so cache invalidates if dataset changes
         key = hashlib.md5("".join(sorted(self.data_dir)).encode()).hexdigest()[:16]
         cache_path = os.path.join(self.data_path, f".valid_proteins_{self.set_type}_{key}.pkl")
@@ -90,7 +95,14 @@ class SidChainDS(Dataset):
             return
 
         before = len(self.data_dir)
-        self.data_dir = [p for p in self.data_dir if self._has_valid_coords(p)]
+        n_workers = min(32, cpu_count())
+        print(f"Scanning {before} proteins for corrupt coordinates using {n_workers} workers...")
+        with Pool(n_workers) as pool:
+            valid_flags = list(tqdm(
+                pool.imap(_check_valid_coords, self.data_dir, chunksize=64),
+                total=before, desc=f"filter_corrupt [{self.set_type}]"
+            ))
+        self.data_dir = [p for p, ok in zip(self.data_dir, valid_flags) if ok]
         removed = before - len(self.data_dir)
         if removed > 0:
             print(f"Filtered {removed} proteins with corrupt coordinates ({len(self.data_dir)} remaining)")

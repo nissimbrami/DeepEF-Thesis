@@ -354,10 +354,6 @@ class PEM(torch.nn.Module):
         self.non_bonded_index = 16
         self.llm_index = -1044
 
-        # batch and node size
-        self.B = 0
-        self.N = 0
-
         # edge index cache
         self._edge_cache_key = None
         self._edge_cache = None
@@ -388,8 +384,8 @@ class PEM(torch.nn.Module):
         # Get the edge index
         edge_index_gcn,edge_index_gat = self.get_edge_index(x, ca_coords=ca_coords)
         # reshape x to [batch_size*n_nodes,features]
-        self.B,self.N,_ = x.shape
-        x = x.reshape(self.B * self.N,-1)
+        B, N, _ = x.shape
+        x = x.reshape(B * N,-1)
         # split features to 2 graphs, bonded and non-bonded
         x_gcn = torch.cat((x[:,:self.non_bonded_index+ self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
         x_gat = torch.cat((x[:,:self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,36
@@ -402,24 +398,24 @@ class PEM(torch.nn.Module):
             x_gat = torch.cat((x_gat, x_proj), dim=-1) # B*N, 36+proj_dim
 
         # forward pass through the graph attention and convolution layers
-        x1 = self.forward_gcn(x_gcn,edge_index_gcn) # B*N,gcn_in -> B*N,gcn_out
-        x2 = self.forward_gat(x_gat,edge_index_gat) # B*N,gat_in -> B*N,gat_out
+        x1 = self.forward_gcn(x_gcn, edge_index_gcn, B, N) # B*N,gcn_in -> B*N,gcn_out
+        x2 = self.forward_gat(x_gat, edge_index_gat, B, N) # B*N,gat_in -> B*N,gat_out
         # concat features
         x = torch.cat((x1,x2),dim=-1) # B*N, gcn_out+gat_out
         # reshape to use instance norm
-        x = x.reshape(self.B, self.N,-1)
+        x = x.reshape(B, N,-1)
         x = self.inst_norm2(x)
-        x = x.reshape(self.B * self.N,-1)
+        x = x.reshape(B * N,-1)
         # Add raw LLM features only when no projection (original behavior)
         if self.emb_projector is None:
             x = torch.cat((x,x_emb_features),dim=-1) # B*N,72+1024->B*N,1096
         # Light attention machanism
         if self.light_attention:
-            x = x.reshape(self.B, self.N,-1)
+            x = x.reshape(B, N,-1)
             x = x.swapaxes(1,2)
             x = self.LA(x)
             x = x.swapaxes(1,2)
-            x = x.reshape(self.B * self.N,-1)
+            x = x.reshape(B * N,-1)
         # fc layers
         x  = self.fc1(x)
         x = F.relu(x)
@@ -427,7 +423,7 @@ class PEM(torch.nn.Module):
         # x = F.relu(x)
         # x = self.fc3(x) # B*N,64->B*N,1
         # reshape to [batch_size,n_nodes]
-        x = x.reshape(self.B,self.N,1)
+        x = x.reshape(B, N, 1)
         # Squeeze the energy between 0 and 1
         # x = torch.sigmoid(x) # B,N,1
         # return energy        
@@ -436,34 +432,34 @@ class PEM(torch.nn.Module):
         elif(f_type == 'A_inference'): # return the energy reference to each amino acid
             return x
         
-    def forward_gat(self,x,edge_index_gat):
+    def forward_gat(self, x, edge_index_gat, B, N):
         """forward function for the graph model"""
         identity = x # identity for the residual connection
         x = self.fc1_gat(x) # N,36->N,64
         x = F.relu(x)
         x = self.fc2_gat(x) # N,64->N,36
         # swap axis to use insrance norm
-        x = x.reshape(self.B, self.N,-1)
+        x = x.reshape(B, N,-1)
         x = self.inst_norm1(x)
-        x = x.reshape(self.B * self.N,-1)
+        x = x.reshape(B * N,-1)
         for gat_layer in self.GAT_layers:
-            h1,z = gat_layer(x, edge_index_gat,self.B,self.N) 
+            h1,z = gat_layer(x, edge_index_gat, B, N)
             x = h1 + identity
 
         return x
 
-    def forward_gcn(self,x,edge_index_gcn):
+    def forward_gcn(self, x, edge_index_gcn, B, N):
         """forward function for the graph model"""
         x = self.fc1_gcn(x) # N,36->N,64
         x = F.relu(x)
         x = self.fc2_gcn(x) # N,64->N,36
         # swap axis to use insrance norm
-        x = x.reshape(self.B, self.N,-1)
+        x = x.reshape(B, N,-1)
         x = self.inst_norm1(x)
-        x = x.reshape(self.B * self.N,-1)
+        x = x.reshape(B * N,-1)
         identity = x # identity for the residual connection
         for gcn_layer in self.GCN_layers:
-            h1,z = gcn_layer(x, edge_index_gcn,self.B,self.N) 
+            h1,z = gcn_layer(x, edge_index_gcn, B, N)
             x = h1 + identity
         return x
   

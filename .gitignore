@@ -1,45 +1,71 @@
-# Data
+# ── Data & tensors ──────────────────────────────────────────────────
 /data/*
 sidechainnet_data/
 *.tar.gz
 *.pt
-*.csv
+*.pdb
 
-# Trained models
+# ── Trained model checkpoints ───────────────────────────────────────
+res/*
+trianed_models-*/
 trained_models/*
 trained_models_log_fix/*
 trained_models_no_const_log_fix/*
 trained_models_no_const/*
 
-# Python
-__pycache__/
-*.pyc
+# ── Results & outputs ───────────────────────────────────────────────
+results/
+*.csv
 
-# OS
-.DS_Store
-
-# IDE
-.vscode/launch.json
-
-# Logs & outputs
+# ── SLURM job scripts & logs ────────────────────────────────────────
+sbatch files/
 *.out
 *.log
 *.db
 logs/
 
-# Images (ignore generated plots, keep figures/ PDFs tracked)
+# ── Experiment tracking ─────────────────────────────────────────────
+wandb/*
+
+# ── Jupyter notebooks ───────────────────────────────────────────────
+# Keep tracked: experiments/EDA.ipynb, Inference.ipynb, Score_matching.ipynb,
+#               ptoT5emb.ipynb, "thermodybamic inference.ipynb",
+#               data_creation/embeddings/generate_embeddings_colab.ipynb
+# Ignore new untracked notebooks and all checkpoint dirs
+experiments/MegaScale.ipynb
+experiments/Paper.ipynb
+experiments/S669-create_ds.ipynb
+experiments/Training_eval.ipynb
+experiments/pnas_dataset.ipynb
+experiments/colab_training.ipynb
+experiments/pdb_files/
+experiments/.ipynb_checkpoints
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# ── Images (ignore generated plots, keep figures/ PDFs tracked) ─────
 experiments/plots/*.png
 experiments/plots/*.pdf
 experiments/*.png
 experiments/*.pdf
 figures/*.png
 
-# Experiments
-experiments/.ipynb_checkpoints
-experiments/colab_training.ipynb
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
 
-# Results
-res/*
+# ── Virtual environments ─────────────────────────────────────────────
+.env
+.venv
+env/
+venv/
 
-# Tracking
-wandb/*
+# ── OS & IDE ────────────────────────────────────────────────────────
+.DS_Store
+.vscode/launch.json
+*.swp
+*.swo

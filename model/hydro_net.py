@@ -490,11 +490,12 @@ class PEM(torch.nn.Module):
                 return self._edge_cache
 
         # GCN: sequential edges (i, i+1) within each batch element
-        offsets = torch.arange(B).unsqueeze(1) * N  # [B, 1]
-        local_gcn = torch.arange(N - 1)
+        dev = x.device
+        offsets = torch.arange(B, device=dev).unsqueeze(1) * N  # [B, 1]
+        local_gcn = torch.arange(N - 1, device=dev)
         gcn_src = (local_gcn.unsqueeze(0) + offsets).reshape(-1)
         gcn_dst = gcn_src + 1
-        edge_index_gcn_all = torch.stack([gcn_src, gcn_dst]).to(CFG.device)
+        edge_index_gcn_all = torch.stack([gcn_src, gcn_dst])
 
         # GAT: distance-cutoff or fully connected
         if ca_coords is not None and self.gat_cutoff is not None:
@@ -504,16 +505,16 @@ class PEM(torch.nn.Module):
             batch_idx, src_idx, dst_idx = torch.where(mask)
             flat_src = batch_idx * N + src_idx
             flat_dst = batch_idx * N + dst_idx
-            edge_index_gat_all = torch.stack([flat_src, flat_dst]).to(CFG.device)
+            edge_index_gat_all = torch.stack([flat_src, flat_dst])
         else:
             # Fully connected within each batch element (original behavior)
-            arange = torch.arange(N)
+            arange = torch.arange(N, device=dev)
             src, dst = torch.meshgrid(arange, arange, indexing='ij')
             mask = src != dst
             local_src, local_dst = src[mask], dst[mask]
             gat_src = (local_src.unsqueeze(0) + offsets).reshape(-1)
             gat_dst = (local_dst.unsqueeze(0) + offsets).reshape(-1)
-            edge_index_gat_all = torch.stack([gat_src, gat_dst]).to(CFG.device)
+            edge_index_gat_all = torch.stack([gat_src, gat_dst])
 
         if ca_coords is None:
             self._edge_cache_key = (B, N)

@@ -6,9 +6,11 @@ from model.net import params as model_params
 from train_utils import *
 import torch
 import torch.nn.functional as F
+import torch.distributed as dist
 from torch import optim
 from torch.optim import lr_scheduler
 from torch.nn.utils import clip_grad_norm_ as clip_grad_norm
+from torch.utils.data import DataLoader, DistributedSampler
 from tqdm import tqdm
 import gc
 import time
@@ -19,6 +21,54 @@ import datetime
 import pathlib
 import pandas as pd
 import wandb
+
+
+# ---------------------------------------------------------------------------
+# DDP helpers — all no-ops when running single-GPU (no torchrun / LOCAL_RANK)
+# ---------------------------------------------------------------------------
+def _is_dist():
+    return dist.is_available() and dist.is_initialized()
+
+def _rank():
+    return dist.get_rank() if _is_dist() else 0
+
+def _world_size():
+    return dist.get_world_size() if _is_dist() else 1
+
+def _is_main():
+    return _rank() == 0
+
+def setup_ddp():
+    """Initialize NCCL process group when launched via torchrun."""
+    local_rank = int(os.environ.get("LOCAL_RANK", -1))
+    if local_rank == -1:
+        return  # single-GPU: nothing to do
+    torch.cuda.set_device(local_rank)
+    CFG.device = torch.device(f"cuda:{local_rank}")
+    CFG.cuda = True
+    dist.init_process_group(backend="nccl")
+
+def cleanup_ddp():
+    if _is_dist():
+        dist.destroy_process_group()
+
+
+def _make_loader(dataset, shuffle=True):
+    """Build a DataLoader with DistributedSampler when running DDP."""
+    if _is_dist():
+        sampler = DistributedSampler(dataset, shuffle=shuffle, seed=CFG.seed)
+    else:
+        sampler = None
+    return DataLoader(
+        dataset,
+        batch_size=CFG.batch_size,
+        shuffle=(shuffle and sampler is None),
+        sampler=sampler,
+        num_workers=CFG.num_workers,
+        pin_memory=CFG.cuda,
+        persistent_workers=CFG.persistent_workers and CFG.num_workers > 0,
+        prefetch_factor=CFG.prefetch_factor if CFG.num_workers > 0 else None,
+    ), sampler
 
 
 # ---------------------------------------------------------------------------
@@ -444,8 +494,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # update the progress bar
             tepoch.set_postfix({"loss":round(loss.item(),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"dsm_α":round(dsm_alpha.item(),3),"seq_len": Xjf.shape[1]})
 
-            # Local per-step CSV (no wandb spam)
-            if RUN_LOGGER is not None:
+            # Local per-step CSV (no wandb spam) — rank 0 only
+            if _is_main() and RUN_LOGGER is not None:
                 step = ds_length*epoch+index
                 RUN_LOGGER.log_step({
                     "epoch": epoch, "step": step, "sequence_len": int(Xjf.shape[1]),
@@ -469,7 +519,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             print(f"EPOCH {epoch} TRAIN SUMMARY  (emb_projection={CFG.emb_projection})")
             print(f"  loss={avg_loss:.4f}  lossd={avg_lossd:.4f}  lossg={avg_lossg:.4f}  dsm_alpha={avg_dsm_alpha:.4f}  fd_score={avg_fd_score:.4f}")
             print(f"{'='*60}\n")
-        save_checkpoint(epoch, model, optimizer, loss,0,CFG.model_path+str(epoch)+"_final_model.pt")
+        save_checkpoint(epoch, model, optimizer, loss, 0, CFG.model_path+str(epoch)+"_final_model.pt", rank=_rank())
         # evaluate the model
         val_loss, val_lossd, val_lossg, valid_lossc, val_metrics = validation(model, valid_loader,CFG.device,epoch, CFG.N, optimizer , val_type = 'robust')
 
@@ -491,9 +541,10 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # Validation EBM ranking + energies
             **val_metrics,
         }
-        wandb.log(epoch_summary)
-        if RUN_LOGGER is not None:
-            RUN_LOGGER.log_epoch(epoch_summary)
+        if _is_main():
+            wandb.log(epoch_summary)
+            if RUN_LOGGER is not None:
+                RUN_LOGGER.log_epoch(epoch_summary)
         # Update the learning rate based on the validation loss
         scheduler.step()
         print(f"\n{'='*60}")
@@ -502,7 +553,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         print(f"{'='*60}\n")
         if val_loss<best_val:
             print('saving model with valid loss: ',val_loss)
-            save_checkpoint(epoch, model, optimizer, loss,val_loss,CFG.model_path+"best_model.pt")
+            save_checkpoint(epoch, model, optimizer, loss, val_loss, CFG.model_path+"best_model.pt", rank=_rank())
             best_val = val_loss
        
         
@@ -510,7 +561,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
     return model, epoch_train_loss,val_loss
 
 # define one epoch train
-def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_loss,scheduler):
+def training(model, optimizer, dataloader, valid_loader, device, N, EPOCH, valid_loss, scheduler, train_sampler=None):
     """
     Training function for the model.
     Args:
@@ -521,12 +572,14 @@ def training (model, optimizer, dataloader,valid_loader, device,N,EPOCH,valid_lo
         device (torch.device): device to use ('cpu' or 'cuda' or 'mps')
         N (int): The number of iterations for the iterative optimization
         epoch (int): The current epoch
+        train_sampler: DistributedSampler for DDP (None in single-GPU mode)
     """
     # setup half precision training
     scaler = _make_scaler()
     for epoch in (range(EPOCH,CFG.num_epochs+EPOCH)):  # loop over the dataset multiple times
+        if train_sampler is not None:
+            train_sampler.set_epoch(epoch)  # ensures different shuffling per epoch on each rank
 
-        
         _empty_cache()
         gc.collect()
         model.train()
@@ -662,13 +715,13 @@ def lossd_fucntion(Ejf, Exd, Ecd, Exdu, Eju, Ecy1, Ecy2, Ecy3, Ecy4, tau=CFG.tau
     return loss_primary + loss_secondary
 
     
-def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,epoch,scheduler):
+def trainAndTest(model, train_loader, valid_loader, test_loader, optimizer, device, N, epoch, scheduler, train_sampler=None):
     "train and test the model"
     valid_loss = 100
     if epoch > 0:
         model,optimizer,epoch,loss,valid_loss = load_checkpoint(CFG.model_path+f"{epoch-1}_final_model.pt", model, optimizer)
         epoch += 1
-    training(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch,valid_loss,scheduler)
+    training(model, optimizer, train_loader, valid_loader, CFG.device, CFG.N, epoch, valid_loss, scheduler, train_sampler)
     #load the best model and check the validation
     load_checkpoint(CFG.model_path+f"best_model.pt", model, optimizer,CFG.device)
     validation(model, valid_loader,CFG.device,-1, CFG.N, optimizer , val_type = 'robust')
@@ -680,12 +733,15 @@ def trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,device,N,
     # diff_data(model, optimizer, train_loader,valid_loader, CFG.device,CFG.N,epoch)
     
 def main():
+    setup_ddp()  # no-op in single-GPU; sets CFG.device per rank in DDP
+
     # Set wandb and debug paths
     if CFG.debug:
         CFG.model_path = f"./res/debug-{CFG.emb_projection}/"
         CFG.results_path = f'./res/results-debug-{CFG.emb_projection}/'
-        os.makedirs(CFG.model_path, exist_ok=True)
-        os.makedirs(CFG.results_path, exist_ok=True)
+        if _is_main():
+            os.makedirs(CFG.model_path, exist_ok=True)
+            os.makedirs(CFG.results_path, exist_ok=True)
         print('**** Debug mode ****')
     proj_tag = f"emb-{CFG.emb_projection}" if CFG.emb_projection != "none" else "no-proj"
     if CFG.emb_projection == "low_rank":
@@ -693,15 +749,23 @@ def main():
     if CFG.emb_projection == "mlp":
         proj_tag += f"-d{CFG.emb_proj_dim}"
     run_name = f'InfoNCE+DSM light attention GCN ({proj_tag})' if not CFG.debug else f'debug-{CFG.debug_size}prot-{CFG.num_epochs}ep-{proj_tag}'
-    wandb.init(project="DeepEF-InfoNCE-DSM", name=run_name)
-    global RUN_LOGGER
-    RUN_LOGGER = RunLogger(root="logs", run_name=run_name.replace(" ", "_").replace("(", "").replace(")", ""))
+
+    if _is_main():
+        wandb.init(project="DeepEF-InfoNCE-DSM", name=run_name)
+        global RUN_LOGGER
+        RUN_LOGGER = RunLogger(root="logs", run_name=run_name.replace(" ", "_").replace("(", "").replace(")", ""))
+
     print('***Start main function***')
     print('***load the data with dataloader***')
-    d_params = data_params(num_workers=CFG.num_workers, batch_size=CFG.batch_size, cuda=CFG.cuda, constraint=CFG.constraint,
+    # Build datasets (all ranks share the same cache; init workers=0 to avoid fork issues before DDP)
+    d_params = data_params(num_workers=0, batch_size=CFG.batch_size, cuda=False, constraint=CFG.constraint,
                            debug=CFG.debug, dataset='scn', LLM_EMB=True,
-                           persistent_workers=CFG.persistent_workers, prefetch_factor=CFG.prefetch_factor)
-    train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
+                           persistent_workers=False, prefetch_factor=None)
+    raw_train, raw_valid, raw_test = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
+    train_loader, train_sampler = _make_loader(raw_train.dataset, shuffle=True)
+    valid_loader, _             = _make_loader(raw_valid.dataset, shuffle=False)
+    test_loader,  _             = _make_loader(raw_test.dataset,  shuffle=False)
+
     # Build the model
     print('***Build the model***')
     model = PEM(layers=CFG.num_layers,gaussian_coef=CFG.gaussian_coef,
@@ -712,21 +776,31 @@ def main():
     model.energy_epsilon = 1e-6
     if CFG.compile_model and hasattr(torch, "compile") and CFG.device.type == "cuda":
         try:
-            model = torch.compile(model, mode="reduce-overhead", fullgraph=False)
+            model = torch.compile(model, mode="reduce-overhead", fullgraph=False, dynamic=True)
             print("torch.compile enabled (reduce-overhead)")
         except Exception as e:
             print(f"torch.compile skipped: {e}")
+    # Wrap with DDP after compile (compile-then-DDP is the recommended order)
+    if _is_dist():
+        model = torch.nn.parallel.DistributedDataParallel(
+            model, device_ids=[_rank()], output_device=_rank()
+        )
+        if _is_main():
+            print(f"DDP enabled: {_world_size()} GPUs")
+
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
-    # configurate wandb
-    wandb_config(wandb, model, optimizer, scheduler, train_loader,
-                CFG.model_path,CFG.reg_alpha,CFG.gaussian_coef,CFG.lr,
-                CFG.num_layers,CFG.dropout_rate,CFG.precision)
+    # configurate wandb (rank-0 only)
+    if _is_main():
+        wandb_config(wandb, model, optimizer, scheduler, train_loader,
+                    CFG.model_path,CFG.reg_alpha,CFG.gaussian_coef,CFG.lr,
+                    CFG.num_layers,CFG.dropout_rate,CFG.precision)
     # Run training
     print('***Start training***')
     epoch = 0
-    trainAndTest(model,train_loader,valid_loader,test_loader,optimizer,CFG.device,CFG.N,epoch, scheduler)
+    trainAndTest(model, train_loader, valid_loader, test_loader, optimizer, CFG.device, CFG.N, epoch, scheduler, train_sampler)
+    cleanup_ddp()
     return 1
 
     

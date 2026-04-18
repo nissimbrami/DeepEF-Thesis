@@ -5,19 +5,20 @@
 ### To ignore, just add another # - like so: ##SBATCH
 ################################################################################################
 
-#SBATCH --partition rtx6000                        ### specify partition name where to run a job. main: all nodes; gtx1080: 1080 gpu card nodes; rtx2080: 2080 nodes; teslap100: p100 nodes; titanrtx: titan nodes
-#SBATCH --time 7-10:30:00                       ### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
-#SBATCH --job-name DeePEF                      ### name of the job
-#SBATCH --output DeePEF.out                     ### output log for running job - %J for job number
-#SBATCH --error DeePEF.out                      ### merge stderr into same file so tqdm/scan progress is visible
-#SBATCH --gpus=1                                ### number of GPUs, allocating more than 1 requires IT team's permission
-#SBATCH --cpus-per-task=8                       ### 8 CPU cores for DataLoader workers (num_workers=8 in CFG)
+#SBATCH --partition rtx6000                        ### specify partition name where to run a job.
+#SBATCH --time 7-10:30:00                          ### limit the time of job running. Format: D-H:MM:SS
+#SBATCH --job-name DeePEF                          ### name of the job
+#SBATCH --output DeePEF.out                        ### stdout + stderr log (merged below)
+#SBATCH --error DeePEF.out                         ### merge stderr so tqdm/scan progress is visible
+#SBATCH --gpus-per-node=1                          ### GPUs per node — change to 4 when IT grants multi-GPU
+#SBATCH --cpus-per-task=8                          ### CPU cores: num_workers × n_gpus (8×1=8 for 1 GPU)
+#SBATCH --ntasks-per-node=1                        ### 1 torchrun launcher per node (torchrun spawns ranks)
 #SBATCH --qos=keasar
 
-# Note: the following 4 lines are commented out
-#BATCH --mail-user=shaharax@post.bgu.ac.il        ### user's email for sending job status messages
-#SBATCH --mail-type=END,FAIL                   ### conditions for sending the email. ALL,BEGIN,END,FAIL, REQUEU, NONE
-##SBATCH --mem=24G                              ### ammount of RAM memory, allocating more than 60G requires IT team's permission
+# Note: the following 2 lines are commented out
+#SBATCH --mail-user=shaharax@post.bgu.ac.il        ### user's email for sending job status messages
+#SBATCH --mail-type=END,FAIL                       ### conditions for sending the email.
+##SBATCH --mem=24G                                 ### RAM (>60G requires IT permission)
 
 ### Print some data to output file ###
 echo `date`
@@ -25,6 +26,11 @@ echo -e "\nSLURM_JOBID:\t\t" $SLURM_JOBID
 echo -e "SLURM_JOB_NODELIST:\t" $SLURM_JOB_NODELIST "\n\n"
 nvidia-smi
 
-module load anaconda ### load anaconda module
-source activate esm2_env_py38 ### activating Conda environment (PyTorch 2.4.1 — enables torch.compile, torch.amp)
-python -u train.py ### execute python script – replace with your own command
+module load anaconda                               ### load anaconda module
+source activate esm2_env_py38                      ### PyTorch 2.4.1 — enables torch.compile, torch.amp, torchrun
+
+NGPUS=${SLURM_GPUS_ON_NODE:-1}
+echo "Launching with $NGPUS GPU(s)"
+
+# torchrun handles DDP rank setup; works transparently with 1 GPU (no dist init)
+torchrun --nproc_per_node=$NGPUS train.py

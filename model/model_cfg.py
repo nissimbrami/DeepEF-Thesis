@@ -2,7 +2,7 @@ import torch
 
 
 class CFG:
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     if device.type == "cuda":
         torch.cuda.empty_cache()
     cuda = device.type in ("cuda", "mps")

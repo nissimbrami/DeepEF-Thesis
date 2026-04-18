@@ -32,7 +32,7 @@ AA_MAP = {
     'Y': 19
 }
 
-def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
+def save_checkpoint(epoch, model, optimizer, loss, val_loss, path, rank=0):
     """
     Save the model check point
     inputs:
@@ -42,11 +42,15 @@ def save_checkpoint(epoch, model, optimizer,loss,val_loss,path):
         loss(tensor) : loss function value
         val_loss(tensor) : validation loss function value
         path (str) : path to save the model
+        rank (int): process rank; only rank 0 writes
     """
+    if rank != 0:
+        return
     os.makedirs(str(Path(path).parent), exist_ok=True)
+    state = model.module.state_dict() if hasattr(model, "module") else model.state_dict()
     torch.save({
             'epoch': epoch,
-            'model_state_dict': model.state_dict(),
+            'model_state_dict': state,
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': loss,
             'valid_loss': val_loss,
@@ -64,8 +68,8 @@ def load_checkpoint(path,model,optimizer=None,device=CFG.device):
     
     model_dict = torch.load(path,map_location=device,weights_only=False)
     print(f"Loaded model from {path}")
-    # print(f"Epoch: {dict['epoch']},loss: {dict['loss']},valid_loss: {dict['valid_loss']}")
-    model.load_state_dict(model_dict['model_state_dict'],)
+    target = model.module if hasattr(model, "module") else model
+    target.load_state_dict(model_dict['model_state_dict'])
     if optimizer is not None:
         optimizer.load_state_dict(model_dict['optimizer_state_dict'])
     return model,optimizer,model_dict['epoch'],model_dict['loss'],model_dict['valid_loss']

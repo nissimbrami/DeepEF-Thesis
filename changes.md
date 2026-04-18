@@ -337,7 +337,7 @@ The hash changes if proteins are added/removed, invalidating the cache automatic
 
 ---
 
-### 19. Enable TF32 on Ampere/Ada GPUs (Apr 18, uncommitted)
+### 19. Enable TF32 on Ampere/Ada GPUs (Apr 18, `bd32eba`)
 
 Added two lines at module load time in `train.py`:
 ```python
@@ -347,3 +347,49 @@ if CFG.device.type == "cuda":
 ```
 
 **Why:** RTX 6000 Ada (Ada Lovelace architecture) has dedicated TF32 hardware. TF32 uses the same 8-bit exponent as fp32 but only 10-bit mantissa (vs 23-bit), providing ~1.5–2× matmul throughput at negligible precision loss for neural network training. PyTorch disables TF32 by default since PyTorch 1.12 to avoid surprising precision changes — these two lines opt back in explicitly. The GNN matmuls and LightAttention convolutions are the primary beneficiaries.
+
+---
+
+### 20. Vectorize Distance Matrix Computation — 9 Calls → 2 (Apr 18, `4f38b32`)
+
+Refactored `get_noised_proteins()` in `train.py` to compute the O(N²) distance matrix **once per unique coordinate set** instead of once per graph representation.
+
+**The problem:** The training loop builds 11 graph representations per protein (native folded/unfolded, decoy sequence/structure variants, 6 cycle permutations). Each call to `get_graph()` ran `get_dist_matrix()` — a `torch.cdist` over `[N×4, 3]` coordinates producing an `[N, N, 16]` tensor. With N=450, this is a 450×450×16 matrix computed 9 times per step, 8 of which used identical native coordinates.
+
+**The fix:** Extract a new helper `_build_graph_features(D_base, mask, emb, one_hot, unfolded)` that takes a pre-computed raw distance matrix and builds the full feature tensor `[N, F]`. Then:
+```python
+D_native_raw = get_dist_matrix(Xjf_sq)  # computed ONCE — shared by 10 representations
+D_decoy_raw  = get_dist_matrix(Xcd_sq)  # computed ONCE — only Xcd uses decoy coords
+
+Xjf  = _build_graph_features(D_native_raw, mask_sq,      emb,        proT5_emb,       unfolded=False)
+Xju  = _build_graph_features(D_native_raw, mask_sq,      emb,        proT5_emb,       unfolded=True)
+Xd   = _build_graph_features(D_native_raw, mask_decoy,   emb_decoy,  proT5_emb_decoy, unfolded=False)
+Xcd  = _build_graph_features(D_decoy_raw,  mask_crd_decoy, emb,      proT5_emb,       unfolded=False)
+# ... cycle permutations all reuse D_native_raw with different embeddings
+```
+
+**Why:** The mask and embeddings (one-hot, ProtT5) differ per representation, but the coordinate geometry — and therefore the distance matrix — does not. Sharing the same `D_native_raw` across 10 representations reduces the most expensive per-step CPU operation by ~5×. Expected speedup: 15–25% reduction in total iteration time (distance matrix was ~30–40% of `get_noised_proteins` cost).
+
+---
+
+### 21. Fix `self.B`/`self.N` Instance Variables + Add `torch.compile` (Apr 18, `4f38b32`)
+
+**Problem:** `PEM.forward()` stored batch size and sequence length as `self.B` and `self.N` (instance variables mutated during the forward pass), then read them in `forward_gat()` and `forward_gcn()` (sub-methods). This pattern prevents `torch.compile` from tracing a static graph — each forward call changes module state, forcing recompilation or falling back to eager mode.
+
+**Fix — convert to local variables:** `self.B, self.N, _ = x.shape` → `B, N, _ = x.shape`, with `B` and `N` passed explicitly as arguments:
+```python
+# Before
+x1 = self.forward_gcn(x_gcn, edge_index_gcn)  # reads self.B, self.N internally
+
+# After
+B, N, _ = x.shape
+x1 = self.forward_gcn(x_gcn, edge_index_gcn, B, N)  # shape is local, not mutated state
+```
+All 12 occurrences of `self.B`/`self.N` converted; the `self.B = 0` / `self.N = 0` initializers in `__init__` removed.
+
+**Add `torch.compile`:** With the mutation removed, the forward pass is now a pure function of its inputs and can be compiled:
+```python
+if CFG.compile_model and hasattr(torch, "compile") and CFG.device.type == "cuda":
+    model = torch.compile(model, mode="reduce-overhead", fullgraph=False)
+```
+`mode="reduce-overhead"` minimizes kernel launch overhead (the main bottleneck at batch_size=1). `fullgraph=False` allows partial compilation — ops that can't be traced (e.g., Python-level control flow in `get_edge_index`) fall back to eager without crashing. Controlled by `CFG.compile_model = True`; disabled automatically in `--debug` mode to avoid compilation overhead during fast iteration. Expected speedup: 10–20% on the GNN forward pass.

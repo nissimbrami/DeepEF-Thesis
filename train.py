@@ -89,16 +89,27 @@ def _empty_cache():
 def _autocast():
     """Return autocast context manager for the active device."""
     if CFG.device.type == "cuda":
-        return torch.amp.autocast(device_type="cuda", dtype=CFG.precision)
-    # MPS/CPU: no-op context manager (autocast not well supported)
-    return torch.amp.autocast(device_type="cpu", enabled=False)
+        try:
+            return torch.amp.autocast(device_type="cuda", dtype=CFG.precision)
+        except AttributeError:
+            return torch.cuda.amp.autocast()
+    try:
+        return torch.amp.autocast(device_type="cpu", enabled=False)
+    except AttributeError:
+        import contextlib
+        return contextlib.nullcontext()
 
 def _make_scaler():
     """GradScaler only works on CUDA. Return a dummy on other devices."""
     if CFG.device.type == "cuda":
-        return torch.amp.GradScaler("cuda")
-    # On MPS/CPU: return a scaler that passes through (scale=1, no-op)
-    return torch.amp.GradScaler(enabled=False)
+        try:
+            return torch.amp.GradScaler("cuda")
+        except AttributeError:
+            return torch.cuda.amp.GradScaler()
+    try:
+        return torch.amp.GradScaler(enabled=False)
+    except AttributeError:
+        return torch.cuda.amp.GradScaler(enabled=False)
 # torch.autograd.set_detect_anomaly(True)
 # CFG.debug = True
 # CFG.clip_grad_norm = True 

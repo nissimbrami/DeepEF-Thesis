@@ -106,92 +106,113 @@ def _make_scaler():
 
 
 
+def _build_graph_features(D_base, mask, emb, one_hot, unfolded=False, gaussian_coef=CFG.gaussian_coef):
+    """Build [N, F] graph feature tensor from a pre-computed raw distance matrix."""
+    D = torch.relu(torch.exp(gaussian_coef * D_base ** 2))
+    mi = torch.where(mask == 0)
+    if mi[0].numel() > 0:
+        D[mi[0], :, :] = 0
+        D[:, mi[0], :] = 0
+    if unfolded:
+        D = zero_except_udiagonal(D)
+    Fb = get_bonded_features(D)
+    D_sum = F.normalize(D.sum(dim=1), p=2, dim=0)
+    emb_n = F.normalize(emb, p=2, dim=0)
+    return torch.cat([D_sum, Fb, emb_n, one_hot], dim=1)
+
+
 def get_noised_proteins(data,device):
     """
-    Returns a noised version of the protein data.
+    Returns 9 graph representations of a protein for InfoNCE + DSM training.
+    Computes the expensive O(N²) distance matrix only twice (native + decoy coords)
+    instead of once per representation.
     """
     id, crd_backbone, mask, seq_one_hot, seq,ang_backbone, ang,\
                 proT5_emb, proT5_mut,seq_mut, crd_decoy, mask_crd_decoy, seq_crd_decoy,proT5_cycle1,\
                 proT5_cycle2, proT5_cycle3, proT5_cycle4, proT5_cycle5, proT5_cycle6 = data
-            
-    # wild type and mutant type
-    Xjf = crd_backbone.to(device) # wilde type structure folded
-    Xju = torch.clone(Xjf).to(device) # wilde type structure unfolded
-    Xcd = torch.clone(crd_decoy).to(device) # decoy structure
-    Xcy1 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
-    Xcy2 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
-    Xcy3 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
-    Xcy4 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
-    Xcy5 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
-    Xcy6 = torch.clone(crd_backbone).to(device) # Cycle permutation structure
-    
-    # change the decoy len to match the native len
+
+    # Load native and decoy coordinates to device
+    Xjf = crd_backbone.to(device)    # native folded coords
+    Xcd = crd_decoy.to(device)       # decoy structure coords
+
+    # Align decoy length to native length
     if Xcd.shape[1] > Xjf.shape[1]:
         Xcd = Xcd[:,:Xjf.shape[1],:,:]
         mask_crd_decoy = mask_crd_decoy[:,:Xjf.shape[1]]
     elif Xcd.shape[1] < Xjf.shape[1]:
-        # add zeros to the end of the decoy
-        Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0],Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:]).to(device)), dim=1)
-        mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(mask.shape[0],mask.shape[1] - mask_crd_decoy.shape[1])), dim=1)
-        
-    
-    # native structure and decoy structure
-    Xd = torch.clone(Xjf).to(device)
-    Xdu = torch.clone(Xjf).to(device)
-    seq_one_hot = seq_one_hot.to(device) # [batch_size,20,seq_len]
-    
-    # create decoy sequence
-    seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
-    
+        Xcd = torch.cat((Xcd, torch.zeros(Xjf.shape[0], Xjf.shape[1] - Xcd.shape[1], *Xcd.shape[2:]).to(device)), dim=1)
+        mask_crd_decoy = torch.cat((mask_crd_decoy, torch.zeros(mask.shape[0], mask.shape[1] - mask_crd_decoy.shape[1])), dim=1)
+
+    seq_one_hot = seq_one_hot.to(device)
+
+    # create decoy sequence (shuffled native)
+    seq_decoy, mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot=seq_one_hot, emb=proT5_emb, mask=mask, val_type='train', device=device)
+
     if Xjf.shape[1] > CFG.seq_len:  # if the protein is too long, skip it (GPU memory limitation)
         return None,None,None,None,None,None,None,None,None,None,None,None,None
-    #emb = torch.cat((esm_embed,seq),dim=2)
-    emb = seq_one_hot.to(device)
-    emb_decoy = seq_decoy.to(device)
-    # get the cycle permutation
-    cycle_emb1 = get_one_hot(seq[0][-1] + seq[0][:-1]).to(device)
-    cycle_emb2 = get_one_hot(seq[0][1:] + seq[0][0]).to(device)
+
+    # Squeeze batch dim (batch_size=1)
+    Xjf_sq = Xjf.squeeze()        # [N, 4, 3]
+    Xcd_sq = Xcd.squeeze()        # [N, 4, 3]
+    emb      = seq_one_hot.squeeze()       # [N, 20]
+    emb_decoy = seq_decoy.squeeze()        # [N, 20]
+    mask_sq  = mask.squeeze()              # [N]
+    mask_decoy = mask_decoy.squeeze()      # [N]
+    mask_crd_decoy = mask_crd_decoy.squeeze()  # [N]
+
+    proT5_emb   = proT5_emb.to(device).squeeze()          # [N, 1024]
+    proT5_emb_decoy = proT5_emb_decoy.squeeze()           # [N, 1024]
+    proT5_cycle1 = proT5_cycle1.to(device).squeeze()
+    proT5_cycle2 = proT5_cycle2.to(device).squeeze()
+    proT5_cycle3 = proT5_cycle3.to(device).squeeze()
+    proT5_cycle4 = proT5_cycle4.to(device).squeeze()
+    proT5_cycle5 = proT5_cycle5.to(device).squeeze()
+    proT5_cycle6 = proT5_cycle6.to(device).squeeze()
+
+    # Cycle permutation one-hot embeddings
+    cycle_emb1 = get_one_hot(seq[0][-1]  + seq[0][:-1]).to(device)
+    cycle_emb2 = get_one_hot(seq[0][1:]  + seq[0][0]).to(device)
     cycle_emb3 = get_one_hot(seq[0][-2:] + seq[0][:-2]).to(device)
     cycle_emb4 = get_one_hot(seq[0][-5:] + seq[0][:-5]).to(device)
-    cycle_emb5 = get_one_hot(seq[0][2:] + seq[0][:2]).to(device)
-    cycle_emb6 = get_one_hot(seq[0][5:] + seq[0][:5]).to(device)
-    
-    # move proT5_emb to device
-    proT5_emb_decoy, proT5_emb, proT5_cycle1, proT5_cycle2, proT5_cycle3, proT5_cycle4, proT5_cycle5, proT5_cycle6  = proT5_emb_decoy.to(device), proT5_emb.to(device), proT5_cycle1.to(device), proT5_cycle2.to(device), proT5_cycle3.to(device),proT5_cycle4.to(device), proT5_cycle5.to(device), proT5_cycle6.to(device)
-    
-    # squeeze the data
-    Xd, Xjf, Xju, Xcd, Xdu, Xcy1, Xcy2, Xcy3, Xcy4, Xcy5, Xcy6 = Xd.squeeze(), Xjf.squeeze(), Xju.squeeze(), Xcd.squeeze(), Xdu.squeeze(), Xcy1.squeeze(), Xcy2.squeeze(), Xcy3.squeeze(), Xcy4.squeeze(), Xcy5.squeeze(), Xcy6.squeeze()
-    emb_decoy, emb = emb_decoy.squeeze(), emb.squeeze()
-    mask_decoy, mask, mask_crd_decoy= mask_decoy.squeeze(), mask.squeeze(), mask_crd_decoy.squeeze()
-    proT5_emb_decoy, proT5_emb = proT5_emb_decoy.squeeze(), proT5_emb.squeeze()
-    proT5_cycle1, proT5_cycle2, proT5_cycle3, proT5_cycle4, proT5_cycle5, proT5_cycle6 = proT5_cycle1.squeeze(), proT5_cycle2.squeeze(), proT5_cycle3.squeeze(), proT5_cycle4.squeeze(), proT5_cycle5.squeeze(), proT5_cycle6.squeeze()
-    # Extract CA coordinates (atom index 1) before get_graph consumes 3D coords
-    ca_native = Xjf[:, 1, :].clone()   # [N, 3]
-    ca_decoy = Xcd[:, 1, :].clone()    # [N, 3]
-    # get folded graph
-    Xjf = get_graph(Xjf, emb, proT5_emb, mask)
-    # get unfolded graph
-    Xju = get_unfolded_graph(Xju, emb, proT5_emb, mask)
-    # get decoy graph
-    Xd, Xcd, Xdu = get_graph(Xd, emb_decoy, proT5_emb_decoy, mask_decoy), get_graph(Xcd, emb, proT5_emb, mask_crd_decoy), get_unfolded_graph(Xdu, emb_decoy, proT5_emb_decoy, mask_decoy)
-    # Add cycle permutation
-    Xcy1 = get_graph(Xcy1, cycle_emb1, proT5_cycle1, mask)
-    Xcy2 = get_graph(Xcy2, cycle_emb2, proT5_cycle2, mask)
-    Xcy3 = get_graph(Xcy3, cycle_emb3, proT5_cycle3, mask)
-    Xcy4 = get_graph(Xcy4, cycle_emb4, proT5_cycle4, mask)
-    Xcy5 = get_graph(Xcy5, cycle_emb5, proT5_cycle5, mask)
-    Xcy6 = get_graph(Xcy6, cycle_emb6, proT5_cycle6, mask)
-    # Xjf.requires_grad = True
-    # create a batch of Xjf,Xkf,Xju,Xku,x_decoy
-    Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6 = Xjf.unsqueeze(0),Xju.unsqueeze(0),Xd.unsqueeze(0), Xcd.unsqueeze(0), Xdu.unsqueeze(0),Xcy1.unsqueeze(0),Xcy2.unsqueeze(0),Xcy3.unsqueeze(0),Xcy4.unsqueeze(0),Xcy5.unsqueeze(0),Xcy6.unsqueeze(0)
+    cycle_emb5 = get_one_hot(seq[0][2:]  + seq[0][:2]).to(device)
+    cycle_emb6 = get_one_hot(seq[0][5:]  + seq[0][:5]).to(device)
 
-    # Also return native coords + metadata for DSM (needs to noise distance matrix)
-    native_info = (crd_backbone.squeeze().to(device), emb, proT5_emb, mask)
-    # Build CA coords batch [9, N, 3] matching X = cat(Xjf,Xju,Xd,Xcd,Xdu,Xcy1..4)
-    ca_n = ca_native.unsqueeze(0)  # [1, N, 3]
-    ca_d = ca_decoy.unsqueeze(0)   # [1, N, 3]
+    # Extract CA coords before computing distance matrices
+    ca_native = Xjf_sq[:, 1, :].clone()  # [N, 3]
+    ca_decoy  = Xcd_sq[:, 1, :].clone()  # [N, 3]
+
+    # ── Phase 4a: compute O(N²) distance matrices ONCE per coordinate set ──
+    # Native coords are shared by 10/11 representations; decoy coords only by Xcd.
+    D_native_raw = get_dist_matrix(Xjf_sq)  # [N, N, 16]
+    D_decoy_raw  = get_dist_matrix(Xcd_sq)  # [N, N, 16]
+
+    # Build all 11 graph representations from the two pre-computed matrices
+    Xjf  = _build_graph_features(D_native_raw, mask_sq,      emb,        proT5_emb,       unfolded=False)
+    Xju  = _build_graph_features(D_native_raw, mask_sq,      emb,        proT5_emb,       unfolded=True)
+    Xd   = _build_graph_features(D_native_raw, mask_decoy,   emb_decoy,  proT5_emb_decoy, unfolded=False)
+    Xcd  = _build_graph_features(D_decoy_raw,  mask_crd_decoy, emb,      proT5_emb,       unfolded=False)
+    Xdu  = _build_graph_features(D_native_raw, mask_decoy,   emb_decoy,  proT5_emb_decoy, unfolded=True)
+    Xcy1 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb1, proT5_cycle1,    unfolded=False)
+    Xcy2 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb2, proT5_cycle2,    unfolded=False)
+    Xcy3 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb3, proT5_cycle3,    unfolded=False)
+    Xcy4 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb4, proT5_cycle4,    unfolded=False)
+    Xcy5 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb5, proT5_cycle5,    unfolded=False)
+    Xcy6 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb6, proT5_cycle6,    unfolded=False)
+
+    # Add batch dimension
+    Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6 = (
+        Xjf.unsqueeze(0), Xju.unsqueeze(0), Xd.unsqueeze(0), Xcd.unsqueeze(0),
+        Xdu.unsqueeze(0), Xcy1.unsqueeze(0), Xcy2.unsqueeze(0), Xcy3.unsqueeze(0),
+        Xcy4.unsqueeze(0), Xcy5.unsqueeze(0), Xcy6.unsqueeze(0)
+    )
+
+    # Native coords + metadata for DSM score matching loss
+    native_info = (crd_backbone.squeeze().to(device), emb, proT5_emb, mask_sq)
+    # CA coords batch [9, N, 3] matching X = cat(Xjf,Xju,Xd,Xcd,Xdu,Xcy1..4)
+    ca_n = ca_native.unsqueeze(0)
+    ca_d = ca_decoy.unsqueeze(0)
     ca_coords = torch.cat([ca_n, ca_n, ca_n, ca_d, ca_n,
-                            ca_n, ca_n, ca_n, ca_n], dim=0)  # [9, N, 3]
+                           ca_n, ca_n, ca_n, ca_n], dim=0)  # [9, N, 3]
     return Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info, ca_coords
     
 # define validation function
@@ -657,6 +678,12 @@ def main():
                 gat_cutoff=CFG.gat_cutoff).to(CFG.device)
     model.name = "PEM-With LLM embedding"
     model.energy_epsilon = 1e-6
+    if CFG.compile_model and hasattr(torch, "compile") and CFG.device.type == "cuda":
+        try:
+            model = torch.compile(model, mode="reduce-overhead", fullgraph=False)
+            print("torch.compile enabled (reduce-overhead)")
+        except Exception as e:
+            print(f"torch.compile skipped: {e}")
     optimizer = optim.Adam(model.parameters(), lr=CFG.lr)
     # Define the learning rate scheduler based on loss
     scheduler = lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.9)
@@ -694,6 +721,7 @@ if __name__ == '__main__':
         CFG.num_epochs = 20
         CFG.num_workers = 0
         CFG.seq_len = 350  # limit protein size for MPS memory
+        CFG.compile_model = False  # skip compile overhead in debug
         print(f'**** Debug mode: {CFG.debug_size} proteins, {CFG.num_epochs} epochs, seq_len<={CFG.seq_len}, emb_projection={CFG.emb_projection}, device={CFG.device} ****')
     if not CFG.debug:
         CFG.model_path = './res/trianed_models-light_attention_newGCN/'

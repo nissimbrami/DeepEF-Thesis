@@ -54,6 +54,7 @@ class CFG:
     reg_alpha = 0.1
     tau = 1.0 # temperature for InfoNCE contrastive loss
     gat_cutoff = 12.0 # Angstroms, distance cutoff for GAT edges (None = fully connected)
+    compile_model = True  # torch.compile for kernel fusion (~10-30% speedup on PyTorch 2+)
     # defalut parameters
     torch_default_dtype = torch.float32
     precision = torch.float32

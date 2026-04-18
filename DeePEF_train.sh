@@ -10,8 +10,8 @@
 #SBATCH --job-name DeePEF                          ### name of the job
 #SBATCH --output DeePEF.out                        ### stdout + stderr log (merged below)
 #SBATCH --error DeePEF.out                         ### merge stderr so tqdm/scan progress is visible
-#SBATCH --gpus-per-node=1                          ### GPUs per node — change to 4 when IT grants multi-GPU
-#SBATCH --cpus-per-task=8                          ### CPU cores: num_workers × n_gpus (8×1=8 for 1 GPU)
+#SBATCH --gpus-per-node=4                          ### 4 GPUs per node (requires IT multi-GPU permission)
+#SBATCH --cpus-per-task=32                         ### CPU cores: num_workers × n_gpus (8×4=32)
 #SBATCH --ntasks-per-node=1                        ### 1 torchrun launcher per node (torchrun spawns ranks)
 #SBATCH --qos=keasar
 

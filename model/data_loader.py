@@ -52,9 +52,9 @@ class SidChainDS(Dataset):
         if(set_type == 'valid'):
             self.folders  =[data_path+val_path for val_path in ['valid-10/','valid-20/','valid-30/','valid-40/','valid-50/']]
             for folder in self.folders:
-                self.data_dir.extend([folder+f for f in os.listdir(folder) if os.path.isdir(os.path.join(folder, f))])
+                self.data_dir.extend([e.path for e in os.scandir(folder) if e.is_dir()])
         else:
-            self.data_dir = [os.path.join(data_path+set_type, f) for f in os.listdir(data_path+set_type) if os.path.isdir(os.path.join(data_path+set_type, f))]   
+            self.data_dir = [e.path for e in os.scandir(data_path+set_type) if e.is_dir()]
         if(debug):
             self.data_dir = self.data_dir[:CFG.debug_size]
         # remove the outliners
@@ -68,14 +68,14 @@ class SidChainDS(Dataset):
     def remove_outliners(self):
         """remove the outliners from the dataset"""
         outliners = pd.read_csv(self.outliners_path)
-        outliners_ids = outliners['protein_id'].to_list()
-        self.data_dir = [f for f in self.data_dir if not any(f_out in f for f_out in outliners_ids)]
+        outliners_ids = set(outliners['protein_id'].to_list())
+        self.data_dir = [f for f in self.data_dir if os.path.basename(f) not in outliners_ids]
     
     def remove_megascale_proteins(self):
         """remove the proteins from the mega-scale dataset"""
         mega_scale = pd.read_csv('./data/megascale_proteins.csv')
-        mega_scale_ids = mega_scale['protein_name'].to_list()
-        self.data_dir = [f for f in self.data_dir if not any(f_ms in f for f_ms in mega_scale_ids)]
+        mega_scale_ids = set(mega_scale['protein_name'].to_list())
+        self.data_dir = [f for f in self.data_dir if os.path.basename(f) not in mega_scale_ids]
 
     def _has_valid_coords(self, path):
         return _check_valid_coords(path)
@@ -83,23 +83,24 @@ class SidChainDS(Dataset):
     def filter_corrupt_proteins(self):
         """Remove proteins with corrupt coordinates. Caches result to avoid rescanning on every run."""
         import hashlib, pickle
-        from multiprocessing import Pool, cpu_count
+        from concurrent.futures import ThreadPoolExecutor
+        import os as _os
         # Cache key: hash of sorted protein paths so cache invalidates if dataset changes
         key = hashlib.md5("".join(sorted(self.data_dir)).encode()).hexdigest()[:16]
-        cache_path = os.path.join(self.data_path, f".valid_proteins_{self.set_type}_{key}.pkl")
+        cache_path = _os.path.join(self.data_path, f".valid_proteins_{self.set_type}_{key}.pkl")
 
-        if os.path.exists(cache_path):
+        if _os.path.exists(cache_path):
             with open(cache_path, "rb") as f:
                 self.data_dir = pickle.load(f)
-            print(f"Loaded valid protein list from cache ({len(self.data_dir)} proteins)")
+            print(f"Loaded valid protein list from cache ({len(self.data_dir)} proteins)", flush=True)
             return
 
         before = len(self.data_dir)
-        n_workers = min(32, cpu_count())
-        print(f"Scanning {before} proteins for corrupt coordinates using {n_workers} workers...")
-        with Pool(n_workers) as pool:
+        n_workers = min(32, ((_os.cpu_count() or 4)))
+        print(f"Scanning {before} proteins for corrupt coordinates using {n_workers} threads...", flush=True)
+        with ThreadPoolExecutor(max_workers=n_workers) as ex:
             valid_flags = list(tqdm(
-                pool.imap(_check_valid_coords, self.data_dir, chunksize=64),
+                ex.map(_check_valid_coords, self.data_dir),
                 total=before, desc=f"filter_corrupt [{self.set_type}]"
             ))
         self.data_dir = [p for p, ok in zip(self.data_dir, valid_flags) if ok]

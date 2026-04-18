@@ -296,11 +296,8 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
 
             # Denoising score matching (replaces gradient penalty)
             if CFG.gradient_penalty:
-                # zero the parameter gradients
-                optimizer.zero_grad(set_to_none=True)
-                with _autocast():
+                with torch.no_grad(), _autocast():
                     lossg, _, _fd = denoising_score_matching(model, Xjf, native_info, sigma=CFG.sigma)
-
                 loss += lossg
 
             valid_loss += loss.item()
@@ -383,8 +380,10 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             grad_norm_g = torch.tensor(0.0)
             fd_score_val = 0.0
             if CFG.gradient_penalty:
+                model.eval()
                 with _autocast():
                     lossg, dsm_raw_val, fd_score_val = denoising_score_matching(model, Xjf, native_info, sigma=CFG.sigma)
+                model.train()
                 lossg = torch.clamp(lossg, max=20.0)
 
                 # Pass 1: backward on lossd — accumulates ∂lossd/∂θ
@@ -413,7 +412,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 # No DSM: single backward on InfoNCE loss
                 scaler.scale(loss).backward()
 
-            # Clip gradients to prevent exploding gradients
+            # Unscale first so clip threshold applies to true (not scaled) gradients
+            scaler.unscale_(optimizer)
             if CFG.clip_grad_norm:
                 clip_grad_norm(model.parameters(), CFG.max_grad_norm)
 
@@ -592,11 +592,10 @@ def denoising_score_matching(model, X_native, native_info, sigma=CFG.sigma, K=1,
         v_d = v_d / (v_d.norm() + 1e-8)
         v[:, :D_DIM] = v_d
 
-        # Single batched forward pass: E+ and E- share the same dropout mask
-        model.eval()
+        # Single batched forward pass: E+ and E- share the same dropout mask.
+        # Caller is responsible for model.eval() — don't toggle state here.
         X_pair = torch.stack([X_noisy + epsilon * v, X_noisy - epsilon * v], dim=0)  # [2, N, F]
         E = model(X_pair, ca_coords=ca_single.expand(2, -1, -1))
-        model.train()
         fd_score = (E[0] - E[1]) / (2 * epsilon)  # scalar: v·∇E
 
         # Target: v·score = v·(-noise/σ²), only D dims contribute since v=0 elsewhere

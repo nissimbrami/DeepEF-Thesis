@@ -9,6 +9,7 @@
 #SBATCH --time 7-10:30:00                       ### limit the time of job running. Make sure it is not greater than the partition time limit!! Format: D-H:MM:SS
 #SBATCH --job-name DeePEF                      ### name of the job
 #SBATCH --output DeePEF.out                     ### output log for running job - %J for job number
+#SBATCH --error DeePEF.out                      ### merge stderr into same file so tqdm/scan progress is visible
 #SBATCH --gpus=1                                ### number of GPUs, allocating more than 1 requires IT team's permission
 #SBATCH --cpus-per-task=8                       ### 8 CPU cores for DataLoader workers (num_workers=8 in CFG)
 #SBATCH --qos=keasar
@@ -25,5 +26,5 @@ echo -e "SLURM_JOB_NODELIST:\t" $SLURM_JOB_NODELIST "\n\n"
 nvidia-smi
 
 module load anaconda ### load anaconda module
-source activate esm2_env ### activating Conda environment, environment must be configured before running the job
-python train.py ### execute python script – replace with your own command
+source activate esm2_env_py38 ### activating Conda environment (PyTorch 2.4.1 — enables torch.compile, torch.amp)
+python -u train.py ### execute python script – replace with your own command

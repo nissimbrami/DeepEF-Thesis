@@ -106,8 +106,12 @@ def _make_scaler():
 
 
 
-def _build_graph_features(D_base, mask, emb, one_hot, unfolded=False, gaussian_coef=CFG.gaussian_coef):
-    """Build [N, F] graph feature tensor from a pre-computed raw distance matrix."""
+def _build_graph_features(D_base, mask, proT5_emb, one_hot, unfolded=False, gaussian_coef=CFG.gaussian_coef):
+    """Build [N, F] graph feature tensor from a pre-computed raw distance matrix.
+
+    Output layout: [D_sum(16), Fb(32), proT5_emb_normalized(1024), one_hot(20)] = [N, 1092]
+    Matches the layout assumed by PEM: llm_index=-1044, one_hot_index=-20.
+    """
     D = torch.relu(torch.exp(gaussian_coef * D_base ** 2))
     mi = torch.where(mask == 0)
     if mi[0].numel() > 0:
@@ -117,7 +121,7 @@ def _build_graph_features(D_base, mask, emb, one_hot, unfolded=False, gaussian_c
         D = zero_except_udiagonal(D)
     Fb = get_bonded_features(D)
     D_sum = F.normalize(D.sum(dim=1), p=2, dim=0)
-    emb_n = F.normalize(emb, p=2, dim=0)
+    emb_n = F.normalize(proT5_emb, p=2, dim=0)
     return torch.cat([D_sum, Fb, emb_n, one_hot], dim=1)
 
 
@@ -186,18 +190,20 @@ def get_noised_proteins(data,device):
     D_native_raw = get_dist_matrix(Xjf_sq)  # [N, N, 16]
     D_decoy_raw  = get_dist_matrix(Xcd_sq)  # [N, N, 16]
 
-    # Build all 11 graph representations from the two pre-computed matrices
-    Xjf  = _build_graph_features(D_native_raw, mask_sq,      emb,        proT5_emb,       unfolded=False)
-    Xju  = _build_graph_features(D_native_raw, mask_sq,      emb,        proT5_emb,       unfolded=True)
-    Xd   = _build_graph_features(D_native_raw, mask_decoy,   emb_decoy,  proT5_emb_decoy, unfolded=False)
-    Xcd  = _build_graph_features(D_decoy_raw,  mask_crd_decoy, emb,      proT5_emb,       unfolded=False)
-    Xdu  = _build_graph_features(D_native_raw, mask_decoy,   emb_decoy,  proT5_emb_decoy, unfolded=True)
-    Xcy1 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb1, proT5_cycle1,    unfolded=False)
-    Xcy2 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb2, proT5_cycle2,    unfolded=False)
-    Xcy3 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb3, proT5_cycle3,    unfolded=False)
-    Xcy4 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb4, proT5_cycle4,    unfolded=False)
-    Xcy5 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb5, proT5_cycle5,    unfolded=False)
-    Xcy6 = _build_graph_features(D_native_raw, mask_sq,      cycle_emb6, proT5_cycle6,    unfolded=False)
+    # Build all 11 graph representations from the two pre-computed matrices.
+    # Arg order: (D_base, mask, proT5_emb, one_hot) — proT5 is normalized into features,
+    # one_hot is appended raw. Matches PEM's llm_index=-1044, one_hot_index=-20.
+    Xjf  = _build_graph_features(D_native_raw, mask_sq,        proT5_emb,       emb,        unfolded=False)
+    Xju  = _build_graph_features(D_native_raw, mask_sq,        proT5_emb,       emb,        unfolded=True)
+    Xd   = _build_graph_features(D_native_raw, mask_decoy,     proT5_emb_decoy, emb_decoy,  unfolded=False)
+    Xcd  = _build_graph_features(D_decoy_raw,  mask_crd_decoy, proT5_emb,       emb,        unfolded=False)
+    Xdu  = _build_graph_features(D_native_raw, mask_decoy,     proT5_emb_decoy, emb_decoy,  unfolded=True)
+    Xcy1 = _build_graph_features(D_native_raw, mask_sq,        proT5_cycle1,    cycle_emb1, unfolded=False)
+    Xcy2 = _build_graph_features(D_native_raw, mask_sq,        proT5_cycle2,    cycle_emb2, unfolded=False)
+    Xcy3 = _build_graph_features(D_native_raw, mask_sq,        proT5_cycle3,    cycle_emb3, unfolded=False)
+    Xcy4 = _build_graph_features(D_native_raw, mask_sq,        proT5_cycle4,    cycle_emb4, unfolded=False)
+    Xcy5 = _build_graph_features(D_native_raw, mask_sq,        proT5_cycle5,    cycle_emb5, unfolded=False)
+    Xcy6 = _build_graph_features(D_native_raw, mask_sq,        proT5_cycle6,    cycle_emb6, unfolded=False)
 
     # Add batch dimension
     Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6 = (
@@ -335,10 +341,26 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 continue
             X = torch.cat((Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4),dim=0)
 
+            # ── Shape & feature-layout sanity check (first step only) ──
+            if index == 0 and epoch == 0:
+                print(f"\n[DEBUG shapes] Xjf={tuple(Xjf.shape)}, X={tuple(X.shape)}, ca_coords={tuple(ca_coords.shape)}")
+                print(f"[DEBUG shapes] native_info: crd={tuple(native_info[0].shape)}, emb={tuple(native_info[1].shape)}, proT5={tuple(native_info[2].shape)}, mask={tuple(native_info[3].shape) if hasattr(native_info[3], 'shape') else native_info[3]}")
+                last20 = Xjf[0, 0, -20:].tolist()
+                pt_sample = Xjf[0, 0, -1044:-1040].tolist()
+                is_binary = all(v in (0.0, 1.0) for v in last20)
+                print(f"[DEBUG layout] last-20 one-hot binary={is_binary}: {last20}")
+                print(f"[DEBUG layout] proT5 sample (floats expected): {pt_sample}")
+                assert is_binary, "FAIL: last-20 dims should be one-hot (0/1)"
+                assert X.shape[-1] == 1092, f"FAIL: expected feature dim 1092, got {X.shape[-1]}"
+                print("[DEBUG] Shape and layout checks PASSED")
+
             # half precision training
             with _autocast():
                 # calculate the energy for the folded unfolded and decoy structure
                 E = model(X, ca_coords=ca_coords)
+                if index == 0 and epoch == 0:
+                    print(f"[DEBUG shapes] E={tuple(E.shape)} (expected [9])")
+                    assert E.shape == (9,), f"FAIL: E shape {E.shape}, expected (9,)"
                 Ejf, Eju, Exd, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4 = E[0], E[1], E[2], E[3], E[4], E[5], E[6], E[7], E[8]
                 # calculate the loss
                 loss ,lossd, lossg,lossc = criterion(Ejf, Eju, Exd, Xjf, Ecd, Exdu, Ecy1, Ecy2, Ecy3, Ecy4, with_grad = False)

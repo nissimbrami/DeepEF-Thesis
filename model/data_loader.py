@@ -439,39 +439,31 @@ def fetch_dataloader(data_dir, params):
         data: (dict) contains the DataLoader object for each type in types
     """
     # Sidechainnet dataset
+    loader_kwargs = dict(
+        num_workers=params.num_workers,
+        pin_memory=params.cuda,
+        persistent_workers=params.persistent_workers,
+        prefetch_factor=params.prefetch_factor,
+    )
     if params.dataset == 'scn':
-        train_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='train', debug=params.debug, LLM_EMB = params.LLM_EMB,outliners_path = params.outliners_path), batch_size=params.batch_size, shuffle=True,
-                                            num_workers=params.num_workers,
-                                            pin_memory=params.cuda)
-        valid_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='valid', debug=params.debug, LLM_EMB = params.LLM_EMB), batch_size=params.batch_size, shuffle=True,
-                                            num_workers=params.num_workers,
-                                            pin_memory=params.cuda)
-
-        test_loader= DataLoader(SidChainDS(data_path=data_dir,set_type='test', debug=params.debug, LLM_EMB = params.LLM_EMB), batch_size=params.batch_size, shuffle=True,
-                                            num_workers=params.num_workers,
-                                            pin_memory=params.cuda)
+        train_loader = DataLoader(SidChainDS(data_path=data_dir, set_type='train', debug=params.debug, LLM_EMB=params.LLM_EMB, outliners_path=params.outliners_path),
+                                  batch_size=params.batch_size, shuffle=True, **loader_kwargs)
+        valid_loader = DataLoader(SidChainDS(data_path=data_dir, set_type='valid', debug=params.debug, LLM_EMB=params.LLM_EMB),
+                                  batch_size=params.batch_size, shuffle=True, **loader_kwargs)
+        test_loader  = DataLoader(SidChainDS(data_path=data_dir, set_type='test',  debug=params.debug, LLM_EMB=params.LLM_EMB),
+                                  batch_size=params.batch_size, shuffle=True, **loader_kwargs)
     else:
-        # Get the filenames from the train folder
         file_names = os.listdir(data_dir)
         if params.debug:
             file_names = file_names[:CFG.debug_size]
-        # Split the data into train, validation and test set
-        X_train, X_rem, y_train, y_rem = train_test_split(file_names,file_names, train_size=CFG.split_train_size,
-                                                        random_state=CFG.seed)
-        # Now since we want the valid and test size to be equal (10% each of overall data). 
-        # we have to define valid_size=0.5 (that is 50% of remaining data)
-        X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5)
-        # Now we have the data split in training, validation and test set
-        train_loader= DataLoader(PEFDataset(X_train,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
-                                            num_workers=params.num_workers,
-                                            pin_memory=params.cuda)
-        valid_loader= DataLoader(PEFDataset(X_valid,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
-                                            num_workers=params.num_workers,
-                                            pin_memory=params.cuda)
-
-        test_loader= DataLoader(PEFDataset(X_test,datapath=data_dir,constraint = params.constraint), batch_size=params.batch_size, shuffle=True,
-                                            num_workers=params.num_workers,
-                                            pin_memory=params.cuda)
+        X_train, X_rem, y_train, y_rem = train_test_split(file_names, file_names, train_size=CFG.split_train_size, random_state=CFG.seed)
+        X_valid, X_test, y_valid, y_test = train_test_split(X_rem, y_rem, test_size=0.5)
+        train_loader = DataLoader(PEFDataset(X_train, datapath=data_dir, constraint=params.constraint),
+                                  batch_size=params.batch_size, shuffle=True, **loader_kwargs)
+        valid_loader = DataLoader(PEFDataset(X_valid, datapath=data_dir, constraint=params.constraint),
+                                  batch_size=params.batch_size, shuffle=True, **loader_kwargs)
+        test_loader  = DataLoader(PEFDataset(X_test,  datapath=data_dir, constraint=params.constraint),
+                                  batch_size=params.batch_size, shuffle=True, **loader_kwargs)
     return train_loader, valid_loader, test_loader
 
 def fetch_inference_loader(data_dir, params):
@@ -489,13 +481,16 @@ def fetch_inference_loader(data_dir, params):
 
 
 class params:
-    def __init__(self,batch_size,num_workers,cuda,constraint, dataset,debug=False,LLM_EMB=True,outliners_path=None):
+    def __init__(self,batch_size,num_workers,cuda,constraint, dataset,debug=False,LLM_EMB=True,outliners_path=None,
+                 persistent_workers=False, prefetch_factor=2):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cuda = cuda
         self.debug = debug
         self.constraint = constraint
         self.dataset = dataset
-        self.LLM_EMB =LLM_EMB
+        self.LLM_EMB = LLM_EMB
         self.outliners_path = outliners_path
+        self.persistent_workers = persistent_workers and num_workers > 0
+        self.prefetch_factor = prefetch_factor if num_workers > 0 else None
 

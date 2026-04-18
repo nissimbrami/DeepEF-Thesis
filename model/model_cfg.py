@@ -40,7 +40,9 @@ class CFG:
     lr = 0.0001
     wd = 0.00001
     batch_size = 1
-    num_workers = 2
+    num_workers = 8
+    persistent_workers = True   # avoid worker restart overhead each epoch
+    prefetch_factor = 4         # pre-load batches in background
     N = 10
     num_epochs = 50
     seq_len = 450

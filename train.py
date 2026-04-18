@@ -91,7 +91,7 @@ def _autocast():
 def _make_scaler():
     """GradScaler only works on CUDA. Return a dummy on other devices."""
     if CFG.device.type == "cuda":
-        return torch.cuda.amp.GradScaler()
+        return torch.amp.GradScaler("cuda")
     # On MPS/CPU: return a scaler that passes through (scale=1, no-op)
     return torch.amp.GradScaler(enabled=False)
 # torch.autograd.set_detect_anomaly(True)
@@ -640,8 +640,9 @@ def main():
     RUN_LOGGER = RunLogger(root="logs", run_name=run_name.replace(" ", "_").replace("(", "").replace(")", ""))
     print('***Start main function***')
     print('***load the data with dataloader***')
-    d_params = data_params(num_workers =CFG.num_workers, batch_size=CFG.batch_size,cuda=CFG.cuda,constraint=CFG.constraint, 
-                           debug=CFG.debug,dataset='scn',LLM_EMB=True)
+    d_params = data_params(num_workers=CFG.num_workers, batch_size=CFG.batch_size, cuda=CFG.cuda, constraint=CFG.constraint,
+                           debug=CFG.debug, dataset='scn', LLM_EMB=True,
+                           persistent_workers=CFG.persistent_workers, prefetch_factor=CFG.prefetch_factor)
     train_loader, valid_loader,test_loader = fetch_dataloader(data_dir=CFG.data_path, params=d_params)
     # Build the model
     print('***Build the model***')

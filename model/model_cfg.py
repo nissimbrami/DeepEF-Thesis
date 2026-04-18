@@ -10,7 +10,7 @@ class CFG:
     if debug:
         data_path = './data/casp12_data_30/'
     else:
-        data_path = './data/casp12_data_30/'
+        data_path = './data/casp12_data_100/'
     inference_path = './data/inference_data'
     results_path = './res/results-emb/'
     seed = 42
@@ -43,7 +43,7 @@ class CFG:
     num_workers = 2
     N = 10
     num_epochs = 50
-    seq_len = 600
+    seq_len = 450
     SM = False # score matching loss
     gradient_penalty = True
     decoy_threshold = 20

@@ -138,7 +138,7 @@ def get_noised_proteins(data,device):
     # create decoy sequence
     seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
     
-    if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
+    if Xjf.shape[1] > CFG.seq_len:  # if the protein is too long, skip it (GPU memory limitation)
         return None,None,None,None,None,None,None,None,None,None,None,None,None
     #emb = torch.cat((esm_embed,seq),dim=2)
     emb = seq_one_hot.to(device)
@@ -234,12 +234,8 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
         # set progress bar description
         tepoch.set_description(f"Validation: Epoch {epoch}")
         for index, data in (enumerate(tepoch)):
-            # Clean the GPU cache
-            if(device.type == "cuda" or device.type == "mps"):
-                _empty_cache()
-            gc.collect()
             # zero the parameter gradients
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info, ca_coords = get_noised_proteins(data,device)
             if Xjf is None:
                 n_skips += 1
@@ -258,9 +254,7 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
             # Denoising score matching (replaces gradient penalty)
             if CFG.gradient_penalty:
                 # zero the parameter gradients
-                optimizer.zero_grad()
-                _empty_cache()
-                gc.collect()
+                optimizer.zero_grad(set_to_none=True)
                 with _autocast():
                     lossg, _, _fd = denoising_score_matching(model, Xjf, native_info, sigma=CFG.sigma)
 
@@ -280,8 +274,6 @@ def validation(model, dataloader, device,epoch,N,optimizer,val_type = 'robust'):
                 energy_accum[k] += v.item()
             n_metric += 1
 
-            _empty_cache()
-            gc.collect()
             # update the progress bar
             if index % 1000 == 999:
                 print(f"Validation loss: {round(valid_loss/(index + 1),2)}, index: {index}, n_skips: {n_skips}")
@@ -309,11 +301,8 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
         # set progress bar description
         tepoch.set_description(f"Epoch {epoch}")
         for index, data in enumerate(tepoch):
-            # Clean the GPU cache
-            _empty_cache()
-            gc.collect()
              # zero the parameter gradients
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             Xjf,Xju,Xd,Xcd,Xdu,Xcy1,Xcy2,Xcy3,Xcy4,Xcy5,Xcy6, native_info, ca_coords = get_noised_proteins(data,device)
             if Xjf is None:
                 n_skips += 1
@@ -344,7 +333,7 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
                 grad_norm_d = sum(p.grad.norm()**2 for p in model.parameters() if p.grad is not None) ** 0.5
                 # Snapshot lossd grads before zeroing
                 grads_d = {n: p.grad.clone() for n, p in model.named_parameters() if p.grad is not None}
-                optimizer.zero_grad()
+                optimizer.zero_grad(set_to_none=True)
 
                 # Pass 2: backward on lossg — accumulates ∂lossg/∂θ
                 scaler.scale(lossg).backward()
@@ -393,8 +382,6 @@ def train_one_epoch(model, optimizer, dataloader, device,epoch,N,valid_loader,be
             # print statistics
             running_loss += loss.item()
 
-            _empty_cache()
-            gc.collect()
             # update the progress bar
             tepoch.set_postfix({"loss":round(loss.item(),3),"lossd":round(lossd.item(),3),"lossg":round(lossg.item(),3),"dsm_α":round(dsm_alpha.item(),3),"seq_len": Xjf.shape[1]})
 

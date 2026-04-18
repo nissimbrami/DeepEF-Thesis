@@ -32,5 +32,11 @@ source activate esm2_env_py38                      ### PyTorch 2.4.1 — enables
 NGPUS=${SLURM_GPUS_ON_NODE:-1}
 echo "Launching with $NGPUS GPU(s)"
 
+# NCCL tuning for clusters without NVLink (RTX 6000 Ada uses PCIe)
+export NCCL_DEBUG=INFO                  # log NCCL init details to diagnose failures
+export NCCL_P2P_DISABLE=1              # disable GPU-to-GPU P2P (use host memory copies)
+export NCCL_IB_DISABLE=1              # disable InfiniBand (use Ethernet/socket)
+export NCCL_SOCKET_IFNAME=eth0,ib0    # try Ethernet first, then IB
+
 # torchrun handles DDP rank setup; works transparently with 1 GPU (no dist init)
-torchrun --nproc_per_node=$NGPUS train.py
+torchrun --nproc_per_node=$NGPUS --master_addr=localhost --master_port=29500 train.py

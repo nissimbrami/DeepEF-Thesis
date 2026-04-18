@@ -74,6 +74,11 @@ RUN_LOGGER: "RunLogger | None" = None
 # Set the default data type to float32
 torch.set_default_dtype(CFG.torch_default_dtype)
 
+# Enable TF32 on Ampere/Ada GPUs — free ~1.5x matmul speedup, same API
+if CFG.device.type == "cuda":
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+
 # Device-aware helpers for mixed precision and cache clearing
 def _empty_cache():
     if CFG.device.type == "cuda":

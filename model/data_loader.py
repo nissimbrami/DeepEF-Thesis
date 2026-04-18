@@ -60,7 +60,10 @@ class SidChainDS(Dataset):
     def _has_valid_coords(self, path):
         """Check that coordinates are not fully NaN and no NaN at valid (mask=1) positions."""
         try:
-            crd = torch.load(path + '/crd_backbone.pt', weights_only=False).float()
+            crd = torch.load(path + '/crd_backbone.pt', weights_only=False)
+            if not isinstance(crd, torch.Tensor):
+                crd = torch.tensor(crd)
+            crd = crd.float()
             if torch.isnan(crd).all():
                 return False
             mask = torch.load(path + '/mask.pt', weights_only=False)

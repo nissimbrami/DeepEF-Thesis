@@ -66,7 +66,7 @@ def get_noised_proteins(data,device):
     # create decoy sequence
     seq_decoy,mask_decoy, proT5_emb_decoy = mix_A_acid(seq_one_hot = seq_one_hot, emb=proT5_emb, mask = mask,val_type='train',device=device)
     
-    if seq_decoy.shape[1] >CFG.seq_len : # if the sequence is too long, skip it(GPU limitation)
+    if Xjf.shape[1] > CFG.seq_len:  # if the protein is too long, skip it (GPU memory limitation)
         return None,None,None,None,None,None,None,None,None
     #emb = torch.cat((esm_embed,seq),dim=2)
     emb = seq_one_hot.to(device)

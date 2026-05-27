@@ -1,0 +1,55 @@
+\documentclass[12pt,a4paper]{report}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{cite}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+
+% Custom commands
+\newcommand{\ddG}{$\Delta\Delta G$}
+\newcommand{\dG}{$\Delta G$}
+\newcommand{\PCC}{\text{PCC}}
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+
+% Title
+\title{
+    \textbf{DeepPEF: Improving Protein Thermodynamic Stability Prediction\\via Structure-Aware Embeddings and Graph Neural Networks}\\[1cm]
+    \large M.Sc. Thesis\\
+    \large Department of Computer Science
+}
+\author{[Student Name]}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Predicting the thermodynamic effect of amino acid mutations on protein stability ($\Delta\Delta G$) is critical for protein engineering, drug design, and understanding genetic disease. This thesis continues and extends the DeepEF (Deep Protein Energy Function) framework, a graph neural network architecture that combines protein language model embeddings with structural features for $\Delta\Delta G$ prediction. Starting from a baseline Pearson correlation coefficient (PCC) of 0.467 on the MegaScale benchmark, we systematically improve the model through loss function engineering, architectural ablation, and embedding upgrades. Our best single-variable improvement --- $k$-nearest neighbor graph attention --- achieves PCC = 0.510. We present a staged plan to reach PCC $\geq$ 0.70 through structure-aware SaProt embeddings, training optimization, per-protein fine-tuning, and model ensembling. All experiments are conducted on the MegaScale/PNAS dataset (340 training proteins, 28 test proteins, $\sim$50,000 single-point mutations) without access to pretrained checkpoints.
+\end{abstract}
+
+\tableofcontents
+
+\include{chapters/introduction}
+\include{chapters/related_work}
+\include{chapters/methods}
+\include{chapters/experiments}
+\include{chapters/results}
+\include{chapters/future_work}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

@@ -1,0 +1,110 @@
+\chapter{Related Work}
+\label{ch:related_work}
+
+\section{Protein Stability Prediction}
+
+Protein thermodynamic stability prediction has evolved through several paradigms:
+
+\subsection{Physics-Based Methods}
+
+\textbf{FoldX} \cite{schymkowitz2005foldx} uses an empirical force field to estimate $\Delta\Delta G$ from structural features (van der Waals, solvation, hydrogen bonds, entropy). It achieves $\sim$1.0 kcal/mol RMSE on curated datasets but requires high-quality input structures and struggles with backbone flexibility.
+
+\textbf{Rosetta ddg\_monomer} \cite{kellogg2011role} performs Cartesian-space energy minimization after mutation modeling. More accurate than FoldX for buried mutations but computationally expensive ($\sim$10 minutes per mutation).
+
+\subsection{Machine Learning Methods}
+
+\textbf{ThermoMPNN} \cite{dieckhaus2024thermompnn} adapts the ProteinMPNN message-passing architecture for $\Delta\Delta G$ prediction. Pre-trained on inverse folding then fine-tuned on stability data, it achieves PCC $\approx$ 0.75 on MegaScale benchmarks with structure-aware inputs.
+
+\textbf{RaSP} (Rapid Stability Prediction) \cite{blaabjerg2023rasp} trains a 3D CNN on Rosetta-generated $\Delta\Delta G$ landscapes, achieving high throughput with competitive accuracy.
+
+\textbf{ACDC-NN} \cite{benevenuta2021acdc} uses sequence and evolutionary features with a feed-forward neural network.
+
+\textbf{DDGun3D} \cite{montanucci2019ddgun} combines sequence conservation with structural features in a gradient boosting framework.
+
+\section{Protein Language Models}
+
+Pre-trained protein language models encode evolutionary and structural information from millions of protein sequences:
+
+\subsection{ProtT5}
+
+ProtT5 \cite{elnaggar2022prottrans} is a T5-based encoder-decoder model trained on UniRef50 ($\sim$45M sequences). It produces 1024-dimensional per-residue embeddings. Key properties:
+\begin{itemize}
+    \item Captures evolutionary conservation and co-evolution patterns
+    \item Sequence-only: no structural information encoded
+    \item Thermostability benchmark: Spearman $\rho \approx 0.65$
+\end{itemize}
+
+\subsection{ESM-2}
+
+ESM-2 \cite{lin2023evolutionary} is a transformer-based masked language model (15M to 15B parameters). The 650M variant produces 1280-dimensional per-residue embeddings. Compared to ProtT5:
+\begin{itemize}
+    \item Trained on UniRef50 with updated architecture (RoPE, no bias, pre-normalization)
+    \item Better mutation effect prediction: Spearman $\rho = 0.680$ on thermostability
+    \item Sequence-only but with stronger evolutionary signal due to scale
+\end{itemize}
+
+\subsection{SaProt}
+
+SaProt (Structure-aware Protein language model) \cite{su2024saprot} extends ESM-2 by incorporating Foldseek 3Di structural tokens:
+\begin{itemize}
+    \item Input: interleaved amino acid + 3Di tokens (e.g., ``MdEvVpQp'')
+    \item 3Di tokens encode local backbone geometry (torsion angles, inter-residue distances)
+    \item Same architecture as ESM-2 (650M params, 1280-dim output)
+    \item \textbf{Thermostability: Spearman $\rho = 0.724$} --- best among PLMs (+6.5\% over ESM-2)
+    \item Ranked \#1 on ProteinGym leaderboard (April 2024)
+    \item Requires AlphaFold-predicted structures for 3Di token extraction
+\end{itemize}
+
+\begin{table}[h]
+\centering
+\caption{Protein language model comparison on thermostability prediction}
+\label{tab:plm_comparison}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Model} & \textbf{Params} & \textbf{Embedding Dim} & \textbf{Spearman $\rho$} \\
+\midrule
+ProtT5-XL & 3B & 1024 & $\sim$0.65 \\
+ESM-2 & 650M & 1280 & 0.680 \\
+\textbf{SaProt} & \textbf{650M} & \textbf{1280} & \textbf{0.724} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Graph Neural Networks for Proteins}
+
+Representing proteins as graphs enables learning over 3D structural relationships:
+
+\subsection{Graph Convolutional Networks (GCN)}
+
+GCNs \cite{kipf2017semi} aggregate neighbor features through spectral convolutions. For proteins, nodes represent residues and edges encode spatial proximity or bonded connectivity.
+
+\subsection{Graph Attention Networks (GAT/GATv2)}
+
+GAT \cite{velickovic2018graph} and GATv2 \cite{brody2022how} learn attention weights between connected nodes, enabling the model to focus on relevant interactions. In protein applications, attention can learn to weight spatially proximal residues differently from distant ones.
+
+\subsection{$k$-Nearest Neighbor Graphs}
+
+Instead of fully-connected or distance-cutoff graphs, $k$-NN graphs connect each residue to its $k$ nearest spatial neighbors. This:
+\begin{itemize}
+    \item Reduces computational cost from $O(N^2)$ to $O(Nk)$
+    \item Forces attention to local structural context
+    \item Prevents over-smoothing from global message passing
+    \item Empirically improves protein property prediction (our ablation: +0.043 PCC with $k=30$)
+\end{itemize}
+
+\section{The MegaScale Dataset}
+
+Tsuboyama et al.\ (2023) \cite{tsuboyama2023mega} measured stability for $\sim$776,000 mutations across $\sim$580 small protein domains using:
+\begin{itemize}
+    \item Massively parallel proteolysis assay (DMS: Deep Mutational Scanning)
+    \item AlphaFold2-predicted structures for all domains
+    \item Both $\Delta G$ (absolute stability) and $\Delta\Delta G$ (mutation effect) measurements
+\end{itemize}
+
+For this thesis, we use the PNAS-filtered subset:
+\begin{itemize}
+    \item 368 proteins total (340 train, 28 test)
+    \item Single-point mutations only (multi-mutations and insertions/deletions removed)
+    \item $\Delta\Delta G$ range: --1.0 to 5.0 kcal/mol (clamped)
+    \item AlphaFold PDB structures available on Zenodo (14 MB download)
+\end{itemize}

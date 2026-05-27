@@ -1,0 +1,188 @@
+\chapter{Methods}
+\label{ch:methods}
+
+\section{DeepEF Architecture Overview}
+
+The Protein Energy Model (PEM) predicts per-residue energy contributions that sum to a protein's total folding energy. The $\Delta\Delta G$ for a mutation is computed as:
+\begin{equation}
+    \Delta\Delta G = E_{\text{mutant}} - E_{\text{wild-type}} = (E_{\text{unfolded}}^{\text{mut}} - E_{\text{folded}}^{\text{mut}}) - (E_{\text{unfolded}}^{\text{wt}} - E_{\text{folded}}^{\text{wt}})
+\end{equation}
+
+\subsection{Input Representation}
+
+For each protein, the input feature vector per residue is:
+\begin{equation}
+    \mathbf{F}_i = [\mathbf{D}_i \,||\, \mathbf{F}_b \,||\, \mathbf{e}_i \,||\, \mathbf{h}_i] \in \mathbb{R}^{16 + 32 + E + 20}
+\end{equation}
+where:
+\begin{itemize}
+    \item $\mathbf{D}_i \in \mathbb{R}^{16}$: Distance matrix features (16 Gaussian kernels applied to atom pair distances, summed over neighbors, L2-normalized)
+    \item $\mathbf{F}_b \in \mathbb{R}^{32}$: Bonded features (16 bonded + 16 non-bonded Gaussian distance kernels from immediate sequential neighbors)
+    \item $\mathbf{e}_i \in \mathbb{R}^{E}$: Protein language model embedding ($E = 1024$ for ProtT5, $E = 1280$ for SaProt/ESM-2)
+    \item $\mathbf{h}_i \in \mathbb{R}^{20}$: One-hot amino acid encoding
+\end{itemize}
+
+The distance matrix uses Gaussian radial basis functions:
+\begin{equation}
+    D_{ij} = \text{ReLU}\left(\exp(\gamma \cdot d_{ij}^2)\right), \quad \gamma = -0.08
+\end{equation}
+computed between backbone atom pairs (N, CA, C, CB) using 16 distance bins.
+
+\subsection{Dual-Branch GNN}
+
+The model processes protein graphs through two parallel branches:
+
+\textbf{GCN Branch} (bonded + non-bonded context):
+\begin{itemize}
+    \item Input: $[\mathbf{D}(16) \,||\, \mathbf{F}_b(32) \,||\, \mathbf{h}(20)] = 68$ dimensions (or $52$ without projection)
+    \item 3 GCN layers with dropout ($p = 0.2$)
+    \item Edge connectivity: fully connected (all residues connected)
+    \item Output: 36-dimensional node features
+\end{itemize}
+
+\textbf{GAT Branch} (non-bonded attention):
+\begin{itemize}
+    \item Input: $[\mathbf{D}(16) \,||\, \mathbf{h}(20)] = 36$ dimensions
+    \item 3 GATv2 layers with 4 attention heads, dropout ($p = 0.2$)
+    \item Edge connectivity: $k$-NN graph ($k = 30$) based on CA atom distances
+    \item Output: 36-dimensional node features
+\end{itemize}
+
+\subsection{$k$-NN Graph Construction}
+
+For the GAT branch, we construct a directed $k$-nearest neighbor graph:
+\begin{equation}
+    \mathcal{E} = \{(i, j) : j \in \text{kNN}(i, k=30) \text{ based on } \|\mathbf{r}_i^{CA} - \mathbf{r}_j^{CA}\|_2\}
+\end{equation}
+
+This replaces the original fully-connected graph and provides:
+\begin{itemize}
+    \item Reduced computation: $O(Nk)$ vs $O(N^2)$ edges
+    \item Focus on local structural contacts (which determine stability)
+    \item Empirically validated: +0.043 PCC improvement over fully-connected
+\end{itemize}
+
+\subsection{Feature Fusion and Prediction}
+
+After both GNN branches:
+\begin{enumerate}
+    \item Concatenate GCN and GAT outputs: $\mathbf{x} = [\mathbf{x}_{\text{GCN}} \,||\, \mathbf{x}_{\text{GAT}}] \in \mathbb{R}^{72}$
+    \item Apply instance normalization
+    \item Concatenate raw LLM embeddings: $\mathbf{x} = [\mathbf{x} \,||\, \mathbf{e}] \in \mathbb{R}^{72 + E}$
+    \item Apply Light Attention mechanism
+    \item Two-layer MLP: $(72 + E) \rightarrow 128 \rightarrow 1$
+\end{enumerate}
+
+\subsection{Light Attention}
+
+Light Attention \cite{starklight} provides a learnable pooling mechanism over the sequence dimension:
+\begin{equation}
+    \mathbf{z} = \text{softmax}(\mathbf{W}_a \mathbf{X}^T) \cdot \mathbf{X}
+\end{equation}
+where $\mathbf{X} \in \mathbb{R}^{N \times d}$ is the sequence of node features and $\mathbf{W}_a$ learns which residues to attend to for the global prediction.
+
+\section{Loss Function}
+
+We use a composite loss combining Huber loss and ranking loss:
+\begin{equation}
+    \mathcal{L} = \mathcal{L}_{\text{Huber}} + \lambda \cdot \mathcal{L}_{\text{ranking}}
+\end{equation}
+
+\textbf{Huber Loss} ($\delta = 1.0$):
+\begin{equation}
+    \mathcal{L}_{\text{Huber}}(y, \hat{y}) = \begin{cases}
+        \frac{1}{2}(y - \hat{y})^2 & \text{if } |y - \hat{y}| \leq \delta \\
+        \delta(|y - \hat{y}| - \frac{1}{2}\delta) & \text{otherwise}
+    \end{cases}
+\end{equation}
+
+\textbf{Ranking Loss} (margin = 0.1, $\lambda = 0.1$):
+\begin{equation}
+    \mathcal{L}_{\text{ranking}} = \frac{1}{|P|} \sum_{(i,j) \in P} \max(0, -\text{sign}(y_i - y_j)(\hat{y}_i - \hat{y}_j) + m)
+\end{equation}
+where $P$ is the set of mutation pairs within a protein, encouraging correct relative ordering.
+
+\section{Training Pipeline}
+
+\subsection{Training Configuration}
+
+\begin{table}[h]
+\centering
+\caption{Training hyperparameters}
+\label{tab:hyperparams}
+\begin{tabular}{lc}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+GNN layers & 3 \\
+Dropout rate & 0.2 \\
+Gaussian coefficient $\gamma$ & --0.08 \\
+Batch size & 1 (protein-level) \\
+Mini-batch size & 64 (mutations per step) \\
+Learning rate & $10^{-4}$ \\
+LR schedule & Cosine annealing ($\eta_{\min} = 10^{-6}$) \\
+Optimizer & Adam (weight decay $= 10^{-5}$) \\
+Gradient accumulation & 4 steps \\
+Epochs & 30 \\
+$\Delta\Delta G$ clipping & $[-1.0, 5.0]$ kcal/mol \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{$\Delta\Delta G$ Computation}
+
+For each protein in a batch:
+\begin{enumerate}
+    \item Construct folded graph from backbone coordinates + embedding of mutation $m$
+    \item Construct unfolded graph (diagonal-only distance matrix, same features)
+    \item Predict energies: $E_{\text{folded}}(m)$, $E_{\text{unfolded}}(m)$
+    \item $\Delta G(m) = E_{\text{unfolded}}(m) - E_{\text{folded}}(m)$
+    \item $\Delta\Delta G(m) = \Delta G(m) - \Delta G(\text{wild-type})$ (index 0 is always WT)
+\end{enumerate}
+
+\subsection{From-Scratch Training}
+
+Unlike the original DeepEF which used a pretrained checkpoint (43\_final\_model.pt) from native/decoy discrimination on CASP12, this work trains \textbf{entirely from scratch} on MegaScale mutation data. This means:
+\begin{itemize}
+    \item No transfer learning from structure discrimination
+    \item Model must learn both structural representations AND stability prediction simultaneously
+    \item Expected performance ceiling lower than with pretraining ($\sim$0.08--0.12 PCC gap)
+\end{itemize}
+
+\section{Data Processing}
+
+\subsection{MegaScale/PNAS Dataset}
+
+The dataset is derived from Tsuboyama et al.\ (2023) with the following filtering:
+\begin{itemize}
+    \item Remove insertions and deletions (point mutations only)
+    \item Remove multi-site mutations (single-point only)
+    \item Remove test set homologs from training
+    \item Clamp $\Delta\Delta G$ to $[-1.0, 5.0]$ kcal/mol
+    \item PNAS mutation list filtering for standardized comparison
+\end{itemize}
+
+Final dataset statistics:
+\begin{itemize}
+    \item \textbf{Training:} 340 proteins, $\sim$50,000--100,000 mutations
+    \item \textbf{Test:} 28 proteins (from ThermoMPNN benchmark set)
+    \item \textbf{Protein sizes:} 50--200 residues (small domains)
+    \item \textbf{Structures:} AlphaFold2-predicted (available on Zenodo)
+\end{itemize}
+
+\subsection{Embedding Generation}
+
+Currently: ProtT5 per-residue embeddings (1024-dim) for each mutant sequence, stored as:
+\begin{verbatim}
+training_data/PROTEIN_NAME/prott5_embeddings/
+    prott5_embedding_0.pt   # Chunk 0: [128, seq_len, 1024]
+    prott5_embedding_1.pt   # Chunk 1: [128, seq_len, 1024]
+    ...
+\end{verbatim}
+
+Planned upgrade: SaProt structure-aware embeddings (1280-dim), requiring:
+\begin{enumerate}
+    \item Download AlphaFold PDB files from Zenodo (14 MB)
+    \item Extract 3Di structural tokens via Foldseek
+    \item Generate SaProt embeddings with combined AA+3Di input
+\end{enumerate}

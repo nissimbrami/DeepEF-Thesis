@@ -1,0 +1,61 @@
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{Motivation}
+
+Proteins are the molecular machines of life. Their function --- catalysis, signaling, structural support --- depends critically on their three-dimensional structure, which in turn depends on thermodynamic stability. A protein's folding free energy ($\Delta G$) determines whether it adopts its native fold or remains unstructured. When a single amino acid is mutated, the resulting change in stability ($\Delta\Delta G = \Delta G_{\text{mutant}} - \Delta G_{\text{wild-type}}$) can determine whether the protein functions normally, loses activity, or gains pathogenic properties.
+
+Accurate computational prediction of $\Delta\Delta G$ upon mutation has profound applications:
+\begin{itemize}
+    \item \textbf{Drug design:} Engineering therapeutic proteins with enhanced stability
+    \item \textbf{Enzyme engineering:} Designing industrial enzymes that tolerate high temperatures
+    \item \textbf{Disease understanding:} Identifying destabilizing mutations that cause genetic disorders
+    \item \textbf{Directed evolution:} Guiding laboratory evolution by predicting beneficial mutations
+\end{itemize}
+
+Despite decades of research, accurate $\Delta\Delta G$ prediction remains challenging. Physics-based methods (FoldX, Rosetta) capture known biophysical principles but struggle with accuracy beyond 1--2 kcal/mol RMSE. Machine learning approaches have shown promise, but until recently lacked sufficient training data to generalize across protein families.
+
+\section{The MegaScale Breakthrough}
+
+In 2023, Tsuboyama et al.\ published the MegaScale dataset \cite{tsuboyama2023mega}, measuring $\Delta\Delta G$ for $\sim$776,000 mutations across $\sim$580 small protein domains using a high-throughput proteolysis assay. This dataset is 100$\times$ larger than previous resources (ProTherm: $\sim$7,000 entries) and provides unprecedented coverage for training deep learning models.
+
+The availability of MegaScale, combined with advances in protein language models (ESM-2, ProtT5, SaProt) and graph neural networks, creates an opportunity to build highly accurate $\Delta\Delta G$ predictors.
+
+\section{DeepEF: Background}
+
+DeepEF (Deep Protein Energy Function) was originally developed by Shahar Cohen as a graph neural network framework for protein stability prediction. The model:
+\begin{enumerate}
+    \item Constructs a protein graph from 3D backbone coordinates (N, CA, C, CB atoms)
+    \item Encodes residue features using protein language model embeddings (originally ProtT5, 1024-dim)
+    \item Processes the graph through parallel GCN (bonded features) and GAT (non-bonded features) branches
+    \item Applies Light Attention pooling for sequence-level aggregation
+    \item Predicts energy values for folded/unfolded states; $\Delta\Delta G$ = $E_{\text{mutant}} - E_{\text{wild-type}}$
+\end{enumerate}
+
+The original DeepEF achieved PCC $\approx$ 0.54 with a pretrained checkpoint on native/decoy discrimination (CASP12 dataset) followed by fine-tuning on MegaScale mutations.
+
+\section{Thesis Objective}
+
+This thesis continues DeepEF with the following constraints and goals:
+\begin{itemize}
+    \item \textbf{Starting point:} No access to the original pretrained checkpoint --- all training from scratch
+    \item \textbf{Dataset:} MegaScale/PNAS filtered subset (340 train proteins, 28 test proteins)
+    \item \textbf{Hardware:} Single NVIDIA RTX 4070 (8GB VRAM), WSL2 environment
+    \item \textbf{Target:} Improve PCC from 0.467 (baseline) to $\geq$ 0.70 through systematic improvements
+    \item \textbf{Approach:} Embedding upgrades (ProtT5 $\rightarrow$ SaProt), architectural ablation, training optimization, and ensembling
+\end{itemize}
+
+\section{Contributions}
+
+The main contributions of this thesis are:
+\begin{enumerate}
+    \item \textbf{Systematic ablation study} identifying which architectural modifications help ($k$-NN GAT: +0.043 PCC) and which hurt (Multi-RBF: --0.081 PCC, edge features: neutral)
+    \item \textbf{Loss function engineering} showing Huber + Ranking loss outperforms L1 loss for $\Delta\Delta G$ regression
+    \item \textbf{Training pipeline optimization} with cosine LR scheduling, gradient accumulation, and weight decay
+    \item \textbf{Embedding upgrade strategy} from ProtT5 (1024-dim, sequence-only) to SaProt (1280-dim, structure-aware), with validated integration pipeline
+    \item \textbf{End-to-end reproducible framework} for protein stability prediction without pretrained checkpoints
+\end{enumerate}
+
+\section{Thesis Structure}
+
+Chapter~\ref{ch:related_work} reviews related work in protein stability prediction, protein language models, and graph neural networks for proteins. Chapter~\ref{ch:methods} describes the DeepEF architecture, training pipeline, and data processing in detail. Chapter~\ref{ch:experiments} presents our systematic experiments: loss ablation, architecture ablation, and the Phase~2 failure analysis. Chapter~\ref{ch:results} summarizes current results. Chapter~\ref{ch:future_work} presents the staged improvement plan with expected gains and timeline.

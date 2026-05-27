@@ -1,0 +1,154 @@
+\chapter{Experiments}
+\label{ch:experiments}
+
+This chapter details our systematic experimental process: reproducing the baseline, loss function selection, architectural ablation, failure analysis, and final configuration.
+
+\section{Experimental Setup}
+
+All experiments conducted on:
+\begin{itemize}
+    \item \textbf{Hardware:} NVIDIA RTX 4070 (8GB VRAM), 32 CPU cores
+    \item \textbf{Software:} PyTorch 2.x, PyTorch Geometric, WSL2 (Ubuntu)
+    \item \textbf{Training:} From scratch (no pretrained checkpoint)
+    \item \textbf{Metric:} Pearson Correlation Coefficient (PCC) on test set (28 proteins)
+    \item \textbf{Training time:} $\sim$2--3 hours per experiment (15 epochs)
+\end{itemize}
+
+\section{Phase 1: Loss Function Selection}
+
+\subsection{Motivation}
+The original DeepEF used L1 loss (Mean Absolute Error). We hypothesized that:
+\begin{enumerate}
+    \item Huber loss would be more robust to outlier mutations
+    \item Ranking loss would improve correlation by preserving relative ordering
+\end{enumerate}
+
+\subsection{Experiments}
+
+\begin{table}[h]
+\centering
+\caption{Loss function ablation results (15 epochs, from scratch)}
+\label{tab:loss_ablation}
+\begin{tabular}{lc}
+\toprule
+\textbf{Loss Function} & \textbf{Test PCC} \\
+\midrule
+L1 (baseline) & 0.467 \\
+Huber ($\delta = 1.0$) & 0.478 \\
+Ranking only & 0.421 \\
+\textbf{Huber + Ranking ($\lambda = 0.1$)} & \textbf{0.486} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Analysis}
+
+Huber + Ranking achieves the best PCC (0.486) because:
+\begin{itemize}
+    \item Huber loss reduces sensitivity to outlier $\Delta\Delta G$ values (measurements with high experimental noise)
+    \item Ranking loss explicitly optimizes for correlation --- it doesn't care about absolute scale, only relative ordering
+    \item The combination balances absolute accuracy (Huber) with correlation (Ranking)
+    \item $\lambda = 0.1$ gives ranking a small but consistent push without destabilizing Huber convergence
+\end{itemize}
+
+\section{Phase 2: Architecture Ablation}
+
+\subsection{Motivation}
+With loss function fixed (Huber + Ranking), we tested three architectural modifications:
+\begin{enumerate}
+    \item \textbf{Multi-RBF:} Replace single Gaussian kernel with 16 centers (2--22\AA, width=1.5)
+    \item \textbf{$k$-NN GAT:} Replace fully-connected GAT edges with $k=30$ nearest neighbors
+    \item \textbf{Edge features:} Add 32-dim edge attributes (16 RBF + 16 positional) to GATv2Conv
+\end{enumerate}
+
+\subsection{Experimental Design}
+
+Critical lesson learned: \textbf{test one variable at a time}. Our initial attempt (Phase~2 combined) failed catastrophically because multiple changes interacted unpredictably. The corrected ablation:
+
+\begin{table}[h]
+\centering
+\caption{Architecture ablation results (one variable at a time, 15 epochs)}
+\label{tab:arch_ablation}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Experiment} & \textbf{Configuration} & \textbf{Test PCC} & \textbf{$\Delta$ vs Baseline} \\
+\midrule
+Exp 0 (baseline) & Huber+Ranking, fully-connected & 0.4677 & --- \\
+Exp A (Multi-RBF) & + 16-center Gaussian & 0.3871 & \textcolor{red}{--0.081} \\
+\textbf{Exp B ($k$-NN GAT)} & \textbf{+ $k$=30 nearest neighbors} & \textbf{0.5103} & \textcolor{green!50!black}{\textbf{+0.043}} \\
+Exp C (Edge features) & + 32-dim edge attributes & 0.4643 & --0.003 \\
+Exp D ($k$-NN + Edge) & B + C combined & 0.4479 & --0.020 \\
+Exp E (All three) & A + B + C combined & 0.4208 & --0.047 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Key Findings}
+
+\begin{enumerate}
+    \item \textbf{$k$-NN GAT is the only beneficial change (+0.043 PCC).} Constraining attention to local neighbors forces the model to learn from physically relevant contacts.
+
+    \item \textbf{Multi-RBF hurts significantly (--0.081 PCC).} The 16-center expansion likely overfits to distance distributions in training proteins without generalizing.
+
+    \item \textbf{Edge features are neutral (--0.003 PCC).} GATv2's learned attention already captures distance information implicitly.
+
+    \item \textbf{Combinations are worse than individual changes.} Multi-RBF's negative effect dominates all combinations. Even $k$-NN + Edge (without Multi-RBF) underperforms $k$-NN alone.
+\end{enumerate}
+
+\section{Phase 2 Failure: Lessons Learned}
+
+\subsection{The Failure}
+
+Before the controlled ablation, we attempted to deploy all three changes simultaneously (``Phase 2 bundle''). Results were catastrophic:
+\begin{itemize}
+    \item Path A (Phase 1 extended): PCC = 0.450 (regression from 0.486)
+    \item Path B (Phase 2 architecture): PCC = 0.086--0.179 (near-random)
+\end{itemize}
+
+\subsection{Root Cause Analysis}
+
+Five bugs were identified through code analysis:
+
+\begin{enumerate}
+    \item \textbf{Bug 1: Default parameter poisoning.} The \texttt{use\_multi\_rbf=True} default in \texttt{train\_utils.py:get\_graph()} affected ALL experiments, including the ``baseline'' Path A. Every experiment unknowingly used Multi-RBF.
+
+    \item \textbf{Bug 2: Dead code path.} \texttt{pnas\_train.py} calls the model WITHOUT \texttt{ca\_coords}, so the $k$-NN graph and edge features were never actually computed. The model fell back to fully-connected with edge\_dim=32 but no edge data.
+
+    \item \textbf{Bug 3: GATv2Conv initialization mismatch.} GATv2Conv was initialized with \texttt{edge\_dim=32} (expecting edge features) but received \texttt{edge\_attr=None} during forward pass, causing silent interference.
+
+    \item \textbf{Bug 4: Embedding projection never activated.} The \texttt{emb\_projection} parameter defaults to \texttt{"none"} and was never passed from \texttt{pnas\_train.py} --- ruled out as cause but initially suspected.
+
+    \item \textbf{Bug 5: Loss function not in main branch.} Huber + Ranking loss was only on the collaborator's local branch, not the git main branch code.
+\end{enumerate}
+
+\subsection{Lessons}
+
+\begin{enumerate}
+    \item \textbf{Never bundle multiple changes.} Each experiment must change exactly one variable.
+    \item \textbf{Use CLI flags, not config file defaults.} Explicit $>$ implicit.
+    \item \textbf{Verify code paths actually execute.} Add logging/assertions to confirm features are active.
+    \item \textbf{Read the data flow end-to-end} before concluding what code actually runs.
+\end{enumerate}
+
+\section{Final Best Configuration}
+
+After the corrected ablation, our best configuration:
+
+\begin{table}[h]
+\centering
+\caption{Current best model configuration}
+\label{tab:best_config}
+\begin{tabular}{ll}
+\toprule
+\textbf{Component} & \textbf{Setting} \\
+\midrule
+Loss function & Huber ($\delta=1.0$) + Ranking ($\lambda=0.1$, margin=0.1) \\
+GAT edge construction & $k$-NN ($k=30$) based on CA distances \\
+GCN edge construction & Fully connected \\
+GNN layers & 3 (both branches) \\
+Embeddings & ProtT5 (1024-dim) \\
+Training & From scratch, 15 epochs, LR=$10^{-4}$ \\
+\textbf{Result} & \textbf{PCC = 0.510} \\
+\bottomrule
+\end{tabular}
+\end{table}

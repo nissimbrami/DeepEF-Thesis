@@ -1,0 +1,96 @@
+\chapter{Current Results}
+\label{ch:results}
+
+\section{Summary of Progress}
+
+\begin{table}[h]
+\centering
+\caption{Chronological progress from baseline to current best}
+\label{tab:progress}
+\begin{tabular}{clcc}
+\toprule
+\textbf{Step} & \textbf{Change} & \textbf{PCC} & \textbf{Gain} \\
+\midrule
+0 & L1 loss, fully-connected, from scratch & 0.467 & --- \\
+1 & + Huber + Ranking loss & 0.486 & +0.019 \\
+2 & + $k$-NN GAT ($k=30$) & \textbf{0.510} & +0.024 \\
+\midrule
+\multicolumn{2}{l}{\textbf{Total improvement}} & & \textbf{+0.043} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Comparison with Related Work}
+
+\begin{table}[h]
+\centering
+\caption{Comparison with published methods on MegaScale/PNAS benchmark}
+\label{tab:comparison}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Method} & \textbf{PCC (approx.)} & \textbf{Uses Structure?} \\
+\midrule
+BLOSUM62 baseline & $\sim$0.30 & No \\
+ESM-2 zero-shot (log-likelihood ratio) & $\sim$0.45 & No \\
+DeepEF (this work, current) & 0.510 & Yes (coordinates) \\
+DeepEF (original, with pretraining) & $\sim$0.54 & Yes \\
+RaSP & $\sim$0.60 & Yes \\
+ThermoMPNN & $\sim$0.75 & Yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Note: Comparisons are approximate as methods use different test splits and evaluation protocols.
+
+\section{What We Have vs.\ What We Need}
+
+\begin{table}[h]
+\centering
+\caption{Current state assessment}
+\label{tab:state}
+\begin{tabular}{p{6cm}p{6cm}}
+\toprule
+\textbf{What We Have (Completed)} & \textbf{What We Need (Remaining)} \\
+\midrule
+\vspace{0.1cm}
+$\checkmark$ Working training pipeline (from scratch) \newline
+$\checkmark$ Huber + Ranking loss (validated) \newline
+$\checkmark$ $k$-NN GAT architecture ($k=30$) \newline
+$\checkmark$ Controlled ablation methodology \newline
+$\checkmark$ PCC = 0.510 on 28-protein test set \newline
+$\checkmark$ MegaScale data preprocessed \newline
+$\checkmark$ AlphaFold PDB files identified (Zenodo) \newline
+$\checkmark$ Code supports CLI flags for all experiments
+&
+\vspace{0.1cm}
+$\square$ Training improvements (cosine LR, grad accum) \newline
+$\square$ SaProt embeddings (1280-dim, structure-aware) \newline
+$\square$ Download PDBs + install Foldseek \newline
+$\square$ Per-protein fine-tuning on test proteins \newline
+$\square$ Multi-seed ensemble (5 seeds) \newline
+$\square$ Embedding projection into GNN branches \newline
+$\square$ Final PCC target: $\geq$ 0.70
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Analysis of Current Limitations}
+
+\subsection{Gap to Target}
+
+Current PCC = 0.510, target $\geq$ 0.70. The gap of +0.19 must come from:
+\begin{enumerate}
+    \item \textbf{Input quality:} ProtT5 embeddings are sequence-only (Spearman $\sim$0.65). SaProt is structure-aware (Spearman 0.724). This single change should provide +0.03--0.05 PCC.
+    \item \textbf{Training suboptimality:} Only 15 epochs with constant LR. Cosine schedule + more epochs + gradient accumulation = smoother convergence.
+    \item \textbf{No pretraining:} The original DeepEF used native/decoy pretraining. Without it, the model must learn both structural representations and stability prediction simultaneously.
+    \item \textbf{Single model variance:} A single random seed has high variance. Ensembling 5 seeds reduces noise by $\sim\sqrt{5}$.
+\end{enumerate}
+
+\subsection{What Cannot Be Fixed}
+
+\begin{itemize}
+    \item \textbf{No pretrained checkpoint:} The 43\_final\_model.pt from CASP12 pretraining is unavailable. This likely accounts for $\sim$0.08--0.12 PCC gap.
+    \item \textbf{Dataset size:} 340 training proteins with $\sim$50K mutations is sufficient but not as large as ThermoMPNN's training set.
+    \item \textbf{Hardware constraint:} 8GB VRAM limits batch size and model scale.
+\end{itemize}

@@ -1,2 +1,3 @@
-# DeepEF-Thesis
-  Deep learning framework for protein thermodynamic stability (ΔΔG) prediction using GNN + protein language model embeddings   (SaProt/ProtT5). M.Sc. thesis continuation 
+Compile with: pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
+
+Or just view the .tex files directly on GitHub (GitHub renders LaTeX source as plain text with syntax highlighting).

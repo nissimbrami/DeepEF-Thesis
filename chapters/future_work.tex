@@ -1,0 +1,186 @@
+\chapter{Planned Improvements and Future Work}
+\label{ch:future_work}
+
+\section{Improvement Roadmap}
+
+We present a four-stage plan to systematically close the gap from PCC = 0.510 to $\geq$ 0.70. Each stage addresses a different bottleneck: underfitting $\rightarrow$ input quality $\rightarrow$ task specificity $\rightarrow$ variance reduction.
+
+\begin{table}[h]
+\centering
+\caption{Four-stage improvement plan with expected gains}
+\label{tab:roadmap}
+\begin{tabular}{clccc}
+\toprule
+\textbf{Stage} & \textbf{Improvement} & \textbf{Expected PCC} & \textbf{P(helps)} & \textbf{Time} \\
+\midrule
+1 & Training optimization & 0.53--0.55 & 85\% & 1 day \\
+2 & SaProt embeddings & 0.56--0.60 & 70\% & 1--2 days \\
+3 & Per-protein fine-tuning & 0.59--0.65 & 55\% & 1 day \\
+4 & 5-seed ensemble & 0.62--0.70 & 90\% & 1 day \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Stage 1: Training Optimization}
+
+\textbf{Changes:}
+\begin{itemize}
+    \item Cosine annealing LR schedule: $10^{-4} \rightarrow 10^{-6}$ over 30 epochs
+    \item Increase training from 15 to 30 epochs
+    \item Gradient accumulation: effective batch size = 4
+    \item Weight decay: $10^{-5}$ (L2 regularization)
+\end{itemize}
+
+\textbf{Rationale:}
+\begin{itemize}
+    \item Constant LR causes oscillation in later epochs instead of fine convergence
+    \item 15 epochs may not be sufficient for the model to converge
+    \item Batch size = 1 produces noisy gradients; accumulation smooths optimization
+    \item 22M parameters with effective batch=1 risks overfitting; weight decay regularizes
+\end{itemize}
+
+\textbf{Risk:} None. These are standard practices with no downside.
+
+\section{Stage 2: SaProt Embeddings}
+
+\textbf{Change:} Replace ProtT5 (1024-dim, sequence-only) with SaProt (1280-dim, structure-aware).
+
+\textbf{Why SaProt:}
+\begin{itemize}
+    \item SaProt encodes both amino acid identity AND local backbone geometry (via Foldseek 3Di tokens)
+    \item Published thermostability Spearman: 0.724 (vs ProtT5 $\sim$0.65, ESM-2 = 0.680)
+    \item $\Delta\Delta G$ prediction depends on 3D context (burial, contacts) --- exactly what SaProt provides
+    \item Same architecture as ESM-2 (650M params) but with structure-aware vocabulary
+\end{itemize}
+
+\textbf{Implementation requirements:}
+\begin{enumerate}
+    \item Download AlphaFold PDB files from Zenodo (14 MB) --- URL already in codebase
+    \item Install Foldseek binary (structural alphabet extraction)
+    \item Run \texttt{structureto3didescriptor} to get 3Di tokens per protein
+    \item Generate per-mutation SaProt embeddings ($\sim$2--4 hours on GPU)
+    \item Update \texttt{model\_cfg.py}: \texttt{emb\_input\_dim = 1280}
+    \item Fix hardcoded index: \texttt{self.llm\_index = -(emb\_input\_dim + 20)}
+\end{enumerate}
+
+\textbf{Risk:} Low. SaProt is a published model (ICLR 2024), MIT license, 54K+ downloads. PDB files confirmed available.
+
+\section{Stage 3: Per-Protein Fine-Tuning}
+
+\textbf{Change:} After training the global model, fine-tune separate copies on each test protein's own mutation data.
+
+\textbf{Rationale:}
+\begin{itemize}
+    \item The global model learns average $\Delta\Delta G$ patterns across 340 diverse proteins
+    \item Each protein has a unique energy landscape (different fold, different stability determinants)
+    \item Per-protein adaptation captures protein-specific effects (e.g., a tight hydrophobic core vs.\ a flexible loop protein)
+    \item This approach is used by ThermoMPNN and RaSP for their best reported numbers
+\end{itemize}
+
+\textbf{Implementation:}
+\begin{enumerate}
+    \item Load best global model checkpoint
+    \item For each test protein: fine-tune for 5--10 epochs on that protein's training mutations
+    \item Predict on held-out mutations
+    \item Report per-protein and aggregate PCC
+\end{enumerate}
+
+\textbf{Risk:} Medium. Helps for proteins with many mutations, may overfit for proteins with few ($<$20) mutations.
+
+\section{Stage 4: Ensemble}
+
+\textbf{Change:} Train 5 models with different random seeds (42, 123, 456, 789, 1337), average predictions.
+
+\textbf{Rationale:}
+\begin{itemize}
+    \item Each random seed finds a different local minimum
+    \item Averaging reduces prediction variance by factor of $\sim\sqrt{5}$
+    \item Empirically always improves correlation metrics (+0.02--0.03 PCC typical)
+    \item Zero implementation complexity --- just run 5 times
+\end{itemize}
+
+\textbf{Risk:} None. Mathematically guaranteed to reduce variance. Only cost is 5$\times$ training time.
+
+\section{Additional Directions Under Consideration}
+
+\subsection{Embedding Projection into GNN (emb\_projection=``mlp'')}
+
+The model already contains code to project the LLM embedding (1280-dim) $\rightarrow$ 16-dim and feed it directly into the GCN and GAT branches. Currently disabled (\texttt{emb\_projection="none"}). This would give the GNN access to semantic information during message passing, not just at the output stage.
+
+\textbf{P(helps): 55\% | Expected gain: +0.01--0.03 PCC}
+
+\subsection{Embedding-Enriched One-Hot}
+
+Project embedding $\rightarrow$ 20-dim and ADD to the one-hot vector, giving the GNN amino acid identity enriched with evolutionary/structural context.
+
+\textbf{P(helps): 50\% | Expected gain: +0.01--0.03 PCC}
+
+\subsection{GCN Branch Modification}
+
+The GCN branch uses fully-connected edges (every residue connected). Applying $k$-NN to GCN as well (or removing GCN entirely since GAT dominates) could reduce noise.
+
+\textbf{P(helps): 40\% | Expected gain: +0.01--0.02 PCC}
+
+\section{Decision Tree}
+
+After each stage, the next action depends on the result:
+
+\begin{verbatim}
+After Stage 1 (PCC = ___):
+  >= 0.53  --> Continue to Stage 2
+  <  0.52  --> Debug (try without cosine LR)
+
+After Stage 2 (PCC = ___):
+  >= 0.63  --> Skip Stage 3, go to Stage 4 (ensemble)
+  0.55-0.63 --> Continue to Stage 3
+  <  0.55  --> Try dual embeddings (ProtT5 + SaProt concat)
+
+After Stage 3 (PCC = ___):
+  >= 0.68  --> Ensemble will reach 0.70+
+  0.62-0.68 --> Ensemble --> 0.65-0.72
+
+After Stage 4 (PCC = ___):
+  >= 0.70  --> TARGET REACHED
+  0.65-0.70 --> Strong thesis result
+  <  0.65  --> Data/pretraining ceiling
+\end{verbatim}
+
+\section{Realistic Expectations}
+
+\begin{table}[h]
+\centering
+\caption{Probability assessment for final PCC}
+\label{tab:probability}
+\begin{tabular}{lc}
+\toprule
+\textbf{Final PCC Range} & \textbf{Probability} \\
+\midrule
+$\geq$ 0.75 & 20--30\% \\
+0.70--0.75 & 25--35\% \\
+0.65--0.70 & 30--35\% \\
+$<$ 0.65 & 10--20\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key constraint:} Without the pretrained checkpoint (native/decoy discrimination), we estimate a $\sim$0.08--0.12 PCC ceiling reduction. ThermoMPNN achieves $\sim$0.75 with structure-specific pretraining AND larger training sets. Our realistic ceiling is 0.70--0.72 with all improvements applied.
+
+\section{Timeline}
+
+\begin{table}[h]
+\centering
+\caption{Estimated timeline for remaining work}
+\label{tab:timeline}
+\begin{tabular}{lll}
+\toprule
+\textbf{Week} & \textbf{Task} & \textbf{Deliverable} \\
+\midrule
+Week 1 & Stage 1 (training) + download PDBs & PCC after Stage 1 \\
+Week 1--2 & Generate SaProt embeddings & Embeddings ready \\
+Week 2 & Stage 2 (SaProt training) & PCC after Stage 2 \\
+Week 2--3 & Stage 3 (per-protein FT) & PCC after Stage 3 \\
+Week 3 & Stage 4 (ensemble) & Final PCC \\
+Week 3--4 & Analysis, writing, figures & Complete thesis \\
+\bottomrule
+\end{tabular}
+\end{table}

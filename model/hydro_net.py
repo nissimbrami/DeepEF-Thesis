@@ -352,7 +352,7 @@ class PEM(torch.nn.Module):
         self.one_hot_index = -20
         self.bonded_index = 48
         self.non_bonded_index = 16
-        self.llm_index = -1044
+        self.llm_index = -(CFG.emb_input_dim + 20)  # dynamic based on embedding dim
 
         # edge index cache
         self._edge_cache_key = None

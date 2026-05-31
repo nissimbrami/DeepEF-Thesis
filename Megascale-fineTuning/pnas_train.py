@@ -67,6 +67,10 @@ parser.add_argument('--no_pretrained', action='store_true', help='Train from scr
 # Epoch control
 parser.add_argument('--epochs_freeze', type=int, default=None, help='Epochs with frozen backbone (overrides --epochs)')
 parser.add_argument('--epochs_unfreeze', type=int, default=None, help='Epochs with unfrozen backbone')
+# Hardware control
+parser.add_argument('--mini_batch_size', type=int, default=64, help='Mini-batch size for mutations within each protein')
+parser.add_argument('--emb_projection', type=str, default='none', choices=['none', 'mlp', 'low_rank'],
+                    help='Embedding projection mode: none (raw concat), mlp (project to 16-dim), low_rank')
 
 args = parser.parse_args()
 
@@ -109,7 +113,8 @@ EMB_DIMS = {
     'saprot': 1280, 'saprot_pm': 1280, 'dual_saprot_pm': 2304,
 }
 CFG.emb_input_dim = EMB_DIMS.get(args.emb_type, 1024)
-print(f"Embedding type: {args.emb_type} (dim={CFG.emb_input_dim})")
+CFG.emb_projection = args.emb_projection
+print(f"Embedding type: {args.emb_type} (dim={CFG.emb_input_dim}), projection={args.emb_projection}")
 
 # Constants
 COORDS = 'coords_tensor.pt'
@@ -126,7 +131,7 @@ EPOCHS_NO_FREEZE = 60 if not DEBUG else 1
 FREEZE_LAYERS = args.freeze_layers
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
-MINI_BATCH_SIZE = 64
+MINI_BATCH_SIZE = args.mini_batch_size
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
 TRAINED_MODEL_PATH = args.trained_model_path
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
@@ -707,7 +712,7 @@ def run_training():
 
     # Create the model
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
-                light_attention=LIGHT_ATTENTION).to(DEVICE)
+                light_attention=LIGHT_ATTENTION, emb_projection=args.emb_projection).to(DEVICE)
     if PRETRAINED:
         try:
             model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
@@ -748,7 +753,7 @@ def run_validation_metrics():
     test_ds = DataLoader(test_ds, batch_size=1, shuffle=True)
     # Create the model
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
-                light_attention=LIGHT_ATTENTION).to(DEVICE)
+                light_attention=LIGHT_ATTENTION, emb_projection=args.emb_projection).to(DEVICE)
     if PRETRAINED:
         try:
             model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)

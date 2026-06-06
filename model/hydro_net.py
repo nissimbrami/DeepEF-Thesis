@@ -345,6 +345,9 @@ class PEM(torch.nn.Module):
         self.fc1 = nn.Linear(fc_in_dim, 128)
         self.fc2 = nn.Linear(128, 1)
 
+        # GNN-SM output head: per-residue amino acid scores [L, 20]
+        self.fc2_sm = nn.Linear(128, 20)
+
         # energy epsilon
         self.energy_epsilon = 1
 
@@ -419,14 +422,17 @@ class PEM(torch.nn.Module):
         # fc layers
         x  = self.fc1(x)
         x = F.relu(x)
+
+        # Branch: subtract-mut mode returns [B, L, 20] scores
+        if f_type == 'subtract_mut':
+            x_sm = self.fc2_sm(x)  # B*N, 20
+            x_sm = x_sm.reshape(B, N, 20)
+            return x_sm
+
         x = self.fc2(x) # -> B*N,1
-        # x = F.relu(x)
-        # x = self.fc3(x) # B*N,64->B*N,1
         # reshape to [batch_size,n_nodes]
         x = x.reshape(B, N, 1)
-        # Squeeze the energy between 0 and 1
-        # x = torch.sigmoid(x) # B,N,1
-        # return energy        
+        # return energy
         if (f_type == 'Default'):
             return self.get_energy(x)
         elif(f_type == 'A_inference'): # return the energy reference to each amino acid

@@ -1,0 +1,31 @@
+general:
+  - logger: logger
+  - model: supervised_v1.0
+  - optimizer: adam
+  - criteria: criteria
+
+wandb_logger:
+  enabled: true
+  project: "Supervised-Naive-V1"
+  per_protein_run_prefix: first_run
+
+
+model:
+  name: "supervised_naive"
+  base_model: 'PEM'
+
+criteria:
+  - mse_folded_unfolded
+  - energy_by_structure
+
+optimizer:
+  name: "adam"
+  lr: 0.0001
+
+training:
+  train_size: 0.8
+  single_protein_batch_size: 32
+  num_epochs: 20
+  freeze_pretrained: true
+  pretrained_ckpt_path: "../model_outputs/trianed_models_energyLimit-inst_norm/"
+  trained_ckpt_path: '../model_outputs/supervised/'

@@ -1,0 +1,59 @@
+# ── Data & tensors ──────────────────────────────────────────────────
+/data/*
+sidechainnet_data/
+*.tar.gz
+*.pt
+*.pdb
+
+# ── Trained model checkpoints ───────────────────────────────────────
+res/*
+trianed_models-*/
+trained_models*/
+
+# ── Results & outputs ───────────────────────────────────────────────
+results/
+*.csv
+
+# ── SLURM job scripts & logs ────────────────────────────────────────
+sbatch files/
+*.out
+*.log
+*.db
+
+# ── Experiment tracking ─────────────────────────────────────────────
+wandb/
+logs/
+
+# ── Jupyter notebooks ───────────────────────────────────────────────
+# Keep: experiments/EDA.ipynb, Inference.ipynb, Score_matching.ipynb,
+#        ptoT5emb.ipynb, "thermodybamic inference.ipynb",
+#        data_creation/embeddings/generate_embeddings_colab.ipynb
+# Ignore: new untracked notebooks and all checkpoint dirs
+experiments/MegaScale.ipynb
+experiments/Paper.ipynb
+experiments/S669-create_ds.ipynb
+experiments/Training_eval.ipynb
+experiments/pnas_dataset.ipynb
+experiments/pdb_files/
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environments ─────────────────────────────────────────────
+.env
+.venv
+env/
+venv/
+
+# ── OS & IDE ────────────────────────────────────────────────────────
+.DS_Store
+.vscode/launch.json
+*.swp
+*.swo

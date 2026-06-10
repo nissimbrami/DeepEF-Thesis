@@ -325,11 +325,7 @@ class PEM(torch.nn.Module):
         gat_dim_in = 36 + proj_extra  # 36 or 52
         gat_dim_h = 64
         gat_dim_out = 36 + proj_extra
-        _use_edge_feat = getattr(CFG, 'use_edge_features', False)
-        _edge_dim = getattr(CFG, 'edge_dim', 32)
-        self.graph_model_gat = [GAT(gat_dim_in, gat_dim_h, gat_dim_out, 8, dropout_rate,
-                                    use_edge_features=_use_edge_feat, edge_dim=_edge_dim)
-                                for i in range(layers)]
+        self.graph_model_gat = [GAT(gat_dim_in, gat_dim_h, gat_dim_out, 8, dropout_rate) for i in range(layers)]
         # Gaussian coefficient
         self.gaussian_coef = gaussian_coef
         # graph attention layers
@@ -349,6 +345,9 @@ class PEM(torch.nn.Module):
         self.fc1 = nn.Linear(fc_in_dim, 128)
         self.fc2 = nn.Linear(128, 1)
 
+        # GNN-SM output head: per-residue amino acid scores [L, 20]
+        self.fc2_sm = nn.Linear(128, 20)
+
         # energy epsilon
         self.energy_epsilon = 1
 
@@ -356,7 +355,7 @@ class PEM(torch.nn.Module):
         self.one_hot_index = -20
         self.bonded_index = 48
         self.non_bonded_index = 16
-        self.llm_index = -(CFG.emb_input_dim + 20)  # -1044 for ProtT5, -1300 for ESM-2, etc.
+        self.llm_index = -(CFG.emb_input_dim + 20)  # dynamic based on embedding dim
 
         # edge index cache
         self._edge_cache_key = None
@@ -403,7 +402,7 @@ class PEM(torch.nn.Module):
 
         # forward pass through the graph attention and convolution layers
         x1 = self.forward_gcn(x_gcn, edge_index_gcn, B, N) # B*N,gcn_in -> B*N,gcn_out
-        x2 = self.forward_gat(x_gat, edge_index_gat, B, N, ca_coords=ca_coords) # B*N,gat_in -> B*N,gat_out
+        x2 = self.forward_gat(x_gat, edge_index_gat, B, N) # B*N,gat_in -> B*N,gat_out
         # concat features
         x = torch.cat((x1,x2),dim=-1) # B*N, gcn_out+gat_out
         # reshape to use instance norm
@@ -423,20 +422,23 @@ class PEM(torch.nn.Module):
         # fc layers
         x  = self.fc1(x)
         x = F.relu(x)
+
+        # Branch: subtract-mut mode returns [B, L, 20] scores
+        if f_type == 'subtract_mut':
+            x_sm = self.fc2_sm(x)  # B*N, 20
+            x_sm = x_sm.reshape(B, N, 20)
+            return x_sm
+
         x = self.fc2(x) # -> B*N,1
-        # x = F.relu(x)
-        # x = self.fc3(x) # B*N,64->B*N,1
         # reshape to [batch_size,n_nodes]
         x = x.reshape(B, N, 1)
-        # Squeeze the energy between 0 and 1
-        # x = torch.sigmoid(x) # B,N,1
-        # return energy        
+        # return energy
         if (f_type == 'Default'):
             return self.get_energy(x)
         elif(f_type == 'A_inference'): # return the energy reference to each amino acid
             return x
         
-    def forward_gat(self, x, edge_index_gat, B, N, ca_coords=None):
+    def forward_gat(self, x, edge_index_gat, B, N):
         """forward function for the graph model"""
         identity = x # identity for the residual connection
         x = self.fc1_gat(x) # N,36->N,64
@@ -446,13 +448,8 @@ class PEM(torch.nn.Module):
         x = x.reshape(B, N,-1)
         x = self.inst_norm1(x)
         x = x.reshape(B * N,-1)
-
-        edge_attr = None
-        if getattr(CFG, 'use_edge_features', False) and ca_coords is not None:
-            edge_attr = self._compute_edge_features(ca_coords, edge_index_gat, B, N)
-
         for gat_layer in self.GAT_layers:
-            h1,z = gat_layer(x, edge_index_gat, B, N, edge_attr=edge_attr)
+            h1,z = gat_layer(x, edge_index_gat, B, N)
             x = h1 + identity
 
         return x
@@ -484,33 +481,6 @@ class PEM(torch.nn.Module):
         # E = torch.log(torch.sum(Fh,dim=(1,2)) + self.energy_epsilon)
         return E
   
-    def _compute_edge_features(self, ca_coords, edge_index, B, N):
-        """Compute 32-dim edge features: 16-dim distance RBF + 16-dim positional encoding.
-        ca_coords: [B, N, 3], edge_index: [2, E] (flat B*N indexing)
-        Returns: [E, 32]
-        """
-        ca_flat = ca_coords.reshape(B * N, 3)
-        src, dst = edge_index[0], edge_index[1]
-
-        # 16-dim RBF distance encoding
-        ca_dist = torch.norm(ca_flat[src] - ca_flat[dst], dim=1)  # [E]
-        centers = torch.linspace(2.0, 22.0, 16, device=ca_coords.device)
-        width = 1.5
-        dist_rbf = torch.exp(-((ca_dist.unsqueeze(-1) - centers) ** 2) / (2 * width ** 2))  # [E, 16]
-
-        # 16-dim sinusoidal positional encoding of sequence separation |i-j|
-        src_res = (src % N).float()
-        dst_res = (dst % N).float()
-        seq_sep = (src_res - dst_res).abs()  # [E]
-        pos_dim = 8
-        freqs = torch.pow(10000.0, -torch.arange(0, pos_dim * 2, 2, device=ca_coords.device).float() / (pos_dim * 2))
-        pos_enc = torch.cat([
-            torch.sin(seq_sep.unsqueeze(-1) * freqs.unsqueeze(0)),
-            torch.cos(seq_sep.unsqueeze(-1) * freqs.unsqueeze(0)),
-        ], dim=-1)  # [E, 16]
-
-        return torch.cat([dist_rbf, pos_enc], dim=-1)  # [E, 32]
-
     def get_edge_index(self, x, ca_coords=None):
         """Return the edge index for the graph convolution and attention layers.
         The edge index of the gcn is a line from the amino acid to the next amino acid.
@@ -533,26 +503,11 @@ class PEM(torch.nn.Module):
         gcn_dst = gcn_src + 1
         edge_index_gcn_all = torch.stack([gcn_src, gcn_dst])
 
-        # GAT: k-NN, distance-cutoff, or fully connected
-        use_knn = getattr(CFG, 'use_knn_gat', False)
-        gat_k = getattr(CFG, 'gat_k', 30)
-
-        if use_knn and ca_coords is not None:
-            # k-NN graph: connect each residue to its k nearest CA neighbors
+        # GAT: distance-cutoff or fully connected
+        if ca_coords is not None and self.gat_cutoff is not None:
+            # Distance-based edges: connect CA atoms within cutoff radius
             dists = torch.cdist(ca_coords, ca_coords)  # [B, N, N]
-            # topk smallest distances (k+1 to exclude self, then drop self)
-            k_actual = min(gat_k, N - 1)
-            _, knn_idx = torch.topk(dists, k=k_actual + 1, largest=False, dim=2)
-            knn_idx = knn_idx[:, :, 1:]  # [B, N, k] — drop self (index 0, dist=0)
-            batch_idx = torch.arange(B, device=dev).view(B, 1, 1).expand(B, N, k_actual)
-            src_idx = torch.arange(N, device=dev).view(1, N, 1).expand(B, N, k_actual)
-            flat_src = (batch_idx * N + src_idx).reshape(-1)
-            flat_dst = (batch_idx * N + knn_idx).reshape(-1)
-            edge_index_gat_all = torch.stack([flat_src, flat_dst])
-        elif ca_coords is not None and self.gat_cutoff is not None:
-            # Distance-cutoff edges (existing behavior)
-            dists = torch.cdist(ca_coords, ca_coords)  # [B, N, N]
-            mask = (dists < self.gat_cutoff) & (dists > 0)
+            mask = (dists < self.gat_cutoff) & (dists > 0)  # exclude self-loops
             batch_idx, src_idx, dst_idx = torch.where(mask)
             flat_src = batch_idx * N + src_idx
             flat_dst = batch_idx * N + dst_idx
@@ -676,38 +631,25 @@ class PEMSM(torch.nn.Module):
 class GAT(torch.nn.Module):
   
   """Graph Attention Network"""
-  def __init__(self, dim_in, dim_h, dim_out, heads=8, dropout_rate=0.2, use_edge_features=False, edge_dim=32):
+  def __init__(self, dim_in, dim_h, dim_out, heads=8, dropout_rate=0.2):
     super().__init__()
-    self.use_edge_features = use_edge_features
-    if use_edge_features:
-        self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads, edge_dim=edge_dim)
-        self.gat2 = GATv2Conv(dim_h * heads, dim_out, heads=1, edge_dim=edge_dim)
-    else:
-        self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
-        self.gat2 = GATv2Conv(dim_h * heads, dim_out, heads=1)
+    self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
+    self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
     # self.bn  = BatchNorm(dim_out)
     self.inst_norm = Normalization_layer(dim_out,affine=True)
     self.dropout = nn.Dropout(dropout_rate)
 
-  def forward(self, x, edge_index, B, N, edge_attr=None):
+  def forward(self, x, edge_index, B, N):
     h=x
     h = self.dropout(x)
-    if self.use_edge_features:
-        if edge_attr is None:
-            # Safety fallback: zero edge features if ca_coords wasn't provided
-            edge_attr = x.new_zeros(edge_index.size(1), self.gat1.lin_edge.in_features)
-        h = self.gat1(h, edge_index, edge_attr=edge_attr)
-        h = F.elu(h)
-        h = self.gat2(h, edge_index, edge_attr=edge_attr)
-    else:
-        h = self.gat1(h, edge_index)
-        h = F.elu(h)
-        h = self.gat2(h, edge_index)
+    h = self.gat1(h, edge_index)
+    h = F.elu(h)
+    h = self.gat2(h, edge_index)
     # swap axis to use insrance norm
-    h = h.reshape(B, N, -1)
+    h = h.reshape(B,N,-1)
     h = self.inst_norm(h)
-    h = h.reshape(B * N, -1)
-
+    h = h.reshape(B*N,-1)
+    
     return h, F.log_softmax(h, dim=1)
 
 

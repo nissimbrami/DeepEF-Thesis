@@ -193,17 +193,8 @@ def diff_data(model, optimizer, dataloader, device,epoch,N,valid_loader):
         torch.save(all_Xn_int,"./all_Xn_int.pt")
         torch.save(all_Xn,"./all_Xn_padded.pt")
 
-def _apply_multi_rbf(D, n_centers=16, min_dist=2.0, max_dist=22.0, width=1.5):
-    """Replace single Gaussian kernel with multi-center RBF encoding.
-    D: [N, N, 16] raw distances. Returns same shape with peak RBF response per channel.
-    Uses max over centers (not mean) to preserve distance discrimination."""
-    centers = torch.linspace(min_dist, max_dist, n_centers, device=D.device)
-    D_rbf = torch.exp(-((D.unsqueeze(-1) - centers) ** 2) / (2 * width ** 2))
-    return D_rbf.max(dim=-1).values
-
-
 def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
-    """Get graph representation of protein
+    """Get graph representation of protein 
     Args:
         x (torch.Tensor): Input tensor representing the coordinates of atoms in the protein structure. Shape: [N, 4,3].
         one_hot (torch.Tensor): One-hot encoded tensor representing additional categorical features for each atom. Shape: [N, 20].
@@ -214,10 +205,7 @@ def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
         torch.Tensor: Concatenated tensor containing distance matrix features, bonded features, embedding features, and one-hot encoded features. Shape: [N, 16 + 32 + emb_size].
     """
     D = get_dist_matrix(x) # N,N,16
-    if getattr(CFG, 'use_multi_rbf', False):
-        D = _apply_multi_rbf(D)
-    else:
-        D = torch.relu(torch.exp(gaussian_coef*D**2))
+    D = torch.relu(torch.exp(gaussian_coef*D**2))
     # remove masks values
     mask_index = torch.where(mask == 0)
     D[mask_index[0],:,:] = 0
@@ -229,16 +217,13 @@ def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     D = F.normalize(D,p=2,dim=0)
     emb = F.normalize(emb,p=2,dim=0)
     Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
-
+    
     return Fh
 
 def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     """Get graph representation of a unfolded protein"""
     D = get_dist_matrix(x) # N,N,16
-    if getattr(CFG, 'use_multi_rbf', False):
-        D = _apply_multi_rbf(D)
-    else:
-        D = torch.relu(torch.exp(gaussian_coef*D**2))
+    D = torch.relu(torch.exp(gaussian_coef*D**2))
     # remove masks values
     mask_index = torch.where(mask == 0)
     D[mask_index[0],:,:] = 0
@@ -252,34 +237,8 @@ def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     D = F.normalize(D,p=2,dim=0)
     emb = F.normalize(emb,p=2,dim=0)
     Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
-
+    
     return Fh
-
-def precompute_graph_features(x, mask, gaussian_coef=CFG.gaussian_coef, use_multi_rbf=False):
-    """Precompute structure-only features shared across all mutations of a protein.
-    Returns (D_f, Fb_f, D_u, Fb_u) — folded and unfolded normalized distance/bonded tensors.
-    """
-    D = get_dist_matrix(x)
-    if use_multi_rbf:
-        D = _apply_multi_rbf(D)
-    else:
-        D = torch.relu(torch.exp(gaussian_coef * D ** 2))
-    mask_index = torch.where(mask == 0)
-    D[mask_index[0], :, :] = 0
-    D[:, mask_index[0], :] = 0
-    Fb_f = get_bonded_features(D)
-    D_f = F.normalize(D.sum(dim=1), p=2, dim=0)
-    D_u_full = zero_except_udiagonal(D.clone())
-    Fb_u = get_bonded_features(D_u_full)
-    D_u = F.normalize(D_u_full.sum(dim=1), p=2, dim=0)
-    return D_f, Fb_f, D_u, Fb_u
-
-
-def get_graph_fast(one_hot, emb, D_norm, Fb):
-    """Build node features using precomputed structure tensors."""
-    emb = F.normalize(emb, p=2, dim=0)
-    return torch.cat([D_norm, Fb, emb, one_hot], dim=1)
-
 
 def get_bonded_features(D):
     """Get bonded features from distance matrix"""

@@ -54,12 +54,6 @@ class CFG:
     reg_alpha = 0.1
     tau = 1.0 # temperature for InfoNCE contrastive loss
     gat_cutoff = 12.0 # Angstroms, distance cutoff for GAT edges (None = fully connected)
-    # Phase 2 architecture flags (all False = original Phase 1 behavior)
-    use_multi_rbf = False      # multi-center RBF distance encoding (vs single Gaussian)
-    use_knn_gat = False        # k-NN graph for GAT (vs fully connected)
-    use_edge_features = False  # 32-dim edge features in GAT
-    gat_k = 30                 # k for k-NN graph
-    edge_dim = 32              # edge feature dimension (16 RBF + 16 positional)
     compile_model = True  # torch.compile for kernel fusion (~10-30% speedup on PyTorch 2+)
     # defalut parameters
     torch_default_dtype = torch.float32

@@ -627,8 +627,7 @@ class Trainer():
         # RMSE (deltaG)
         rmse = float(torch.sqrt(F.mse_loss(val_dg_pred, val_dg)).item())
         # ddG metrics
-        from sklearn.metrics import mean_squared_error
-        ddg_rmse = mean_squared_error(ddg_true, ddg_pred, squared=False) if len(ddg_true) > 1 else float('nan')
+        ddg_rmse = float(np.sqrt(np.mean((np.array(ddg_true) - np.array(ddg_pred))**2))) if len(ddg_true) > 1 else float('nan')
         # Pearson for ddG
         try:
             from scipy.stats import pearsonr

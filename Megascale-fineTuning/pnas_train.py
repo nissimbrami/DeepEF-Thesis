@@ -71,6 +71,15 @@ parser.add_argument('--epochs_unfreeze', type=int, default=None, help='Epochs wi
 parser.add_argument('--mini_batch_size', type=int, default=64, help='Mini-batch size for mutations within each protein')
 parser.add_argument('--emb_projection', type=str, default='none', choices=['none', 'mlp', 'low_rank'],
                     help='Embedding projection mode: none (raw concat), mlp (project to 16-dim), low_rank')
+# v2 improvements: serial fusion + learned AA
+parser.add_argument('--serial_fusion', action='store_true',
+                    help='Project PLM embeddings INTO GNN input for message-passing.')
+parser.add_argument('--serial_fusion_dim', type=int, default=64,
+                    help='Projection dim for serial fusion path.')
+parser.add_argument('--use_learned_aa', action='store_true',
+                    help='Use nn.Embedding(20,64) instead of static one-hot.')
+parser.add_argument('--aa_emb_dim', type=int, default=64,
+                    help='Learned AA embedding dimension.')
 
 args = parser.parse_args()
 
@@ -711,7 +720,10 @@ def run_training():
 
     # Create the model
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
-                light_attention=LIGHT_ATTENTION, emb_projection=args.emb_projection).to(DEVICE)
+                light_attention=LIGHT_ATTENTION, emb_projection=args.emb_projection,
+                gat_cutoff=12.0 if args.use_knn_gat else None,
+                serial_fusion=args.serial_fusion, serial_fusion_dim=args.serial_fusion_dim,
+                use_learned_aa=args.use_learned_aa, aa_emb_dim=args.aa_emb_dim).to(DEVICE)
     if PRETRAINED:
         try:
             model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
@@ -752,7 +764,10 @@ def run_validation_metrics():
     test_ds = DataLoader(test_ds, batch_size=1, shuffle=True)
     # Create the model
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
-                light_attention=LIGHT_ATTENTION, emb_projection=args.emb_projection).to(DEVICE)
+                light_attention=LIGHT_ATTENTION, emb_projection=args.emb_projection,
+                gat_cutoff=12.0 if args.use_knn_gat else None,
+                serial_fusion=args.serial_fusion, serial_fusion_dim=args.serial_fusion_dim,
+                use_learned_aa=args.use_learned_aa, aa_emb_dim=args.aa_emb_dim).to(DEVICE)
     if PRETRAINED:
         try:
             model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)

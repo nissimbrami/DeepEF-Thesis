@@ -42,6 +42,7 @@ DG_ML = True
 ONE_MUT = True
 DS_TYPE = 'pnas'
 DEBUG = False
+FULL_MEGASCALE = False  # When True, skip PNAS mutation filtering → use ALL mutations
 
 
 def parse_single_mutation(mut_type):
@@ -69,9 +70,10 @@ class SMDataset(Dataset):
         self.mutations_root_dir = mutations_root_dir
         self.train = train
 
-        # Get all protein directories
+        # Get all protein directories (skip hidden folders like .cache)
         all_proteins = [p for p in os.listdir(tensor_root_dir)
-                        if os.path.isdir(os.path.join(tensor_root_dir, p))]
+                        if os.path.isdir(os.path.join(tensor_root_dir, p))
+                        and not p.startswith('.')]
 
         # Test proteins from ThermoMPNN benchmark
         tm_df = pd.read_csv(TM_PATH)
@@ -80,15 +82,20 @@ class SMDataset(Dataset):
         train_candidates = [p for p in all_proteins if p not in test_protein_names]
 
         # Filter by PNAS protein list (removes homologs)
-        if DS_TYPE == 'pnas':
+        if DS_TYPE == 'pnas' and not FULL_MEGASCALE:
             pnas_proteins = pd.read_csv(PNAS_PROTEINS)['protein_name'].tolist()
             # Also remove proteins in mega_train (homologs to test set)
             tm_train = pd.read_csv(TM_TRAIN_PATH)['WT_name'].str.replace('.pdb', '', regex=False).unique().tolist()
             train_candidates = [p for p in train_candidates
                                 if p in pnas_proteins and p not in tm_train]
+        elif FULL_MEGASCALE:
+            # Full MegaScale: use ALL proteins EXCEPT test proteins
+            # Note: mega_train.csv contains the ThermoMPNN TRAINING split (safe to use)
+            # Only exclude the 28 test proteins (already excluded above via test_protein_names)
+            train_candidates = train_candidates  # no additional filtering needed
 
         self.train_proteins = train_candidates
-        self.pnas_mutations = pd.read_csv(PNAS_MUT)
+        self.pnas_mutations = pd.read_csv(PNAS_MUT) if not FULL_MEGASCALE else None
         self.test_mutations = pd.read_csv(TM_PATH)
 
         if DEBUG:
@@ -154,6 +161,23 @@ class SMDataset(Dataset):
                 return torch.cat([prott5, esmif], dim=-1)  # [L, 1536]
             return torch.cat([prott5, torch.zeros(seq_len, 512)], dim=-1)
 
+        elif EMB_TYPE == 'proteinmpnn':
+            path = os.path.join(protein_dir, 'proteinmpnn_feat.pt')
+            if os.path.exists(path):
+                emb = torch.load(path, weights_only=True).float()
+                return emb[:seq_len] if emb.shape[0] >= seq_len else emb
+            # Fallback to ProtT5
+            print(f"  WARNING: proteinmpnn_feat.pt not found in {protein_dir}, falling back to ProtT5")
+            return self._load_prott5_wt(protein_dir, seq_len)
+
+        elif EMB_TYPE == 'dual_proteinmpnn':
+            prott5 = self._load_prott5_wt(protein_dir, seq_len)  # [L, 1024]
+            mpnn_path = os.path.join(protein_dir, 'proteinmpnn_feat.pt')
+            if os.path.exists(mpnn_path):
+                mpnn = torch.load(mpnn_path, weights_only=True).float()[:seq_len]
+                return torch.cat([prott5, mpnn], dim=-1)  # [L, 1408]
+            return torch.cat([prott5, torch.zeros(seq_len, 384)], dim=-1)
+
         else:
             # Default: ProtT5 (1024-dim)
             return self._load_prott5_wt(protein_dir, seq_len)
@@ -182,8 +206,8 @@ class SMDataset(Dataset):
         """Parse mutations CSV into list of {pos, wt_idx, mut_idx, ddG} dicts."""
         mutations = []
 
-        # Filter by PNAS mutations list if in pnas mode
-        if self.train and DS_TYPE == 'pnas':
+        # Filter by PNAS mutations list if in pnas mode (skip if full_megascale)
+        if self.train and DS_TYPE == 'pnas' and not FULL_MEGASCALE and self.pnas_mutations is not None:
             valid_names = set(self.pnas_mutations['name'].tolist())
         elif not self.train and DS_TYPE in ('pnas', 'deepef1'):
             valid_names = set(self.test_mutations['name'].tolist())

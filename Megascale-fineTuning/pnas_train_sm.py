@@ -45,7 +45,7 @@ parser.add_argument('--lr_min', type=float, default=1e-6)
 parser.add_argument('--weight_decay', type=float, default=1e-5)
 parser.add_argument('--model_name', type=str, default='gnn_sm_seed42')
 parser.add_argument('--emb_type', type=str, default='prott5',
-                    choices=['prott5', 'esmif_enc', 'dual_esmif'])
+                    choices=['prott5', 'esmif_enc', 'dual_esmif', 'proteinmpnn', 'dual_proteinmpnn'])
 parser.add_argument('--emb_projection', type=str, default='none',
                     choices=['none', 'mlp', 'low_rank'])
 parser.add_argument('--use_knn_gat', action='store_true', default=True)
@@ -57,6 +57,19 @@ parser.add_argument('--verify_only', action='store_true',
                     help='Run verification checks only (5 proteins, 1 epoch)')
 parser.add_argument('--data_dir', type=str, default='./data/MsDs/training_data')
 parser.add_argument('--mut_dir', type=str, default='./data/MsDs/mutation_files')
+# --- New v2 flags ---
+parser.add_argument('--full_megascale', action='store_true',
+                    help='Use ALL mutations (skip PNAS filtering). ~200K+ mutations.')
+parser.add_argument('--serial_fusion', action='store_true',
+                    help='Project PLM embeddings INTO GNN input for message-passing.')
+parser.add_argument('--serial_fusion_dim', type=int, default=64,
+                    help='Projection dim for serial fusion path.')
+parser.add_argument('--use_learned_aa', action='store_true',
+                    help='Replace 20-dim one-hot with learned 64-dim AA embeddings.')
+parser.add_argument('--aa_emb_dim', type=int, default=64,
+                    help='Dimension for learned amino acid embeddings.')
+parser.add_argument('--antisymmetric_aug', action='store_true',
+                    help='Add reverse mutations (A->G ddG=x => G->A ddG=-x) as augmentation.')
 args = parser.parse_args()
 
 # ============================================================
@@ -74,7 +87,8 @@ def set_seed(seed):
 set_seed(args.seed)
 
 # Configure embedding dimensions
-EMB_DIMS = {'prott5': 1024, 'esmif_enc': 512, 'dual_esmif': 1536}
+EMB_DIMS = {'prott5': 1024, 'esmif_enc': 512, 'dual_esmif': 1536,
+            'proteinmpnn': 384, 'dual_proteinmpnn': 1408}
 CFG.emb_input_dim = EMB_DIMS[args.emb_type]
 CFG.emb_projection = args.emb_projection
 
@@ -88,6 +102,7 @@ dataset_sm.DG_ML = True
 dataset_sm.ONE_MUT = True
 dataset_sm.DS_TYPE = 'pnas'
 dataset_sm.DEBUG = args.debug or args.verify_only
+dataset_sm.FULL_MEGASCALE = args.full_megascale
 from dataset_sm import SMDataset, sm_collate_fn
 
 # ============================================================
@@ -101,6 +116,10 @@ def create_model():
         light_attention=True,
         emb_projection=args.emb_projection,
         gat_cutoff=12.0 if args.use_knn_gat else None,
+        serial_fusion=args.serial_fusion,
+        serial_fusion_dim=args.serial_fusion_dim,
+        use_learned_aa=args.use_learned_aa,
+        aa_emb_dim=args.aa_emb_dim,
     ).to(DEVICE)
     return model
 
@@ -134,11 +153,12 @@ def build_wt_graph(batch_item):
 # ============================================================
 # Compute ddG predictions from [L, 20] scores
 # ============================================================
-def compute_ddg_from_scores(scores, mutations):
+def compute_ddg_from_scores(scores, mutations, antisymmetric_aug=False):
     """
     Args:
         scores: [L, 20] amino acid preference scores
         mutations: list of dicts with 'pos', 'wt_idx', 'mut_idx', 'ddG'
+        antisymmetric_aug: if True, add reverse mutation (G->A, ddG=-x) for each A->G
     Returns:
         pred_ddg: [n_mutations] tensor
         true_ddg: [n_mutations] tensor
@@ -162,6 +182,12 @@ def compute_ddg_from_scores(scores, mutations):
         ddg_pred = scores[pos, mut_idx] - scores[pos, wt_idx]
         pred_list.append(ddg_pred)
         true_list.append(mut['ddG'])
+
+        # Antisymmetric augmentation: add reverse mutation as training signal
+        if antisymmetric_aug:
+            ddg_pred_rev = scores[pos, wt_idx] - scores[pos, mut_idx]
+            pred_list.append(ddg_pred_rev)
+            true_list.append(-mut['ddG'])
 
     if len(pred_list) == 0:
         return None, None
@@ -201,6 +227,10 @@ def train():
     print(f"  Seed: {args.seed}")
     print(f"  Embedding: {args.emb_type} (dim={CFG.emb_input_dim})")
     print(f"  Projection: {args.emb_projection}")
+    print(f"  Serial fusion: {args.serial_fusion} (dim={args.serial_fusion_dim})")
+    print(f"  Learned AA: {args.use_learned_aa} (dim={args.aa_emb_dim})")
+    print(f"  Antisymmetric aug: {args.antisymmetric_aug}")
+    print(f"  Full MegaScale: {args.full_megascale}")
     print(f"  k-NN GAT: {args.use_knn_gat} (k={args.knn_k})")
     print(f"  LR: {args.lr} -> {args.lr_min} (cosine)")
     print(f"  Epochs: {args.epochs}")
@@ -322,7 +352,8 @@ def train():
             scores = model(graph, f_type='subtract_mut', ca_coords=ca_coords)
 
             # Compute ddG from scores
-            pred_ddg, true_ddg = compute_ddg_from_scores(scores[0], item['mutations'])
+            pred_ddg, true_ddg = compute_ddg_from_scores(
+                scores[0], item['mutations'], antisymmetric_aug=args.antisymmetric_aug)
             if pred_ddg is None:
                 continue
 

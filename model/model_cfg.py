@@ -36,6 +36,12 @@ class CFG:
     emb_proj_hidden = 128    # hidden dim for MLP projection
     emb_proj_rank = 4        # bottleneck rank for low_rank projection
     emb_input_dim = 1024     # LLM embedding dimension
+    # Serial fusion: project PLM into GNN input so message-passing uses PLM signal
+    serial_fusion = False
+    serial_fusion_dim = 64   # projection dim for serial fusion path
+    # Learned amino acid embeddings (replaces 20-dim one-hot with nn.Embedding)
+    use_learned_aa = False
+    aa_emb_dim = 64          # learned AA embedding dimension
     #training parameters
     lr = 0.0001
     wd = 0.00001

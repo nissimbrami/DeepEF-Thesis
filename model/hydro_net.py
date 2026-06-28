@@ -293,7 +293,9 @@ class LowRankProjection(nn.Module):
 class PEM(torch.nn.Module):
     """Protein energy model"""
 
-    def __init__(self, layers, gaussian_coef,dropout_rate = 0.2, light_attention=False, emb_projection="none", gat_cutoff=None):
+    def __init__(self, layers, gaussian_coef, dropout_rate=0.2, light_attention=False,
+                 emb_projection="none", gat_cutoff=None, serial_fusion=False,
+                 serial_fusion_dim=64, use_learned_aa=False, aa_emb_dim=64):
         super().__init__()
 
         # Embedding projection config: "none", "mlp", "low_rank"
@@ -311,37 +313,59 @@ class PEM(torch.nn.Module):
         else:
             self.emb_projector = None
 
+        # Serial fusion: project PLM embeddings INTO the GNN input
+        self.serial_fusion = serial_fusion
+        self.serial_fusion_dim = serial_fusion_dim
+        if serial_fusion:
+            self.serial_projector = MLPProjection(
+                input_dim=CFG.emb_input_dim, hidden_dim=serial_fusion_dim * 2,
+                output_dim=serial_fusion_dim, dropout=dropout_rate)
+
+        # Learned amino acid embeddings (replaces 20-dim one-hot)
+        self.use_learned_aa = use_learned_aa
+        self.aa_emb_dim = aa_emb_dim
+        if use_learned_aa:
+            self.aa_embedding = nn.Embedding(20, aa_emb_dim)
+        aa_dim = aa_emb_dim if use_learned_aa else 20
+
         # Dimensions depend on whether embeddings are projected into GNN
         # When projected: emb_proj_dim added to GNN input, not concatenated after
         proj_extra = emb_proj_dim if self.emb_projector is not None else 0
+        serial_extra = serial_fusion_dim if serial_fusion else 0
         post_gnn_emb = 0 if self.emb_projector is not None else CFG.emb_input_dim
 
-        # GCN layers
-        gcn_dim_in = 36 + proj_extra  # 36 or 52
+        # GNN internal dimension (what the graph layers operate on)
+        # Base: 16 (dist) + aa_dim = 36 (default) or 16+aa_emb_dim (learned)
+        gnn_internal_dim = 16 + aa_dim + proj_extra + serial_extra
+        gcn_dim_in = gnn_internal_dim
         gcn_dim_h = 64
-        gcn_dim_out = 36 + proj_extra
+        gcn_dim_out = gnn_internal_dim
         self.graph_model_gcn = [GCN(gcn_dim_in, gcn_dim_h, gcn_dim_out, dropout_rate) for i in range(layers)]
-        # GAT layers
-        gat_dim_in = 36 + proj_extra  # 36 or 52
+        gat_dim_in = gnn_internal_dim
         gat_dim_h = 64
-        gat_dim_out = 36 + proj_extra
+        gat_dim_out = gnn_internal_dim
         self.graph_model_gat = [GAT(gat_dim_in, gat_dim_h, gat_dim_out, 8, dropout_rate) for i in range(layers)]
         # Gaussian coefficient
         self.gaussian_coef = gaussian_coef
         # graph attention layers
         self.GAT_layers = torch.nn.ModuleList(self.graph_model_gat)
         self.GCN_layers = torch.nn.ModuleList(self.graph_model_gcn)
-        # Fully connected layers - GCN
-        self.fc1_gcn = nn.Linear(52 + proj_extra, 64) # 52 = 32(dist) + 20(one-hot) [+ proj_extra]
+        # Fully connected layers - GCN (projects from raw features to GNN dim)
+        # GCN raw input: dist(16) + bonded(16) + aa_dim + proj_extra + serial_extra
+        gcn_fc_in = 16 + 16 + aa_dim + proj_extra + serial_extra
+        self.fc1_gcn = nn.Linear(gcn_fc_in, 64)
         self.fc2_gcn = nn.Linear(64, gcn_dim_in)
-        # Fully connected layers - GAT
-        self.fc1_gat = nn.Linear(36 + proj_extra, 64) # 36 = 16(dist) + 20(one-hot) [+ proj_extra]
+        # Fully connected layers - GAT (projects from raw features to GNN dim)
+        # GAT raw input: dist(16) + aa_dim + proj_extra + serial_extra
+        gat_fc_in = 16 + aa_dim + proj_extra + serial_extra
+        self.fc1_gat = nn.Linear(gat_fc_in, 64)
         self.fc2_gat = nn.Linear(64, gat_dim_in)
         # normalization layers
-        self.inst_norm1 = Normalization_layer(36 + proj_extra, affine=True)
-        self.inst_norm2 = Normalization_layer(2 * (36 + proj_extra), affine=True)
+        # GCN and GAT share the same internal dim, so use one norm layer (backward-compatible)
+        self.inst_norm1 = Normalization_layer(gnn_internal_dim, affine=True)
+        self.inst_norm2 = Normalization_layer(gcn_dim_out + gat_dim_out, affine=True)
         # Fc layers for the final output
-        fc_in_dim = 2 * (36 + proj_extra) + post_gnn_emb  # 72+1024 (none) or 104+0 (projected)
+        fc_in_dim = gcn_dim_out + gat_dim_out + post_gnn_emb
         self.fc1 = nn.Linear(fc_in_dim, 128)
         self.fc2 = nn.Linear(128, 1)
 
@@ -351,8 +375,9 @@ class PEM(torch.nn.Module):
         # energy epsilon
         self.energy_epsilon = 1
 
-        # embedding indexes
-        self.one_hot_index = -20
+        # embedding indexes — dynamically computed in forward
+        self.aa_dim = aa_dim
+        self.one_hot_index = -20  # legacy: used only without learned_aa
         self.bonded_index = 48
         self.non_bonded_index = 16
         self.llm_index = -(CFG.emb_input_dim + 20)  # dynamic based on embedding dim
@@ -389,29 +414,49 @@ class PEM(torch.nn.Module):
         # reshape x to [batch_size*n_nodes,features]
         B, N, _ = x.shape
         x = x.reshape(B * N,-1)
-        # split features to 2 graphs, bonded and non-bonded
-        x_gcn = torch.cat((x[:,:self.non_bonded_index+ self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
-        x_gat = torch.cat((x[:,:self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,36
-        x_emb_features = x[:,self.llm_index:self.one_hot_index] # B*N,1024
+        # split features: layout is [dist:16 | bonded:32 | emb:E | one_hot:20]
+        # GCN uses only first 16 of bonded (bonded-to-previous), matching original behavior
+        x_dist = x[:, :self.non_bonded_index]  # B*N, 16
+        x_bonded = x[:, self.non_bonded_index:self.non_bonded_index * 2]  # B*N, 16
+        x_emb_features = x[:, self.llm_index:self.one_hot_index]  # B*N, E (1024 or other)
+        x_onehot = x[:, self.one_hot_index:]  # B*N, 20
+
+        # Learned AA embeddings: convert one-hot to learned embedding
+        if self.use_learned_aa:
+            aa_indices = x_onehot.argmax(dim=-1)  # B*N
+            x_aa = self.aa_embedding(aa_indices)  # B*N, aa_emb_dim
+        else:
+            x_aa = x_onehot  # B*N, 20
+
+        # Build GCN input: dist(16) + bonded(16) + aa
+        x_gcn = torch.cat((x_dist, x_bonded, x_aa), dim=-1)  # B*N, 32+aa_dim
+        # Build GAT input: dist(16) + aa
+        x_gat = torch.cat((x_dist, x_aa), dim=-1)  # B*N, 16+aa_dim
 
         # Project embeddings and concatenate into GNN input, or keep for post-GNN concat
         if self.emb_projector is not None:
-            x_proj = self.emb_projector(x_emb_features) # B*N,1024 -> B*N,proj_dim
-            x_gcn = torch.cat((x_gcn, x_proj), dim=-1) # B*N, 52+proj_dim
-            x_gat = torch.cat((x_gat, x_proj), dim=-1) # B*N, 36+proj_dim
+            x_proj = self.emb_projector(x_emb_features)  # B*N, proj_dim
+            x_gcn = torch.cat((x_gcn, x_proj), dim=-1)
+            x_gat = torch.cat((x_gat, x_proj), dim=-1)
+
+        # Serial fusion: project PLM into GNN input for message-passing
+        if self.serial_fusion:
+            x_serial = self.serial_projector(x_emb_features)  # B*N, serial_fusion_dim
+            x_gcn = torch.cat((x_gcn, x_serial), dim=-1)
+            x_gat = torch.cat((x_gat, x_serial), dim=-1)
 
         # forward pass through the graph attention and convolution layers
-        x1 = self.forward_gcn(x_gcn, edge_index_gcn, B, N) # B*N,gcn_in -> B*N,gcn_out
-        x2 = self.forward_gat(x_gat, edge_index_gat, B, N) # B*N,gat_in -> B*N,gat_out
+        x1 = self.forward_gcn(x_gcn, edge_index_gcn, B, N)
+        x2 = self.forward_gat(x_gat, edge_index_gat, B, N)
         # concat features
-        x = torch.cat((x1,x2),dim=-1) # B*N, gcn_out+gat_out
+        x = torch.cat((x1,x2),dim=-1)
         # reshape to use instance norm
         x = x.reshape(B, N,-1)
         x = self.inst_norm2(x)
         x = x.reshape(B * N,-1)
         # Add raw LLM features only when no projection (original behavior)
         if self.emb_projector is None:
-            x = torch.cat((x,x_emb_features),dim=-1) # B*N,72+1024->B*N,1096
+            x = torch.cat((x,x_emb_features),dim=-1)
         # Light attention machanism
         if self.light_attention:
             x = x.reshape(B, N,-1)
@@ -441,9 +486,9 @@ class PEM(torch.nn.Module):
     def forward_gat(self, x, edge_index_gat, B, N):
         """forward function for the graph model"""
         identity = x # identity for the residual connection
-        x = self.fc1_gat(x) # N,36->N,64
+        x = self.fc1_gat(x) # N,gat_in->N,64
         x = F.relu(x)
-        x = self.fc2_gat(x) # N,64->N,36
+        x = self.fc2_gat(x) # N,64->N,gat_in
         # swap axis to use insrance norm
         x = x.reshape(B, N,-1)
         x = self.inst_norm1(x)
@@ -456,9 +501,9 @@ class PEM(torch.nn.Module):
 
     def forward_gcn(self, x, edge_index_gcn, B, N):
         """forward function for the graph model"""
-        x = self.fc1_gcn(x) # N,36->N,64
+        x = self.fc1_gcn(x) # N,gcn_in->N,64
         x = F.relu(x)
-        x = self.fc2_gcn(x) # N,64->N,36
+        x = self.fc2_gcn(x) # N,64->N,gcn_in
         # swap axis to use insrance norm
         x = x.reshape(B, N,-1)
         x = self.inst_norm1(x)

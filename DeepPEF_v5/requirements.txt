@@ -1,0 +1,15 @@
+# DeepPEF_v5 requirements
+# Install torch + torch_geometric matching your CUDA/CPU build first.
+# CPU-only smoke test: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Then: pip install torch_geometric
+# For real training set WANDB_MODE=disabled (see V5_README.md) to skip wandb login.
+
+torch>=2.0
+torch_geometric>=2.3
+pandas>=1.5
+numpy>=1.23
+scipy>=1.9
+scikit-learn>=1.1
+tqdm>=4.64
+matplotlib>=3.6
+wandb>=0.15

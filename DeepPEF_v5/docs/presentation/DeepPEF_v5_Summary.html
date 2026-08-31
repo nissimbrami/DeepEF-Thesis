@@ -1,0 +1,178 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>DeepPEF_v5 - Summary</title>
+<style>
+:root{--fg:#1a1a1a;--muted:#555;--acc:#DD8452;--blue:#4C72B0;--bg:#fff;--code:#f4f4f6;}
+*{box-sizing:border-box;}
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--fg);
+ line-height:1.55;max-width:900px;margin:0 auto;padding:2rem 1.4rem 5rem;background:var(--bg);}
+h1{font-size:2rem;border-bottom:3px solid var(--acc);padding-bottom:.3rem;}
+h2{font-size:1.35rem;color:var(--blue);margin-top:2rem;border-bottom:1px solid #eee;padding-bottom:.2rem;}
+code{background:var(--code);padding:.12em .4em;border-radius:4px;font-size:.9em;
+ font-family:SFMono-Regular,Consolas,monospace;}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem;}
+th,td{border:1px solid #ddd;padding:.4rem .6rem;text-align:left;vertical-align:top;}
+th{background:#f0f2f6;}
+.detail{display:inline-block;font-size:.8rem;background:var(--acc);color:#fff;border-radius:14px;
+ padding:.12rem .7rem;text-decoration:none;margin:.2rem 0 .5rem;}
+.detail:hover{background:#c96f38;}
+.toc{background:#f7f8fa;border:1px solid #e4e6eb;border-radius:10px;padding:1rem 1.4rem;margin:1.5rem 0;}
+.toc a{color:var(--blue);text-decoration:none;} .toc a:hover{text-decoration:underline;}
+.cover{text-align:center;padding:2rem 1rem 1rem;}
+.cover .sub{color:var(--muted);font-size:1.05rem;}
+.badge{display:inline-block;background:var(--acc);color:#fff;border-radius:20px;padding:.2rem .8rem;
+ font-size:.8rem;margin-top:.5rem;}
+blockquote{border-left:4px solid var(--acc);margin:1rem 0;padding:.4rem 1rem;background:#fff8f2;}
+hr{border:none;border-top:1px solid #e4e6eb;margin:2rem 0;}
+</style></head><body>
+<div class='cover'><h1 style='border:none;font-size:2.2rem'>DeepPEF&nbsp;v5 &mdash; Summary</h1><div class='sub'>Every topic in one screen each &mdash; biology, architecture, the six levers, metrics, losses, dataset, pretraining, and the physics rationale. No topic omitted.</div><div class='badge'>Each topic links to full detail &rarr; <code>DeepPEF_v5_Teaching.html</code></div></div>
+<div class='toc'><b>Contents</b><ol>
+<li><a href='#s0'>1. The core idea (biology)</a></li>
+<li><a href='#s1'>2. The dimension contract</a></li>
+<li><a href='#s2'>3. The two-tower architecture</a></li>
+<li><a href='#s3'>4. The six levers A&ndash;F</a></li>
+<li><a href='#s4'>5. Evaluation metrics</a></li>
+<li><a href='#s5'>6. Loss functions</a></li>
+<li><a href='#s6'>7. Dataset biology</a></li>
+<li><a href='#s7'>8. EBM pretraining theory</a></li>
+<li><a href='#s8'>9. Why physics-grounded</a></li>
+<li><a href='#s9'>10. Verification & limitations</a></li>
+</ol></div>
+<hr/>
+<h2 id='s0'>1. The core idea (biology)</h2>
+<a class='detail' href='DeepPEF_v5_Teaching.html#the-six-levers-a-f'>Full detail &rarr;</a>
+
+<p>Protein <b>stability</b> = folding free energy. The model computes two energies from the
+<i>same</i> backbone coordinates and subtracts them:</p>
+<blockquote><b>dG = E<sub>unfolded</sub> &minus; E<sub>folded</sub></b> &nbsp;&nbsp;
+<b>ddG = dG<sub>mut</sub> &minus; dG<sub>wt</sub></b></blockquote>
+<p><b>Folded graph</b> = real 3D contacts (all pairwise distances). <b>Unfolded graph</b> = same
+coords but reduced to the linear backbone chain (a random-coil reference). The difference is the
+model's reward for forming 3D contacts. A mutation keeps the coordinates fixed but changes the
+sequence one-hot + PLM embedding, so ddG isolates the sequence-driven stability change.</p>
+
+<hr/>
+<h2 id='s1'>2. The dimension contract</h2>
+<a class='detail' href='DeepPEF_v5_Teaching.html#'>Full detail &rarr;</a>
+
+<p>Every tensor width derives from <b>one</b> config object (<code>model_cfg_v5.CFG</code>) read by
+both the graph builder and the model. Node feature layout:</p>
+<blockquote><code>[ D(16 distance) | Fb(32 bonded) | (burial b) | emb(E=1024 ProtT5) | one_hot(20) ]</code></blockquote>
+<p><code>one_hot</code> always stays last (sliced from the right). Because widths come from one
+source, every lever's default reproduces the baseline tensors <b>bit-for-bit</b>.</p>
+
+<hr/>
+<h2 id='s2'>3. The two-tower architecture</h2>
+<a class='detail' href='DeepPEF_v5_Teaching.html#visual-representations'>Full detail &rarr;</a>
+
+<p>Two GNN towers run <b>in parallel</b>, are concatenated, re-joined with the raw PLM embedding,
+passed through light attention, and mapped to a per-residue energy that is summed:</p>
+<table>
+<tr><th>Stage</th><th>Width (baseline)</th></tr>
+<tr><td>GCN input <code>[dist|bonded|aa]</code></td><td>52 &rarr; internal 36</td></tr>
+<tr><td>GAT input <code>[dist|aa]</code></td><td>36 &rarr; internal 36</td></tr>
+<tr><td>concat(GCN,GAT)</td><td>36 + 36 = <b>72</b></td></tr>
+<tr><td>+ raw emb</td><td>72 + 1024 = <b>1096</b> (= <code>fc_in_dim</code>)</td></tr>
+<tr><td>fc1 &rarr; fc2</td><td>1096 &rarr; 128 &rarr; K (K=1 scalar)</td></tr>
+<tr><td>energy</td><td>E = &Sigma; per-residue (extensive; &divide;L if <code>length_norm</code>)</td></tr>
+</table>
+<p>GCN uses <b>sequential</b> backbone edges (i, i+1); GATv2 uses <b>spatial</b> k-NN / distance-cutoff edges.</p>
+
+<hr/>
+<h2 id='s3'>4. The six levers A&ndash;F</h2>
+<a class='detail' href='DeepPEF_v5_Teaching.html#the-six-levers-a-f'>Full detail &rarr;</a>
+
+<p>All flag-gated; <b>default OFF = exact baseline</b>. Change one lever per ablation rung.</p>
+<table>
+<tr><th>Lever</th><th>Flag</th><th>Effect</th><th>Shape impact</th></tr>
+<tr><td>A</td><td><code>--energy_terms K</code></td><td>fc2 emits K per-residue energy terms (K=1 = today's scalar)</td><td>head 128&rarr;K, sum&rarr;scalar</td></tr>
+<tr><td>B</td><td><code>--rbf_centers M</code></td><td>M RBFs summed back to width 16 (dimension-preserving)</td><td>NONE</td></tr>
+<tr><td>C</td><td><code>--use_burial</code></td><td>CB neighbor-density scalar inserted before emb</td><td>+b node dims</td></tr>
+<tr><td>D</td><td><code>--flory_unfolded</code></td><td>random-coil unfolded reference d~|i&minus;j|<sup>&nu;</sup> (value-only)</td><td>NONE</td></tr>
+<tr><td>E</td><td><code>--denoise_weight w</code></td><td>aux head predicts injected coord noise (train only)</td><td>+aux head</td></tr>
+<tr><td>F</td><td><code>--gcn_span S</code>, <code>--use_edge_features</code></td><td>span-S GCN edges + 41-d GAT edge_attr</td><td>edges only</td></tr>
+</table>
+<p><b>Composability:</b> A/E are orthogonal to widths; B preserves width; D is value-only; C changes
+node width and F changes edges &mdash; all compose via the CFG single source of truth.</p>
+
+<hr/>
+<h2 id='s4'>5. Evaluation metrics</h2>
+<a class='detail' href='DeepPEF_v5_Teaching.html#evaluation-metrics'>Full detail &rarr;</a>
+
+<ul>
+<li><b>PCC</b> (primary) <code>r = cov(p,y)/(&sigma;_p&sigma;_y)</code> &mdash; linear trend,
+shift/scale-invariant. Historical best <b>~0.5259</b>.</li>
+<li><b>Spearman &rho;</b> &mdash; Pearson on ranks; monotonic ordering, outlier-robust.</li>
+<li><b>RMSE</b> <code>sqrt(mean((p&minus;y)&sup2;))</code> &mdash; absolute error (diagnostic; energy is relative units).</li>
+</ul>
+
+<hr/>
+<h2 id='s5'>6. Loss functions</h2>
+<a class='detail' href='DeepPEF_v5_Teaching.html#loss-functions'>Full detail &rarr;</a>
+
+<p><code>loss = primary + reg + energy_reg + rank + corr (+ denoise, Lever E)</code></p>
+<ul>
+<li><b>Huber(&delta;=1)</b> &mdash; MSE near zero, L1 far out; robust to noisy labels.</li>
+<li><b>Margin ranking</b> <code>max(0, &minus;s&middot;&Delta;p + margin)</code> &mdash; optimizes pairwise order (weight 0.1).</li>
+<li><b>Energy reg</b> <code>0.001&middot;mean(E&sup2;)</code> &mdash; anchors the extensive energy scale.</li>
+<li><b>Pearson loss</b> <code>1&minus;r</code>; <b>CCC loss</b> <code>1&minus;CCC</code> &mdash; CCC also penalizes shift + scale (agreement about the 1:1 line).</li>
+<li><b>Denoise MSE</b> (Lever E) &mdash; consistency under structural noise.</li>
+</ul>
+
+<hr/>
+<h2 id='s6'>7. Dataset biology</h2>
+<a class='detail' href='DeepPEF_v5_Teaching.html#dataset-biology'>Full detail &rarr;</a>
+
+<ul>
+<li><b>Tsuboyama et al. 2023</b> mega-scale dataset (~hundreds of thousands of domains/mutants).</li>
+<li><b>K50 cDNA-display proteolysis assay</b> &mdash; folded proteins resist protease; K50 = protease
+concentration at the cleavage midpoint; converted to folding free energy dG. Higher K50 = more stable.</li>
+<li><b>Clamp dG to [&minus;1, 5] kcal/mol</b> (<code>--dg_ml</code>) &mdash; the assay's dynamic range; outside it, values are extrapolations.</li>
+<li><b>Single mutations + PNAS curation</b> (<code>--one_mut</code>) &mdash; quality &gt; quantity;
+adding unfiltered data <i>hurt</i> performance.</li>
+<li><b>ThermoMPNN</b> (ProteinMPNN inverse-folding competitor) proteins + homologs are <b>held out</b> to prevent test leakage.</li>
+</ul>
+
+<hr/>
+<h2 id='s7'>8. EBM pretraining theory</h2>
+<a class='detail' href='DeepPEF_v5_Teaching.html#ebm-pretraining'>Full detail &rarr;</a>
+
+<ul>
+<li><b>Native = energy minimum:</b> train the energy landscape so the native folded state is lowest.</li>
+<li><b>InfoNCE / Boltzmann contrastive:</b> <code>L = E_native/&tau; + log &Sigma; exp(&minus;E_k/&tau;)</code>;
+negatives = decoy sequence, decoy structure, unfolded, cyclic permutations.</li>
+<li><b>Denoising Score Matching (DSM):</b> teach the gradient to point back to native under noise
+(<code>v&middot;&nabla;E &asymp; v&middot;(&minus;noise/&sigma;&sup2;)</code>, finite-difference estimate).</li>
+<li><b>Connection to Lever E:</b> DSM builds the force field; Lever E keeps it intact during ddG fine-tuning.</li>
+</ul>
+
+<hr/>
+<h2 id='s8'>9. Why physics-grounded</h2>
+<a class='detail' href='DeepPEF_v5_Teaching.html#why-physics-grounded'>Full detail &rarr;</a>
+
+<p>The bet is <b>architectural</b> &mdash; build thermodynamics into the model:</p>
+<ol>
+<li><b>Folded&minus;unfolded difference</b> mirrors the thermodynamic cycle.</li>
+<li><b>Extensive (summed) energy</b> is additive over residues (interpretable per-residue terms).</li>
+<li><b>Flory / unfolded reference</b> makes the difference meaningful.</li>
+</ol>
+<p>This shrinks the hypothesis space to physically plausible functions &rarr; better data
+efficiency, interpretability, and generalization. Trade-off: constraints may cap raw accuracy vs a
+purely data-driven, inverse-folding-pretrained competitor. That is the research question.</p>
+
+<hr/>
+<h2 id='s9'>10. Verification & limitations</h2>
+<a class='detail' href='DeepPEF_v5_Teaching.html#limitations'>Full detail &rarr;</a>
+
+<ul>
+<li><b>CPU smoke test</b> runs baseline + each lever on synthetic data (no GPU, no real data).</li>
+<li><b>Baseline regression:</b> default flags &rArr; no denoise/edge params, fc2=(K=1), burial_dim=0, gcn_span=1.</li>
+<li><b>Fail-fast</b> checks name the offending lever on any width mismatch.</li>
+<li><b>GPU ablation ladder</b> measures PCC one lever at a time.</li>
+</ul>
+<p><b>Limitations:</b> no inverse-folding pretraining in baseline; fixed WT structure per protein;
+extensive energy confounds length; relative-unit energy (RMSE is diagnostic); glycine virtual-CB
+caveat; ESM-IF 1536-dim broadcast alignment relies on the CFG contract.</p>
+<p><code>python DeepPEF_v5/tests/smoke_test.py</code> &rarr; all configs PASS.</p>
+
+</body></html>

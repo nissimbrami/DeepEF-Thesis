@@ -43,15 +43,16 @@ def parse():
     p.add_argument('--use_learned_aa', action='store_true')
     p.add_argument('--emb_type', type=str, default='prott5')
     p.add_argument('--emb_projection', type=str, default='none')
-    # Levers that CHANGE parameter shapes (A, C, E, F) MUST match training so load_state_dict works.
-    # B (rbf) and D (flory) are shape-preserving/value-only so they do NOT affect state_dict loading;
-    # they are omitted here (they only change how graphs are built at TRAIN time, not the params).
+    # Levers that CHANGE parameter shapes (A, C, E, F, G-mutation_delta) MUST match training so
+    # load_state_dict works. B (rbf), D (flory + afrc) and G-antisymmetry are shape-preserving /
+    # value-only / train-only, so they do NOT affect state_dict loading and are omitted here.
     p.add_argument('--energy_terms', type=int, default=1)            # A
     p.add_argument('--use_burial', action='store_true')              # C
     p.add_argument('--burial_radius', type=float, default=10.0)      # C
     p.add_argument('--denoise_weight', type=float, default=0.0)      # E
     p.add_argument('--gcn_span', type=int, default=1)                # F
     p.add_argument('--use_edge_features', action='store_true')       # F
+    p.add_argument('--mutation_delta', action='store_true')          # G (shape-changing)
     return p.parse_args()
 
 
@@ -88,6 +89,11 @@ def main():
         train_argv += ['--gcn_span', str(args.gcn_span)]
     if args.use_edge_features:
         train_argv.append('--use_edge_features')
+    # Lever G mutation_delta changes node widths (fc1_gcn/fc1_gat/gnn dims), so it MUST be
+    # forwarded for load_state_dict to match. antisymmetry_weight / flory_afrc are train-only /
+    # value-only and do NOT affect the state_dict, so they are omitted here.
+    if args.mutation_delta:
+        train_argv.append('--mutation_delta')
 
     saved_argv = sys.argv
     sys.argv = train_argv

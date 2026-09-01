@@ -114,6 +114,10 @@ parser.add_argument('--flory_unfolded', action='store_true',
                     help='Lever D: use Flory random-coil |i-j|^nu unfolded reference instead of tridiagonal.')
 parser.add_argument('--flory_nu', type=float, default=0.5,
                     help='Lever D: Flory scaling exponent nu (0.5 ideal chain, ~0.588 good solvent).')
+parser.add_argument('--flory_afrc', action='store_true',
+                    help='Lever D+: use AFRC sequence-specific random-coil distance map as the unfolded '
+                         'reference (requires --flory_unfolded; needs `pip install afrc`, falls back to '
+                         'analytic coil if absent). IFUM-style unfolded distogram.')
 parser.add_argument('--denoise_weight', type=float, default=0.0,
                     help='Lever E: weight of the auxiliary coordinate-denoising MSE loss (0 = off).')
 parser.add_argument('--denoise_sigma', type=float, default=0.3,
@@ -124,6 +128,14 @@ parser.add_argument('--gcn_span', type=int, default=1,
                     help='Lever F: connect GCN edges up to +/-S sequence offsets (1 = baseline i,i+1 only).')
 parser.add_argument('--use_edge_features', action='store_true',
                     help='Lever F: feed GATv2 a 41-dim edge_attr [onehot_src|onehot_dst|dist].')
+parser.add_argument('--mutation_delta', action='store_true',
+                    help='Lever G: append (emb_mut - emb_wt) delta block to node features so the model '
+                         'sees WHAT CHANGED, not just the whole mutant embedding (JanusDDG-style).')
+parser.add_argument('--antisymmetry_weight', type=float, default=0.0,
+                    help='Lever G: weight of the antisymmetry loss enforcing ddG(A->B) = -ddG(B->A) via '
+                         'a reverse-mutation pass (train only; 0 = off = baseline).')
+parser.add_argument('--reverse_mut_prob', type=float, default=0.5,
+                    help='Lever G: probability of building the reverse mutation for the antisymmetry term.')
 
 args = parser.parse_args()
 
@@ -204,15 +216,21 @@ CFG.burial_dim = 1 if args.use_burial else 0
 CFG.burial_radius = args.burial_radius
 CFG.flory_unfolded = args.flory_unfolded             # D
 CFG.flory_nu = args.flory_nu
+CFG.flory_afrc = args.flory_afrc                     # D+
 CFG.denoise_weight = args.denoise_weight             # E
 CFG.denoise_sigma = args.denoise_sigma
 CFG.denoise_prob = args.denoise_prob
 CFG.gcn_span = args.gcn_span                         # F
 CFG.use_edge_features = args.use_edge_features
+CFG.mutation_delta = args.mutation_delta             # G
+CFG.mutation_delta_dim = CFG.emb_input_dim if args.mutation_delta else 0
+CFG.antisymmetry_weight = args.antisymmetry_weight
+CFG.reverse_mut_prob = args.reverse_mut_prob
 print(f"[v5 levers] A energy_terms={CFG.energy_terms} | B rbf_centers={CFG.rbf_centers} | "
-      f"C use_burial={CFG.use_burial} | D flory_unfolded={CFG.flory_unfolded} | "
-      f"E denoise_weight={CFG.denoise_weight} | F gcn_span={CFG.gcn_span} "
-      f"use_edge_features={CFG.use_edge_features}")
+      f"C use_burial={CFG.use_burial} | D flory_unfolded={CFG.flory_unfolded} "
+      f"afrc={CFG.flory_afrc} | E denoise_weight={CFG.denoise_weight} | F gcn_span={CFG.gcn_span} "
+      f"use_edge_features={CFG.use_edge_features} | G mutation_delta={CFG.mutation_delta} "
+      f"antisymmetry_weight={CFG.antisymmetry_weight}")
 
 # Constants
 COORDS = 'coords_tensor.pt'
@@ -621,6 +639,21 @@ class Trainer():
                         loss = loss + dn_term
                         dn_loss_val = dn_term.item()
 
+                    # Lever G: antisymmetry loss. Penalize ddG(WT->mut) + ddG(mut->WT) != 0 using a
+                    # reverse-mutation pass (JanusDDG-style). ddG here is per-variant dG minus the
+                    # WT (index 0) dG. Weight 0 -> no reverse pass -> exact baseline.
+                    anti_loss_val = 0.0
+                    anti_w = float(getattr(CFG, 'antisymmetry_weight', 0.0))
+                    if (anti_w > 0 and getattr(CFG, 'mutation_delta', False)
+                            and torch.rand(1).item() < float(getattr(CFG, 'reverse_mut_prob', 0.5))
+                            and output.size(0) > 1):
+                        rev_output = self.get_deltaG_reverse(batch, j)
+                        ddg_fwd = output - output[0]          # ddG(WT->mut)
+                        ddg_rev = rev_output - rev_output[0]  # ddG(mut->WT)
+                        anti_term = anti_w * (ddg_fwd + ddg_rev).pow(2).mean()
+                        loss = loss + anti_term
+                        anti_loss_val = anti_term.item()
+
                     # Scale loss for gradient accumulation
                     scaled_loss = loss / self.grad_accum_steps
                     scaled_loss.backward()
@@ -649,6 +682,8 @@ class Trainer():
                         log_dict['corr_loss'] = corr_loss.item()
                     if dn_loss_val:
                         log_dict['denoise_loss'] = dn_loss_val
+                    if anti_loss_val:
+                        log_dict['antisymmetry_loss'] = anti_loss_val
                     wandb_log(log_dict, run)
 
             # Handle remaining accumulated gradients at end of epoch
@@ -774,12 +809,44 @@ class Trainer():
         print(f'  Epoch {epoch} | PCC: {pc_corr:.4f} | Spearman: {sp_corr:.4f} | RMSE: {rmse:.4f} | ddG PCC: {ddg_pearson_corr:.4f}')
         return pc_corr, val_loss, val_df
 
+    def _energy_split(self, all_graph, coords):
+        """Compute GAT edge coords (k-NN cutoff or Lever-F edge features), run the model, and
+        split the stacked [folded; unfolded] energies. Shared by get_deltaG and its reverse pass.
+
+        `coords` must be the UN-NOISED backbone [L,4,3]: denoising perturbs the folded GRAPH's
+        node features, never the edge topology, so ca_coords always derive from the true coords.
+        """
+        ca_coords = None
+        if USE_KNN:
+            ca_pos = coords[:, 1, :]  # CA is atom index 1 (N=0, CA=1, C=2, CB=3)
+            dists = torch.cdist(ca_pos.unsqueeze(0), ca_pos.unsqueeze(0)).squeeze(0)  # [N, N]
+            k = min(KNN_K, dists.size(0) - 1)
+            kth_dist, _ = dists.topk(k + 1, dim=1, largest=False)  # +1: self-distance=0
+            self.model.gat_cutoff = kth_dist[:, -1].max().item()  # max k-th distance = cutoff
+            ca_coords = ca_pos.unsqueeze(0).expand(all_graph.size(0), -1, -1)
+        elif getattr(self.model, 'use_edge_features', False):
+            # Lever F: edge features need CA coords even when k-NN GAT is off (topology unchanged).
+            ca_pos = coords[:, 1, :]
+            ca_coords = ca_pos.unsqueeze(0).expand(all_graph.size(0), -1, -1)
+        energy = self.model(all_graph, ca_coords=ca_coords)
+        folded = energy[:energy.size(0) // 2]
+        unfolded = energy[energy.size(0) // 2:]
+        return folded, unfolded
+
     def get_deltaG(self, batch, i, train=False):
         # move all to the same device
         one_hot_minibatch = batch['one_hot'][0,i: i + self.mini_batch_size].to(self.device)
         prott5_embedding_minibatch = batch['prott5'][0,i: i + self.mini_batch_size].to(self.device)
         batch['coords'] = batch['coords'].to(self.device)
         batch['masks'] = batch['masks'].to(self.device)
+
+        # Lever G: mutation-delta node feature (emb_mut - emb_wt). Index 0 of the batch is always
+        # the wild-type (new_dataset adds iloc[0] as the WT reference for the ddG calculation), so
+        # its embedding is the WT reference every mutant subtracts. Off -> None -> exact baseline.
+        emb_delta_minibatch = None
+        if getattr(CFG, 'mutation_delta', False):
+            emb_wt = batch['prott5'][0, 0].to(self.device)  # [L, E]
+            emb_delta_minibatch = prott5_embedding_minibatch - emb_wt.unsqueeze(0)  # [nb, L, E]
 
         # Lever E: denoising. During training (with probability CFG.denoise_prob) inject Gaussian
         # coordinate noise into the FOLDED structure and ask the model to predict it back. The
@@ -799,43 +866,20 @@ class Trainer():
             denoise_target = noise  # [L, 4, 3] — what the head must recover
 
         # get the graph
+        def _delta(j):
+            return emb_delta_minibatch[j].squeeze() if emb_delta_minibatch is not None else None
         folded_graph_minibatch = torch.stack(
-            [get_graph(coords_folded, one_hot_minibatch[j].squeeze(), prott5_embedding_minibatch[j].squeeze(), batch['masks'].squeeze()) for j in
+            [get_graph(coords_folded, one_hot_minibatch[j].squeeze(), prott5_embedding_minibatch[j].squeeze(), batch['masks'].squeeze(), emb_delta=_delta(j)) for j in
             range(prott5_embedding_minibatch.size(0))])
         unfolded_graph_minibatch = torch.stack(
-            [get_unfolded_graph(batch['coords'].squeeze(), one_hot_minibatch[j].squeeze(), prott5_embedding_minibatch[j].squeeze(), batch['masks'].squeeze()) for j in
+            [get_unfolded_graph(batch['coords'].squeeze(), one_hot_minibatch[j].squeeze(), prott5_embedding_minibatch[j].squeeze(), batch['masks'].squeeze(), emb_delta=_delta(j)) for j in
             range(prott5_embedding_minibatch.size(0))])
 
         all_graph_minibatch = torch.cat([folded_graph_minibatch, unfolded_graph_minibatch], dim=0)
 
-        # k-NN GAT: compute CA coordinates for distance-based edges
-        ca_coords = None
-        if USE_KNN:
-            # CA is atom index 1 (N=0, CA=1, C=2, CB=3)
-            coords_squeezed = batch['coords'].squeeze()  # [seq_len, 4, 3]
-            ca_pos = coords_squeezed[:, 1, :]  # [seq_len, 3]
-            # Compute k-NN based cutoff: find the distance that includes k nearest neighbors
-            dists = torch.cdist(ca_pos.unsqueeze(0), ca_pos.unsqueeze(0)).squeeze(0)  # [N, N]
-            # For each residue, get the k-th nearest neighbor distance
-            k = min(KNN_K, dists.size(0) - 1)
-            kth_dist, _ = dists.topk(k + 1, dim=1, largest=False)  # +1 because self-distance=0
-            cutoff = kth_dist[:, -1].max().item()  # use max k-th distance as cutoff
-            # Expand ca_coords for the full batch (folded + unfolded)
-            batch_size = all_graph_minibatch.size(0)
-            ca_coords = ca_pos.unsqueeze(0).expand(batch_size, -1, -1)
-            # Temporarily set model's gat_cutoff
-            self.model.gat_cutoff = cutoff
-        elif getattr(self.model, 'use_edge_features', False):
-            # Lever F: edge features need CA coordinates for the pairwise-distance term even
-            # when k-NN GAT is off. Provide them without changing the (fully-connected) topology.
-            coords_squeezed = batch['coords'].squeeze()  # [seq_len, 4, 3]
-            ca_pos = coords_squeezed[:, 1, :]  # [seq_len, 3]
-            batch_size = all_graph_minibatch.size(0)
-            ca_coords = ca_pos.unsqueeze(0).expand(batch_size, -1, -1)
-
-        minibatch_energy = self.model(all_graph_minibatch, ca_coords=ca_coords)
-        folded_energy = minibatch_energy[:minibatch_energy.size(0) // 2]
-        unfolded_energy = minibatch_energy[minibatch_energy.size(0) // 2:]
+        # k-NN GAT / edge-feature CA coords + model forward + folded/unfolded split. Uses the
+        # UN-NOISED coords (denoise only perturbs the folded GRAPH, not the edge topology).
+        folded_energy, unfolded_energy = self._energy_split(all_graph_minibatch, batch['coords'].squeeze())
 
         # Lever E: denoise auxiliary loss (folded half only; head predicts injected noise).
         denoise_loss = None
@@ -846,6 +890,40 @@ class Trainer():
             denoise_loss = F.mse_loss(pred_folded, target)
 
         return unfolded_energy - folded_energy, unfolded_energy, folded_energy, denoise_loss
+
+    def get_deltaG_reverse(self, batch, i):
+        """Lever G — reverse-mutation pass for the antisymmetry constraint.
+
+        Physical antisymmetry: ddG(WT->mut) = -ddG(mut->WT). We realize the reverse mutation by
+        treating each MUTANT as the reference and each variant's target as the WT, which only
+        changes the model output when the mutation-delta feature (Lever G) is on: the delta block
+        flips sign (emb_wt - emb_mut instead of emb_mut - emb_wt) and the amino-acid one-hot /
+        embedding are the WT's. We return the reverse per-variant dG so the trainer can penalize
+        (ddG_fwd + ddG_rev)^2. Train-only; never called in validation.
+        """
+        one_hot_mb = batch['one_hot'][0, i: i + self.mini_batch_size].to(self.device)
+        prott5_mb = batch['prott5'][0, i: i + self.mini_batch_size].to(self.device)
+        emb_wt = batch['prott5'][0, 0].to(self.device)          # [L, E]
+        one_hot_wt = batch['one_hot'][0, 0].to(self.device)     # [L, 20]
+        coords = batch['coords'].squeeze()
+        masks = batch['masks'].squeeze()
+
+        # Reverse: sequence/embedding become the WT; delta = emb_wt - emb_mut (sign-flipped).
+        def _rev_delta(j):
+            if not getattr(CFG, 'mutation_delta', False):
+                return None
+            return (emb_wt - prott5_mb[j]).squeeze()
+
+        folded = torch.stack(
+            [get_graph(coords, one_hot_wt.squeeze(), emb_wt.squeeze(), masks, emb_delta=_rev_delta(j))
+             for j in range(prott5_mb.size(0))])
+        unfolded = torch.stack(
+            [get_unfolded_graph(coords, one_hot_wt.squeeze(), emb_wt.squeeze(), masks, emb_delta=_rev_delta(j))
+             for j in range(prott5_mb.size(0))])
+        all_graph = torch.cat([folded, unfolded], dim=0)
+
+        folded_e, unfolded_e = self._energy_split(all_graph, coords)
+        return unfolded_e - folded_e  # reverse per-variant dG
 
 
 def run_training():

@@ -13,7 +13,7 @@ can be ablated one at a time.
 | dual_esmif embeddings | `--emb_type dual_esmif` | ProtT5(1024)+ESM-IF1(512) structural prior | `training/new_dataset.py` |
 | Seed ensemble | `training/ensemble_v5.py` | average dG across seeds | `training/ensemble_v5.py` |
 
-## Proposal levers A–F (physics-grounded, flag-gated, ablatable)
+## Proposal levers A–G (physics-grounded, flag-gated, ablatable)
 These are the thesis-proposal research directions. Every lever's **default reproduces the baseline
 bit-for-bit** (verified by the CPU smoke test + a state_dict regression check). See
 `docs/RESEARCH_PROPOSAL.md` for physics motivation and `docs/TEACHING_*.md` for teaching material.
@@ -24,11 +24,15 @@ bit-for-bit** (verified by the CPU smoke test + a state_dict regression check). 
 | **B. RBF distance bank** | `--rbf_centers M` `--rbf_min` `--rbf_max` | `M=0` | Replace the single Gaussian distance kernel with M RBFs summed back to width 16 (dimension-preserving). M=0 = single Gaussian = today. |
 | **C. Burial / solvation** | `--use_burial` `--burial_radius` | off, `burial_dim=0` | Insert a per-residue CB neighbor-density scalar BEFORE emb: `[D\|Fb\|burial\|emb\|onehot]`. Fed to both GNN towers; widths grow by 1. |
 | **D. Flory unfolded reference** | `--flory_unfolded` `--flory_nu` | off | Model the unfolded state as a random coil (`d~\|i−j\|^ν`) instead of tridiagonal. Value-only; shapes unchanged. |
+| **D+. AFRC unfolded reference** | `--flory_afrc` (needs `--flory_unfolded`) | off | Use the Analytical Flory Random Coil (idptools/afrc) SEQUENCE-SPECIFIC ensemble-average distance map as the unfolded reference — the same random-coil-distogram idea IFUM (Lee et al., *Nat. Commun.* 2026) used to reach SOTA on this fold−unfold approach. `pip install afrc`; falls back to the analytic coil if absent. Value-only. |
 | **E. Decoys + denoising head** | `--denoise_weight w` `--denoise_sigma` `--denoise_prob` | `w=0` | Train-only aux MLP predicts injected coordinate noise on the folded structure. Head absent when w=0. |
 | **F. Edge features + connectivity** | `--gcn_span S` `--use_edge_features` | `S=1`, off | (i) GCN offsets 1..S both directions (S=1 = i,i+1 = today). (ii) GATv2 consumes a 41-dim edge feature `[onehot_src(20)\|onehot_dst(20)\|dist(1)]`. |
+| **G. Antisymmetry + mutation-delta** | `--mutation_delta` `--antisymmetry_weight w` `--reverse_mut_prob p` | off, `w=0` | The JanusDDG lever (arXiv:2504.03278, U. Turin; S669 PCC 0.69 sequence-only). `--mutation_delta` appends a `(emb_mut − emb_wt)` block after emb so both GNN towers see WHAT CHANGED (width change). `--antisymmetry_weight` adds a train-only reverse-mutation loss enforcing `ddG(A→B) = −ddG(B→A)`. |
 
-Composability: A/E are orthogonal to widths; B is dimension-preserving; D is value-only; C (node
-width) and F (edges) compose because all widths derive from `model_cfg_v5.CFG`.
+Composability: A/E are orthogonal to widths; B is dimension-preserving; D/D+ are value-only;
+C and G change node width, F changes edges — all compose because every width derives from
+`model_cfg_v5.CFG`. The antisymmetry loss (G) is only meaningful together with `--mutation_delta`
+(otherwise the forward/reverse dG are algebraically identical and the penalty is a no-op).
 
 ## Standalone package + smoke test (no GPU / no real data)
 `DeepPEF_v5/` runs independently. Paths resolve via (in priority order): `--data_root` CLI arg →
@@ -46,7 +50,7 @@ python DeepPEF_v5/tests/smoke_test.py     # exit 0 = all configs passed (CI-frie
 python DeepPEF_v5/training/pnas_train_v5.py --data_root /path/to/data ...   # or: export DEEPPEF_DATA_ROOT=...
 ```
 The smoke test generates a tiny synthetic dataset, forces CPU + `WANDB_MODE=disabled` + `--debug`,
-then runs 1 train step + 1 validation + `get_deltaG` for the baseline AND each lever (A–F) and
+then runs 1 train step + 1 validation + `get_deltaG` for the baseline AND each lever (A–G) and
 asserts finite outputs + correct energy-vector shapes. It catches every dimension-contract bug.
 
 ## What's kept (proven — unchanged)

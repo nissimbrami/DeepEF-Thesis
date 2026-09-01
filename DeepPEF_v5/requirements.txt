@@ -13,3 +13,7 @@ scikit-learn>=1.1
 tqdm>=4.64
 matplotlib>=3.6
 wandb>=0.15
+
+# Optional — Lever D+ (--flory_afrc): sequence-specific AFRC random-coil unfolded reference.
+# If absent, Lever D falls back to the analytic b*|i-j|^nu coil, so this is safe to skip.
+# afrc>=0.3

@@ -193,7 +193,7 @@ def diff_data(model, optimizer, dataloader, device,epoch,N,valid_loader):
         torch.save(all_Xn_int,"./all_Xn_int.pt")
         torch.save(all_Xn,"./all_Xn_padded.pt")
 
-def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
+def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef, emb_delta=None):
     """Get graph representation of protein 
     Args:
         x (torch.Tensor): Input tensor representing the coordinates of atoms in the protein structure. Shape: [N, 4,3].
@@ -218,11 +218,11 @@ def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
     emb = F.normalize(emb,p=2,dim=0)
-    Fh = maybe_concat_burial(x, D, Fb, emb, one_hot, mask) #N, [16+32(+burial)+emb+20]
+    Fh = maybe_concat_burial(x, D, Fb, emb, one_hot, mask, emb_delta=emb_delta) #N, [16+32(+burial)+emb(+delta)+20]
 
     return Fh
 
-def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
+def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef, emb_delta=None):
     """Get graph representation of a unfolded protein.
 
     Baseline (CFG.flory_unfolded=False): keep only the tridiagonal (chain-local) contacts —
@@ -233,7 +233,7 @@ def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     physics). This is value-only: the output tensor SHAPE is identical to the baseline.
     """
     if getattr(CFG, 'flory_unfolded', False):
-        return flory_reference(x, one_hot, emb, mask, gaussian_coef)
+        return flory_reference(x, one_hot, emb, mask, gaussian_coef, emb_delta=emb_delta)
     D = get_dist_matrix(x) # N,N,16
     D = apply_distance_kernel(D, gaussian_coef)   # Lever B kernel (baseline single Gaussian)
     # remove masks values
@@ -248,12 +248,12 @@ def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
     emb = F.normalize(emb,p=2,dim=0)
-    Fh = maybe_concat_burial(x, D, Fb, emb, one_hot, mask) #N, [16+32(+burial)+emb+20]
+    Fh = maybe_concat_burial(x, D, Fb, emb, one_hot, mask, emb_delta=emb_delta) #N, [16+32(+burial)+emb(+delta)+20]
 
     return Fh
 
 
-def flory_reference(x, one_hot, emb, mask, gaussian_coef):
+def flory_reference(x, one_hot, emb, mask, gaussian_coef, emb_delta=None):
     """Lever D — Flory random-coil unfolded reference.
 
     Instead of zeroing off-tridiagonal contacts, model the unfolded chain as an ideal random
@@ -261,6 +261,11 @@ def flory_reference(x, one_hot, emb, mask, gaussian_coef):
     per-atom-pair distance block of width 16 (matching get_dist_matrix's layout) from this
     polymer model, apply the SAME Gaussian/RBF kernel and masking as the folded path, then
     reduce identically. Output shape == baseline unfolded graph.
+
+    Lever D+ (CFG.flory_afrc=True): replace the analytic b*|i-j|^nu with the AFRC
+    (Analytical Flory Random Coil) SEQUENCE-SPECIFIC ensemble-average distance map — the same
+    random-coil-distogram reference IFUM (Lee et al., Nat. Commun. 2026) used. Falls back to
+    the analytic coil if the `afrc` package is not installed.
     """
     N = x.shape[0]
     nu = float(getattr(CFG, 'flory_nu', 0.5))
@@ -280,7 +285,12 @@ def flory_reference(x, one_hot, emb, mask, gaussian_coef):
         b = torch.clamp(b, min=1e-3)
     else:
         b = torch.tensor(3.8, device=dev)
-    d_coil = b * torch.pow(sep + 1e-6, nu)  # [N,N] expected coil distance
+    d_coil = b * torch.pow(sep + 1e-6, nu)  # [N,N] analytic expected coil distance
+    # Lever D+: sequence-specific AFRC distance map (falls back to analytic coil on any failure).
+    if getattr(CFG, 'flory_afrc', False):
+        d_afrc = afrc_distance_map(one_hot, N, dev)
+        if d_afrc is not None:
+            d_coil = d_afrc
     # Broadcast the same scalar distance across all 16 atom-atom channels (the coil model is
     # residue-level; per-atom detail is not defined in the unfolded ensemble).
     D = d_coil.unsqueeze(-1).expand(N, N, n_atom_dist).contiguous()  # [N,N,16] RAW distances
@@ -292,8 +302,58 @@ def flory_reference(x, one_hot, emb, mask, gaussian_coef):
     D = D.sum(dim=1)  # N,16
     D = F.normalize(D, p=2, dim=0)
     emb = F.normalize(emb, p=2, dim=0)
-    Fh = maybe_concat_burial(x, D, Fb, emb, one_hot, mask)
+    Fh = maybe_concat_burial(x, D, Fb, emb, one_hot, mask, emb_delta=emb_delta)
     return Fh
+
+
+# AFRC distance maps are deterministic per sequence; cache them so we call the polymer model
+# once per unique sequence instead of once per mutation/mini-batch pass.
+_AFRC_CACHE = {}
+_AFRC_AVAILABLE = None  # tri-state: None=untested, True/False after first probe
+
+
+def _seq_from_one_hot(one_hot, N):
+    """Reconstruct the 1-letter amino-acid string from the one-hot block."""
+    inv = {v: k for k, v in AA_MAP.items()}
+    idx = one_hot.argmax(dim=-1).tolist()
+    return "".join(inv.get(int(i), "A") for i in idx[:N])
+
+
+def afrc_distance_map(one_hot, N, dev):
+    """Lever D+ — AFRC ensemble-average inter-residue distance map for this sequence.
+
+    Uses the Analytical Flory Random Coil model (pip install afrc; idptools/afrc), which returns
+    a sequence-specific mean distance map with NO simulation and only the sequence as input.
+    Returns an [N,N] float tensor of expected unfolded distances, or None if afrc is unavailable
+    or errors (caller then falls back to the analytic b*|i-j|^nu coil). Cached per sequence.
+    """
+    global _AFRC_AVAILABLE
+    if _AFRC_AVAILABLE is False:
+        return None
+    seq = _seq_from_one_hot(one_hot, N)
+    cached = _AFRC_CACHE.get(seq)
+    if cached is not None:
+        return cached.to(dev)
+    try:
+        from afrc import AnalyticalFRC  # optional dependency
+        _AFRC_AVAILABLE = True
+        P = AnalyticalFRC(seq)
+        dmap = P.get_distance_map()  # numpy [L,L] ensemble-average distances
+        dmap = np.asarray(dmap, dtype=np.float32)
+        if dmap.shape[0] < N:  # guard: pad/trim to N if AFRC dropped terminal residues
+            pad = np.zeros((N, N), dtype=np.float32)
+            k = dmap.shape[0]
+            pad[:k, :k] = dmap
+            dmap = pad
+        t = torch.from_numpy(dmap[:N, :N])
+        _AFRC_CACHE[seq] = t
+        return t.to(dev)
+    except ImportError:
+        _AFRC_AVAILABLE = False  # never probe again this run
+        return None
+    except Exception:
+        # Any AFRC-internal failure (odd residue, length limits): fall back silently to analytic.
+        return None
 
 def apply_distance_kernel(D, gaussian_coef):
     """Turn raw pairwise distances into contact features (Lever B).
@@ -338,14 +398,17 @@ def compute_burial(x, mask, radius):
     return counts / max(N, 1)
 
 
-def maybe_concat_burial(x, D, Fb, emb, one_hot, mask):
-    """Assemble the node feature vector, optionally inserting the burial scalar BEFORE emb.
+def maybe_concat_burial(x, D, Fb, emb, one_hot, mask, emb_delta=None):
+    """Assemble the node feature vector, optionally inserting the burial scalar BEFORE emb
+    and/or the mutation-delta block AFTER emb.
 
     Baseline layout:            [D(16) | Fb(32) | emb(E) | one_hot(20)]
     Lever C (CFG.use_burial):   [D(16) | Fb(32) | burial(b) | emb(E) | one_hot(20)]
-    one_hot ALWAYS stays last so the model's from-the-right one_hot slice is unaffected; the
-    model reads emb from a from-the-LEFT index (dist_dim*3 + burial_dim) when burial is on.
+    Lever G (CFG.mutation_delta): [D(16) | Fb(32) | (burial) | emb(E) | delta(md) | one_hot(20)]
+    one_hot ALWAYS stays last; when Lever G is on, a width-md (emb_mut - emb_wt) block is placed
+    directly before one_hot so the model reads emb / delta / one_hot from-the-right indices.
     """
+    parts_pre = [D, Fb]
     if getattr(CFG, 'use_burial', False):
         b = compute_burial(x, mask, float(getattr(CFG, 'burial_radius', 10.0)))
         # Lever C fail-fast: the burial width MUST equal CFG.burial_dim or the model's slice
@@ -356,8 +419,27 @@ def maybe_concat_burial(x, D, Fb, emb, one_hot, mask):
                 f"[Lever C] burial width {b.shape[1]} != CFG.burial_dim {expected}. "
                 f"The graph builder and model disagree on the node layout — check "
                 f"CFG.burial_dim was set to 1 when --use_burial is on.")
-        return torch.cat([D, Fb, b, emb, one_hot], dim=1)
-    return torch.cat([D, Fb, emb, one_hot], dim=1)
+        parts_pre.append(b)
+    parts_pre.append(emb)
+    # Lever G: mutation-delta block goes after emb, before one_hot.
+    if getattr(CFG, 'mutation_delta', False):
+        # Fail-fast (matches Levers B/C/D/F): if the lever is on but the caller did not supply the
+        # delta, the node vector would be md columns too NARROW and blow up in a downstream GNN
+        # matmul with a misleading error. Name the lever now.
+        if emb_delta is None:
+            raise ValueError(
+                "[Lever G] mutation_delta is ON but emb_delta was not passed by the graph-builder "
+                "caller. The (emb_mut - emb_wt) block is required; the node vector would be "
+                f"{int(getattr(CFG, 'mutation_delta_dim', 0))} columns too narrow otherwise.")
+        expected_md = int(getattr(CFG, 'mutation_delta_dim', 0))
+        if emb_delta.shape[1] != expected_md:
+            raise ValueError(
+                f"[Lever G] mutation-delta width {emb_delta.shape[1]} != "
+                f"CFG.mutation_delta_dim {expected_md}. Graph builder / model layout mismatch — "
+                f"delta block must equal the embedding width.")
+        parts_pre.append(emb_delta)
+    parts_pre.append(one_hot)
+    return torch.cat(parts_pre, dim=1)
 
 
 def get_bonded_features(D):

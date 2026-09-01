@@ -143,8 +143,17 @@ LEVER_CONFIGS = [
     ('E_denoise', ['--denoise_weight', '0.1', '--denoise_prob', '1.0']),
     ('F_edges', ['--gcn_span', '3', '--use_edge_features']),
     ('C_burial', ['--use_burial']),
+    # Lever D+: AFRC unfolded reference. Falls back to the analytic coil if `afrc` is not
+    # installed, so this passes with or without the optional dependency (value-only shape).
+    ('D_afrc', ['--flory_unfolded', '--flory_afrc']),
+    # Lever G: mutation-delta node feature (width change) + antisymmetry reverse-mutation loss.
+    # reverse_mut_prob=1.0 forces the reverse pass every step so the antisymmetry path is exercised.
+    ('G_mutdelta', ['--mutation_delta']),
+    ('G_antisym', ['--mutation_delta', '--antisymmetry_weight', '0.1', '--reverse_mut_prob', '1.0']),
     # A representative composition of the two width/edge-changing levers + a value lever.
     ('CF_compose', ['--use_burial', '--gcn_span', '2', '--use_edge_features']),
+    # Compose the two node-width levers (burial + mutation-delta) to prove widths stack via CFG.
+    ('CG_compose', ['--use_burial', '--mutation_delta']),
 ]
 
 

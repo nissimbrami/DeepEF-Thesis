@@ -349,9 +349,16 @@ class PEM(torch.nn.Module):
         self.burial_dim = int(getattr(CFG, 'burial_dim', 0)) if getattr(CFG, 'use_burial', False) else 0
         b = self.burial_dim
 
+        # Lever G: mutation-delta node feature (emb_mut - emb_wt). When CFG.mutation_delta, a
+        # width-md block is inserted between emb and one_hot in the graph layout and fed into BOTH
+        # GNN towers so the model sees WHAT CHANGED, not just the whole mutant embedding
+        # (JanusDDG-style). md=0 reproduces the baseline widths exactly.
+        self.mutation_delta_dim = int(getattr(CFG, 'mutation_delta_dim', 0)) if getattr(CFG, 'mutation_delta', False) else 0
+        md = self.mutation_delta_dim
+
         # GNN internal dimension (what the graph layers operate on)
         # Base: 16 (dist) + aa_dim = 36 (default) or 16+aa_emb_dim (learned)
-        gnn_internal_dim = 16 + aa_dim + proj_extra + serial_extra + b
+        gnn_internal_dim = 16 + aa_dim + proj_extra + serial_extra + b + md
         gcn_dim_in = gnn_internal_dim
         gcn_dim_h = 64
         gcn_dim_out = gnn_internal_dim
@@ -369,13 +376,13 @@ class PEM(torch.nn.Module):
         self.GAT_layers = torch.nn.ModuleList(self.graph_model_gat)
         self.GCN_layers = torch.nn.ModuleList(self.graph_model_gcn)
         # Fully connected layers - GCN (projects from raw features to GNN dim)
-        # GCN raw input: dist(16) + bonded(16) + aa_dim + proj_extra + serial_extra + burial(b)
-        gcn_fc_in = 16 + 16 + aa_dim + proj_extra + serial_extra + b
+        # GCN raw input: dist(16) + bonded(16) + aa_dim + proj_extra + serial_extra + burial(b) + delta(md)
+        gcn_fc_in = 16 + 16 + aa_dim + proj_extra + serial_extra + b + md
         self.fc1_gcn = nn.Linear(gcn_fc_in, 64)
         self.fc2_gcn = nn.Linear(64, gcn_dim_in)
         # Fully connected layers - GAT (projects from raw features to GNN dim)
-        # GAT raw input: dist(16) + aa_dim + proj_extra + serial_extra + burial(b)
-        gat_fc_in = 16 + aa_dim + proj_extra + serial_extra + b
+        # GAT raw input: dist(16) + aa_dim + proj_extra + serial_extra + burial(b) + delta(md)
+        gat_fc_in = 16 + aa_dim + proj_extra + serial_extra + b + md
         self.fc1_gat = nn.Linear(gat_fc_in, 64)
         self.fc2_gat = nn.Linear(64, gat_dim_in)
         # normalization layers
@@ -417,7 +424,11 @@ class PEM(torch.nn.Module):
         self.one_hot_index = -20  # legacy: used only without learned_aa
         self.bonded_index = 48
         self.non_bonded_index = 16
-        self.llm_index = -(CFG.emb_input_dim + 20)  # dynamic based on embedding dim
+        # Lever G: mutation-delta block (width md, from the ctor above) sits between emb and
+        # one_hot, so both the emb and delta slices are anchored from the right. md=0 reproduces
+        # the baseline indices exactly.
+        self.delta_index = -(20 + md)               # start of the delta block (from the right)
+        self.llm_index = -(CFG.emb_input_dim + 20 + md)  # emb block sits left of the delta block
         # Lever C: burial occupies [dist_dim*3 : dist_dim*3 + burial_dim] i.e. right after the
         # 48 dist+bonded columns (dist_dim*3 = 16*3 = 48). one_hot/emb stay at from-the-right.
         self.burial_start = CFG.dist_dim * 3
@@ -454,12 +465,23 @@ class PEM(torch.nn.Module):
         # reshape x to [batch_size*n_nodes,features]
         B, N, _ = x.shape
         x = x.reshape(B * N,-1)
-        # split features: layout is [dist:16 | bonded:32 | (burial:b) | emb:E | one_hot:20]
+        # split features: layout is
+        #   [dist:16 | bonded:32 | (burial:b) | emb:E | (delta:md) | one_hot:20]
         # GCN uses only first 16 of bonded (bonded-to-previous), matching original behavior
         x_dist = x[:, :self.non_bonded_index]  # B*N, 16
         x_bonded = x[:, self.non_bonded_index:self.non_bonded_index * 2]  # B*N, 16
-        x_emb_features = x[:, self.llm_index:self.one_hot_index]  # B*N, E (from the right)
+        x_emb_features = x[:, self.llm_index:self.delta_index]  # B*N, E (from the right, left of delta)
         x_onehot = x[:, self.one_hot_index:]  # B*N, 20 (always last)
+        # Lever G: mutation-delta slice sits between the emb block and one_hot.
+        if self.mutation_delta_dim > 0:
+            x_delta = x[:, self.delta_index:self.one_hot_index]  # B*N, md
+            if x_delta.shape[1] != self.mutation_delta_dim:
+                raise ValueError(
+                    f"[Lever G] mutation-delta slice width {x_delta.shape[1]} != "
+                    f"mutation_delta_dim {self.mutation_delta_dim}; node feature vector shape "
+                    f"mismatch. Graph builder / model layout disagree.")
+        else:
+            x_delta = None
         # Lever C: burial slice sits between the 48 dist+bonded cols and the emb block.
         if self.burial_dim > 0:
             x_burial = x[:, self.burial_start:self.burial_start + self.burial_dim]  # B*N, b
@@ -487,6 +509,12 @@ class PEM(torch.nn.Module):
         if x_burial is not None:
             x_gcn = torch.cat((x_gcn, x_burial), dim=-1)
             x_gat = torch.cat((x_gat, x_burial), dim=-1)
+
+        # Lever G: feed the mutation-delta block into BOTH towers so message-passing sees the
+        # change signal (emb_mut - emb_wt). Appended after burial; widths tracked in the ctor.
+        if x_delta is not None:
+            x_gcn = torch.cat((x_gcn, x_delta), dim=-1)
+            x_gat = torch.cat((x_gat, x_delta), dim=-1)
 
         # Project embeddings and concatenate into GNN input, or keep for post-GNN concat
         if self.emb_projector is not None:

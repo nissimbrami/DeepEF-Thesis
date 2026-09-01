@@ -98,6 +98,14 @@ class CFG:
     # scaling |i-j|^nu instead, a physics-grounded reference state.
     flory_unfolded = False
     flory_nu = 0.5
+    # Lever D+ — AFRC sequence-specific unfolded reference. flory_afrc=False => the analytic
+    # b*|i-j|^nu coil (above). flory_afrc=True (requires flory_unfolded=True) => use the
+    # Analytical Flory Random Coil (idptools/afrc) ensemble-average inter-residue distance map
+    # for THIS sequence as the unfolded reference — the same random-coil-distogram idea IFUM
+    # (Lee et al., Nat. Commun. 2026) used to reach SOTA. Value-only: output shape unchanged.
+    # If the `afrc` package is not installed, the builder falls back to the analytic coil, so
+    # the flag is safe to leave in configs even without the dependency.
+    flory_afrc = False
     # Lever E — decoy denoising auxiliary head. denoise_weight=0 => head absent, no aux loss
     # (baseline). w>0 => an MLP off the 128-dim pre-energy features predicts injected coord
     # noise; a w*MSE term is added to the TRAIN loss only (never validation).
@@ -109,3 +117,13 @@ class CFG:
     # => GATv2 layers consume a 41-dim edge_attr [onehot_src(20)|onehot_dst(20)|dist(1)].
     gcn_span = 1
     use_edge_features = False
+    # Lever G — antisymmetry + mutation-delta (the JanusDDG lever). All default OFF = baseline.
+    #   mutation_delta: concatenate (emb_mut - emb_wt) as an extra node block so the model sees
+    #     WHAT CHANGED, not just the whole mutant embedding. Adds mutation_delta_dim node width.
+    #   antisymmetry_weight: w>0 adds a loss term enforcing ddG(A->B) = -ddG(B->A) using the
+    #     reverse-mutation pass (train only). w=0 => no reverse pass, exact baseline.
+    #   reverse_mut_prob: probability of building the reverse mutation for the antisymmetry term.
+    mutation_delta = False
+    mutation_delta_dim = 0
+    antisymmetry_weight = 0.0
+    reverse_mut_prob = 0.5

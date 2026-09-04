@@ -557,6 +557,10 @@ class Trainer():
             ddg_pearson_corr, _ = pearsonr(ddg_true, ddg_pred)
         except ImportError:
             ddg_pearson_corr = float('nan')
+        # Diagnostic print so metrics land in the log (wandb is disabled in our runs).
+        print(f'[metrics] epoch={epoch} dG_PCC={pc_corr:.4f} dG_SCC={sp_corr:.4f} '
+              f'dG_RMSE={rmse:.4f} ddG_PCC={ddg_pearson_corr:.4f} ddG_RMSE={ddg_rmse:.4f}',
+              flush=True)
         # Log all metrics
         if not test:
             wandb_log({'val_loss': val_loss,

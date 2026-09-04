@@ -67,6 +67,10 @@ parser.add_argument('--flory_nu', type=float, default=0.5,
 parser.add_argument('--dump_energies', action='store_true',
                     help='During validate/eval, write per-protein mean Eu/Ef/dG to a CSV '
                          '(mechanism diagnostic; does not affect the normal path).')
+parser.add_argument('--resume', action='store_true',
+                    help='Resume from the latest epoch_N.pt in the model dir. Loads that state '
+                         'and restarts at epoch N+1, correctly split across the frozen/unfrozen '
+                         'stages. Makes a crash cost one epoch instead of the whole run.')
 
 args, _ = parser.parse_known_args()
 CFG.model_arch = args.model_arch
@@ -628,14 +632,28 @@ class Trainer():
         return unfolded_energy - folded_energy, unfolded_energy, folded_energy
 
 
+def _find_latest_checkpoint():
+    """Return (path, epoch_index) of the highest epoch_N.pt in the model dir, or (None, -1)."""
+    import glob, re
+    cdir = os.path.join(MODEL_PATH, MODEL_NAME)
+    best_e, best_p = -1, None
+    for p in glob.glob(os.path.join(cdir, 'epoch_*.pt')):
+        m = re.search(r'epoch_(\d+)\.pt$', os.path.basename(p))
+        if m:
+            e = int(m.group(1))
+            if e > best_e:
+                best_e, best_p = e, p
+    return best_p, best_e
+
+
 def run_training():
     """Run the training for all the proteins"""
     train_ds = MSDataset(tensor_root_dir=tensor_root_dir,
                                           mutations_root_dir=mutations_root_dir, train=True)
-    
+
     test_ds = MSDataset(tensor_root_dir=tensor_root_dir,
                                             mutations_root_dir=mutations_root_dir, train=False)
-    
+
      # Create the dataloaders
     train_ds = DataLoader(train_ds, batch_size=1, shuffle=True)
     test_ds = DataLoader(test_ds, batch_size=1, shuffle=True)
@@ -650,26 +668,46 @@ def run_training():
         emb_projection=CFG.emb_projection,
         gat_cutoff=CFG.gat_cutoff,
     ).to(DEVICE)
-    if PRETRAINED: 
+    if PRETRAINED:
         try:
             model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
         except:
             model.load_state_dict(torch.load(TRAINED_MODEL_PATH))
-    
-    # Train the model
-    trainer = Trainer(model, train_ds, test_ds)
-    model, pc_corr = trainer.train(epochs=EPOCHS_FREEZE)
-    
-    # Unfreeze the layers and train the model with lower learning rate
+
+    # --resume: pick up the latest saved epoch. epoch_N.pt is saved at the END of epoch N,
+    # so a checkpoint at epoch N means epochs 0..N are done; restart at start_epoch = N+1.
     global FREEZE_LAYERS, LR
+    start_epoch = 0
+    if args.resume:
+        ckpt, last_e = _find_latest_checkpoint()
+        if ckpt is not None:
+            model.load_state_dict(torch.load(ckpt, map_location=DEVICE))
+            start_epoch = last_e + 1
+            print(f'[resume] loaded {ckpt}; restarting at epoch {start_epoch} '
+                  f'(freeze stage 0..{EPOCHS_FREEZE-1}, unfrozen {EPOCHS_FREEZE}..{EPOCHS_FREEZE+EPOCHS_NO_FREEZE-1})')
+        else:
+            print('[resume] no epoch_*.pt found; starting fresh from epoch 0')
+
+    # Stage 1: frozen. Only run the epochs of this stage not already completed.
+    if start_epoch < EPOCHS_FREEZE:
+        remaining_freeze = EPOCHS_FREEZE - start_epoch
+        trainer = Trainer(model, train_ds, test_ds)
+        model, pc_corr = trainer.train(epochs=remaining_freeze, s_epoch=start_epoch)
+        unfrozen_start = EPOCHS_FREEZE
+    else:
+        # frozen stage already finished before the crash
+        unfrozen_start = start_epoch
+
+    # Stage 2: unfreeze the layers and train with lower learning rate.
     FREEZE_LAYERS = False
     LR = 1e-5
-    
-    print('Training the whole model with lower learning rate')
-    trainer = Trainer(model, train_ds, test_ds)
-    model, pc_corr = trainer.train(epochs=EPOCHS_NO_FREEZE, s_epoch=EPOCHS_FREEZE)
+    remaining_unfrozen = (EPOCHS_FREEZE + EPOCHS_NO_FREEZE) - unfrozen_start
+    if remaining_unfrozen > 0:
+        print('Training the whole model with lower learning rate')
+        trainer = Trainer(model, train_ds, test_ds)
+        model, pc_corr = trainer.train(epochs=remaining_unfrozen, s_epoch=unfrozen_start)
     wandb.finish()
-    
+
     print(f'Training completed with Pearson Correlation: {pc_corr}')
     
     

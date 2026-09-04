@@ -48,6 +48,23 @@ parser.add_argument('--loss_mode', type=str, default='dg', choices=['dg', 'ddg',
                          "'joint' (dG + ddg_weight * ddG)")
 parser.add_argument('--ddg_weight', type=float, default=1.0,
                     help='Weight of the ddG term when --loss_mode joint')
+# --- offset-attack additions (branch offset-attack-run; defaults preserve baseline behavior) ---
+parser.add_argument('--no_pretrained', action='store_true',
+                    help='Train from scratch (PRETRAINED=False): do NOT load any checkpoint. '
+                         'Matches the from-scratch 0.531/0.655 regime; also required when '
+                         'the pretrained core (43_final_model.pt) is absent.')
+parser.add_argument('--mini_batch_size', type=int, default=16,
+                    help='Mini-batch of variants per forward pass (OOM rule: 16, not the old 64).')
+parser.add_argument('--seed', type=int, default=42,
+                    help='Random seed for torch/numpy/random (deterministic run).')
+parser.add_argument('--flory_unfolded', action='store_true',
+                    help='Lever D: use an analytic Flory random-coil unfolded reference '
+                         '(d(i,j)=b*|i-j|^nu) instead of the tridiagonal-mask unfolded state.')
+parser.add_argument('--flory_nu', type=float, default=0.5,
+                    help='Lever D coil scaling exponent in (0,1]; 0.5=ideal chain, ~0.588=SAW.')
+parser.add_argument('--dump_energies', action='store_true',
+                    help='During validate/eval, write per-protein mean Eu/Ef/dG to a CSV '
+                         '(mechanism diagnostic; does not affect the normal path).')
 
 args, _ = parser.parse_known_args()
 CFG.model_arch = args.model_arch
@@ -56,6 +73,25 @@ CFG.gt_hidden_dim = args.gt_hidden_dim
 CFG.gt_heads = args.gt_heads
 CFG.gt_layers = args.gt_layers
 CFG.gt_edge_cutoff = args.gt_edge_cutoff
+# Lever D (analytic Flory coil unfolded reference) — read by train_utils.get_unfolded_graph
+# off the SAME model.model_cfg.CFG object. Default OFF => bit-identical tridiagonal baseline.
+CFG.flory_unfolded = args.flory_unfolded
+CFG.flory_nu = args.flory_nu
+
+
+def set_seed(seed):
+    """Deterministic seeding for torch / numpy / python-random."""
+    import random
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+set_seed(args.seed)
 
 # Constants
 COORDS = 'coords_tensor.pt'
@@ -72,12 +108,12 @@ EPOCHS_NO_FREEZE = 60 if not DEBUG else 1
 FREEZE_LAYERS = args.freeze_layers
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
-MINI_BATCH_SIZE = 64
+MINI_BATCH_SIZE = args.mini_batch_size
 DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
 TRAINED_MODEL_PATH = args.trained_model_path
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = args.model_name
-PRETRAINED = True
+PRETRAINED = not args.no_pretrained
 TM_PATH = "./data/ThermoMPNN/mega_test.csv"
 PNAS_PROTEINS = "./data/Processed_K50_dG_datasets/Pnas_filtering/train_proteins.csv"
 PNAS_MUT = "./data/Processed_K50_dG_datasets/Pnas_filtering/pnas_mutations.csv"
@@ -123,6 +159,11 @@ config = {
     'dG_ml': DG_ML,
     'loss_mode': LOSS_MODE,
     'ddg_weight': DDG_WEIGHT,
+    'no_pretrained': args.no_pretrained,
+    'seed': args.seed,
+    'flory_unfolded': CFG.flory_unfolded,
+    'flory_nu': CFG.flory_nu,
+    'dump_energies': args.dump_energies,
     'model_arch': CFG.model_arch,
     'emb_projection': CFG.emb_projection,
     'gt_hidden_dim': CFG.gt_hidden_dim,
@@ -324,7 +365,7 @@ class Trainer():
         # self.criterion = nn.MSELoss()
         self.criterion = nn.L1Loss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=LR)
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='max', factor=0.1, patience=5, verbose=True)
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='max', factor=0.1, patience=5)
         self.model.to(self.device)
         self.mini_batch_size = MINI_BATCH_SIZE
         self.model_name = 'PEM_fine_tuned' if FREEZE_LAYERS else 'PEM_full_trained'
@@ -431,11 +472,15 @@ class Trainer():
         val_dg = torch.tensor([],device=self.device)
         val_dg_pred = torch.tensor([],device=self.device)
         val_df = pd.DataFrame([],columns=['protein','deltaG','pred_deltaG'])
+        # --dump_energies: accumulate per-protein mean unfolded/folded energy + dG (mechanism split).
+        energy_rows = []
         with torch.no_grad():
             for i, batch in enumerate(tqdm(self.val_ds,desc=f'Validation Epoch: {epoch}')):
                 # batch = normalize_batch(batch, True)
                 batch_loss = 0
                 batch_idx = 1
+                prot_eu = torch.tensor([], device=self.device)
+                prot_ef = torch.tensor([], device=self.device)
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
                     batch_idx += 1
                     output,u_energy,f_energy = self.get_deltaG(batch, j)
@@ -447,6 +492,9 @@ class Trainer():
                     batch_loss += loss.item()
                     val_dg = torch.cat((val_dg, delta_g), dim=0)
                     val_dg_pred = torch.cat((val_dg_pred, output), dim=0)
+                    if args.dump_energies:
+                        prot_eu = torch.cat((prot_eu, u_energy.detach().flatten()), dim=0)
+                        prot_ef = torch.cat((prot_ef, f_energy.detach().flatten()), dim=0)
                     batch_df = pd.DataFrame([],columns=['protein','deltaG','pred_deltaG'])
                     batch_df['deltaG'] = delta_g.cpu().numpy()
                     batch_df['pred_deltaG']  = output.cpu().numpy()
@@ -455,6 +503,13 @@ class Trainer():
                     # clear memory
                     torch.cuda.empty_cache()
                     gc.collect()
+                if args.dump_energies and prot_eu.numel() > 0:
+                    mean_eu = float(prot_eu.mean().item())
+                    mean_ef = float(prot_ef.mean().item())
+                    energy_rows.append({'protein': batch['name'][0],
+                                        'L': int(batch['masks'].sum().item()),
+                                        'n_variants': int(prot_eu.numel()),
+                                        'Eu': mean_eu, 'Ef': mean_ef, 'dG': mean_eu - mean_ef})
                 batch_loss /= batch_idx
             val_loss += batch_loss
         val_loss /= len(self.val_ds)
@@ -506,6 +561,14 @@ class Trainer():
                        'ddg_rmse': ddg_rmse}, run)
         # Save datafeame
         # val_df.to_csv("val_df.csv",index=False)
+        # --dump_energies: write per-protein Eu/Ef/dG so we can split across-protein variance and
+        # correlate with wt_err (mirrors analysis/wt_dg_error/gat_gcn_energy.csv). Off the normal path.
+        if args.dump_energies and energy_rows:
+            edir = os.path.join(MODEL_PATH, MODEL_NAME)
+            os.makedirs(edir, exist_ok=True)
+            epath = os.path.join(edir, f'energies_epoch_{epoch}.csv')
+            pd.DataFrame(energy_rows).to_csv(epath, index=False)
+            print(f'[dump_energies] wrote {len(energy_rows)} proteins -> {epath}')
         # Selection / LR-scheduler metric matches the training objective:
         # ddG Pearson for (ddg, joint), deltaG Pearson for dg.
         selection_corr = ddg_pearson_corr if LOSS_MODE in ('ddg', 'joint') else pc_corr

@@ -30,6 +30,12 @@ class CFG:
     model_path = "./res/trianed_models-newDecoys/"
     light_attention = True
     gaussian_coef = -0.08
+    # Offset-attack Lever D — analytic Flory random-coil unfolded reference.
+    # flory_unfolded=False (default) => bit-identical to the historical tridiagonal-mask
+    # unfolded state. flory_unfolded=True => get_unfolded_graph replaces the tridiagonal
+    # mask with an analytic ideal-coil distance d(i,j) = b*|i-j|^nu (value-only, shape-identical).
+    flory_unfolded = False
+    flory_nu = 0.5  # coil scaling exponent in (0,1]; 0.5 = ideal chain, ~0.588 = self-avoiding walk
     # Embedding projection: "none", "mlp", "low_rank"
     emb_projection = "mlp"
     emb_proj_dim = 16        # output dim of projection (integrated into GNN)

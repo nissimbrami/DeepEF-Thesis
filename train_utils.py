@@ -221,7 +221,18 @@ def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     return Fh
 
 def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
-    """Get graph representation of a unfolded protein"""
+    """Get graph representation of a unfolded protein.
+
+    Baseline (CFG.flory_unfolded=False): keep only the tridiagonal (chain-local) contacts via
+    zero_except_udiagonal — the historical reference state (no long-range 3D structure).
+
+    Offset-attack Lever D (CFG.flory_unfolded=True): replace the stark tridiagonal mask with an
+    analytic Flory random-coil reference where the expected inter-residue distance scales as
+    d(i,j) = b*|i-j|^nu (polymer physics). Value-only: the output tensor SHAPE is identical to
+    the baseline. Default OFF reproduces the tridiagonal baseline bit-for-bit.
+    """
+    if getattr(CFG, 'flory_unfolded', False):
+        return _flory_unfolded_graph(x, one_hot, emb, mask, gaussian_coef)
     D = get_dist_matrix(x) # N,N,16
     D = torch.relu(torch.exp(gaussian_coef*D**2))
     # remove masks values
@@ -237,7 +248,56 @@ def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     D = F.normalize(D,p=2,dim=0)
     emb = F.normalize(emb,p=2,dim=0)
     Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
-    
+
+    return Fh
+
+
+def _flory_unfolded_graph(x, one_hot, emb, mask, gaussian_coef):
+    """Lever D — analytic Flory random-coil unfolded reference.
+
+    Instead of zeroing off-tridiagonal contacts, model the unfolded chain as an ideal random
+    coil: the expected distance between residues i and j scales as d(i,j) = b*|i-j|^nu. We build
+    a per-atom-pair distance block matching get_dist_matrix's width (16), apply the SAME Gaussian
+    kernel and masking as the baseline path, then reduce identically. The output tensor shape is
+    byte-identical to the baseline unfolded graph (value-only lever, no new parameters).
+
+    Reference: DeepPEF_v5/training/train_utils.py:flory_reference (simplified to match Shahar's
+    get_unfolded_graph exactly — no burial / RBF bank / AFRC, none of which exist in this tree).
+    """
+    nu = float(getattr(CFG, 'flory_nu', 0.5))
+    # Fail-fast: nu outside (0,1] is unphysical for a polymer coil scaling exponent.
+    if not (0.0 < nu <= 1.0):
+        raise ValueError(f"[Lever D] flory_nu must be in (0, 1]; got {nu}. "
+                         f"(0.5 = ideal chain, ~0.588 = self-avoiding walk.)")
+    N, N_atoms, _ = x.shape
+    n_atom_dist = N_atoms * N_atoms  # 16, matches get_dist_matrix last-dim width
+    dev = x.device
+    idx = torch.arange(N, device=dev, dtype=torch.float32)
+    sep = (idx.unsqueeze(0) - idx.unsqueeze(1)).abs()  # |i-j|, [N,N]
+    # Effective bond length b: mean CA-CA neighbor distance so the coil is scaled to THIS protein
+    # rather than an arbitrary constant. CA is atom index 1 (N=0, CA=1, C=2, CB=3).
+    ca = x[:, 1, :]
+    if N > 1:
+        b = torch.linalg.norm(ca[1:] - ca[:-1], dim=-1).mean()
+        b = torch.clamp(b, min=1e-3)
+    else:
+        b = torch.tensor(3.8, device=dev)
+    d_coil = b * torch.pow(sep + 1e-6, nu)  # [N,N] analytic expected coil distance
+    # Broadcast the scalar coil distance across all atom-atom channels (coil model is residue-level).
+    D = d_coil.unsqueeze(-1).expand(N, N, n_atom_dist).contiguous()  # [N,N,16] RAW distances
+    # SAME kernel as folded/baseline unfolded path (train_utils.py get_graph line 208).
+    D = torch.relu(torch.exp(gaussian_coef * D ** 2))
+    # remove masks values (identical to baseline)
+    mask_index = torch.where(mask == 0)
+    D[mask_index[0], :, :] = 0
+    D[:, mask_index[0], :] = 0
+    # NOTE: no zero_except_udiagonal — the coil IS the full unfolded reference now.
+    Fb = get_bonded_features(D)  # N,32
+    D = D.sum(dim=1)  # N,16
+    D = F.normalize(D, p=2, dim=0)
+    emb = F.normalize(emb, p=2, dim=0)
+    Fh = torch.cat([D, Fb, emb, one_hot], dim=1)  # N,16+32+emb_size
+
     return Fh
 
 def get_bonded_features(D):

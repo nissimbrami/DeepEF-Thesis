@@ -34,6 +34,9 @@ parser.add_argument('--one_mut', action='store_true', help='Remove the multiple 
 parser.add_argument('--freeze_layers',action = 'store_true', help ='Freeze model layers except mlp and LA')
 parser.add_argument('--trained_model_path',type=str,default = "./res/trianed_models-light_attention/43_final_model.pt",help='Trained model path')
 parser.add_argument('--dg_ml', action='store_true', help='Change deltaG threshold to [-1,5]')
+parser.add_argument('--readout', default='sum', choices=['sum','attention','gated'], help='per-residue energy aggregation')
+parser.add_argument('--dg_length_norm', default='none', choices=['none','n','sqrtn'], help='lever 2: MUST match training — length-normalize predicted dG')
+parser.add_argument('--affine', default=None, help='lever 3: path to affine.json {a,b}; pred_deltaG := a*pred+b before ddG (RMSE only). Defaults to env DEEPEF_AFFINE.')
 
 args = parser.parse_args()
 
@@ -69,6 +72,16 @@ DS_TYPE = args.dataset_type
 LIGHT_ATTENTION = True
 ONE_MUT =  args.one_mut
 DG_ML = args.dg_ml
+DG_LENGTH_NORM = args.dg_length_norm
+# lever 3: load affine (a,b) from --affine or env DEEPEF_AFFINE (applied to pred_deltaG; RMSE only)
+_AFFINE_PATH = args.affine or os.environ.get('DEEPEF_AFFINE')
+AFFINE_AB = None
+if _AFFINE_PATH:
+    import json as _json
+    with open(_AFFINE_PATH) as _f:
+        _ab = _json.load(_f)
+    AFFINE_AB = (float(_ab['a']), float(_ab['b']))
+    print(f'AFFINE calibration loaded from {_AFFINE_PATH}: a={AFFINE_AB[0]:.4f} b={AFFINE_AB[1]:.4f}')
 
 # config wandb
 config = {
@@ -400,7 +413,10 @@ class Trainer():
                     val_dg_pred = torch.cat((val_dg_pred, output), dim=0)
                     batch_df = pd.DataFrame([],columns=['protein','deltaG','pred_deltaG','ddG','pred_ddG'])
                     batch_df['deltaG'] = delta_g.cpu().numpy()
-                    batch_df['pred_deltaG']  = output.cpu().numpy()
+                    pred_np = output.cpu().numpy()
+                    if AFFINE_AB is not None:  # lever 3: pred := a*pred + b (RMSE only)
+                        pred_np = AFFINE_AB[0] * pred_np + AFFINE_AB[1]
+                    batch_df['pred_deltaG']  = pred_np
                     batch_df['protein'] = [batch['name'][0] for i in range(len(delta_g))]
                     protein_df = pd.concat([protein_df,batch_df])
                     # clear memory
@@ -442,8 +458,13 @@ class Trainer():
         minibatch_energy = self.model(all_graph_minibatch)
         folded_energy = minibatch_energy[:minibatch_energy.size(0) // 2]
         unfolded_energy = minibatch_energy[minibatch_energy.size(0) // 2:]
-        
-        return unfolded_energy - folded_energy,unfolded_energy,folded_energy
+        # lever 2: length-normalize dG identically to training (raw energies kept for energy_reg)
+        if DG_LENGTH_NORM != 'none':
+            nv = batch['masks'].squeeze().float().sum().clamp(min=1.0)
+            norm = nv if DG_LENGTH_NORM == 'n' else torch.sqrt(nv)
+        else:
+            norm = 1.0
+        return (unfolded_energy - folded_energy) / norm, unfolded_energy, folded_energy
 
 
 def run_training():
@@ -460,7 +481,7 @@ def run_training():
 
     # Create the model
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
-                light_attention=LIGHT_ATTENTION).to(DEVICE)
+                light_attention=LIGHT_ATTENTION, readout=args.readout).to(DEVICE)
     if PRETRAINED: 
         try:
             model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
@@ -509,7 +530,7 @@ def run_validation_metrics():
     test_ds = DataLoader(test_ds, batch_size=1, shuffle=True)
     # Create the model
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
-                light_attention=LIGHT_ATTENTION).to(DEVICE)
+                light_attention=LIGHT_ATTENTION, readout=args.readout).to(DEVICE)
     if PRETRAINED: 
         try:
             model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)

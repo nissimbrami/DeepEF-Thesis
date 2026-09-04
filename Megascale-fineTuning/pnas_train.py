@@ -548,7 +548,9 @@ class Trainer():
         rmse = float(torch.sqrt(F.mse_loss(val_dg_pred, val_dg)).item())
         # ddG metrics
         from sklearn.metrics import mean_squared_error
-        ddg_rmse = mean_squared_error(ddg_true, ddg_pred, squared=False) if len(ddg_true) > 1 else float('nan')
+        # RMSE via sqrt(MSE): the `squared=False` kwarg was removed in newer scikit-learn,
+        # so compute it version-agnostically (identical value).
+        ddg_rmse = float(np.sqrt(mean_squared_error(ddg_true, ddg_pred))) if len(ddg_true) > 1 else float('nan')
         # Pearson for ddG
         try:
             from scipy.stats import pearsonr

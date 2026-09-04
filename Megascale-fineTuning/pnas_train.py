@@ -28,7 +28,9 @@ from new_dataset import MSDataset
 
 parser = argparse.ArgumentParser(description='Train the model with the mega-scale data')
 parser.add_argument('--debug',default=False, action='store_true', help='Debug mode')
-parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
+parser.add_argument('--epochs', type=int, default=50, help='Total epochs; split into frozen+unfrozen two-stage (default 1/3 frozen, 2/3 unfrozen) unless --epochs_freeze/--epochs_no_freeze given')
+parser.add_argument('--epochs_freeze', type=int, default=-1, help='Override: epochs in the frozen stage (-1 = derive from --epochs)')
+parser.add_argument('--epochs_no_freeze', type=int, default=-1, help='Override: epochs in the unfrozen stage (-1 = derive from --epochs)')
 parser.add_argument('--model_name', type=str, default='PEM_fine_tuned', help='Model name')
 parser.add_argument('--dataset_type', type=str, default='pnas', help='Dataset type')
 parser.add_argument('--unstable_mut', action='store_true', help='Save the unstable mutations')
@@ -103,8 +105,17 @@ VAL_RATIO = 0.2
 RANDOM_SEED = 42
 NANO_TO_ANGSTROM = 0.1
 DEBUG  = args.debug
-EPOCHS_FREEZE = 20 if not DEBUG else 1
-EPOCHS_NO_FREEZE = 60 if not DEBUG else 1
+# Two-stage schedule now derives from --epochs (was hardcoded 20+60=80; our prior runs plateau by
+# epoch ~12-14, so default --epochs 15 -> 5 frozen + 10 unfrozen). Explicit overrides win.
+if args.epochs_freeze >= 0 or args.epochs_no_freeze >= 0:
+    EPOCHS_FREEZE = args.epochs_freeze if args.epochs_freeze >= 0 else 0
+    EPOCHS_NO_FREEZE = args.epochs_no_freeze if args.epochs_no_freeze >= 0 else 0
+else:
+    EPOCHS_FREEZE = max(1, args.epochs // 3)
+    EPOCHS_NO_FREEZE = args.epochs - EPOCHS_FREEZE
+if DEBUG:
+    EPOCHS_FREEZE = 1
+    EPOCHS_NO_FREEZE = 1
 FREEZE_LAYERS = args.freeze_layers
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'

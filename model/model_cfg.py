@@ -45,15 +45,23 @@ class CFG:
     prefetch_factor = 4         # pre-load batches in background
     N = 10
     num_epochs = 50
-    seq_len = 450
+    max_steps = None  # optional optimizer-step cap for smoke experiments
+    seq_len = 350
     SM = False # score matching loss
     gradient_penalty = True
     decoy_threshold = 20
     max_grad_norm = 10.0
     clip_grad_norm = True
     reg_alpha = 0.1
+    lambda_anchor = 0.01  # Huber anchor on Ejf: pulls native folded energy toward 0 (calibration)
     tau = 1.0 # temperature for InfoNCE contrastive loss
     gat_cutoff = 12.0 # Angstroms, distance cutoff for GAT edges (None = fully connected)
+    model_arch = "pem"  # "pem" or "graph_transformer"
+    gt_hidden_dim = 64
+    gt_heads = 4
+    gt_layers = 3
+    gt_edge_cutoff = 12.0
+    gt_edge_rbf_dim = 16
     compile_model = True  # torch.compile for kernel fusion (~10-30% speedup on PyTorch 2+)
     # defalut parameters
     torch_default_dtype = torch.float32

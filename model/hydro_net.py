@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout
-from torch_geometric.nn import GCNConv, GATv2Conv, BatchNorm
+from torch_geometric.nn import GCNConv, GATv2Conv, BatchNorm, TransformerConv
 from model.model_cfg import CFG
 # import matplotlib.pyplot as plt
 
@@ -293,8 +293,13 @@ class LowRankProjection(nn.Module):
 class PEM(torch.nn.Module):
     """Protein energy model"""
 
-    def __init__(self, layers, gaussian_coef,dropout_rate = 0.2, light_attention=False, emb_projection="none", gat_cutoff=None):
+    def __init__(self, layers, gaussian_coef,dropout_rate = 0.2, light_attention=False, emb_projection="none", gat_cutoff=None, readout='sum'):
         super().__init__()
+        # Experiment 1: learned aggregation of per-residue energies instead of the plain sum.
+        #   'sum'       : G = sum_i e_i               (default, extensive energy — baseline)
+        #   'attention' : G = N * sum_i softmax(s_i) e_i   (learned per-residue weights)
+        #   'gated'     : G = sum_i sigmoid(s_i) e_i        (learned per-residue gates, keeps extensivity)
+        self.readout = readout
 
         # Embedding projection config: "none", "mlp", "low_rank"
         self.emb_projection_type = emb_projection
@@ -344,9 +349,8 @@ class PEM(torch.nn.Module):
         fc_in_dim = 2 * (36 + proj_extra) + post_gnn_emb  # 72+1024 (none) or 104+0 (projected)
         self.fc1 = nn.Linear(fc_in_dim, 128)
         self.fc2 = nn.Linear(128, 1)
-
-        # GNN-SM output head: per-residue amino acid scores [L, 20]
-        self.fc2_sm = nn.Linear(128, 20)
+        if readout in ('attention', 'gated'):
+            self.readout_score = nn.Linear(128, 1)   # per-residue weight/gate logit
 
         # energy epsilon
         self.energy_epsilon = 1
@@ -420,23 +424,22 @@ class PEM(torch.nn.Module):
             x = x.swapaxes(1,2)
             x = x.reshape(B * N,-1)
         # fc layers
-        x  = self.fc1(x)
-        x = F.relu(x)
-
-        # Branch: subtract-mut mode returns [B, L, 20] scores
-        if f_type == 'subtract_mut':
-            x_sm = self.fc2_sm(x)  # B*N, 20
-            x_sm = x_sm.reshape(B, N, 20)
-            return x_sm
-
-        x = self.fc2(x) # -> B*N,1
-        # reshape to [batch_size,n_nodes]
+        h = F.relu(self.fc1(x))      # [B*N, 128] per-residue feature
+        x = self.fc2(h)              # [B*N, 1]   per-residue energy e_i
         x = x.reshape(B, N, 1)
-        # return energy
+        # Learned aggregation (Experiment 1): reweight per-residue energies before summing.
+        if self.readout in ('attention', 'gated'):
+            s = self.readout_score(h).reshape(B, N, 1)
+            if self.readout == 'attention':
+                x = torch.softmax(s, dim=1) * x * N    # weighted; *N keeps magnitude ~ a plain sum
+            else:  # gated
+                x = torch.sigmoid(s) * x
         if (f_type == 'Default'):
             return self.get_energy(x)
-        elif(f_type == 'A_inference'): # return the energy reference to each amino acid
+        elif(f_type == 'A_inference'): # return the (post-readout) per-residue energy
             return x
+        elif(f_type == 'features'): # return per-residue latent features h [B,N,128] for a direct-ddG head
+            return h.reshape(B, N, -1)
         
     def forward_gat(self, x, edge_index_gat, B, N):
         """forward function for the graph model"""
@@ -527,6 +530,244 @@ class PEM(torch.nn.Module):
             self._edge_cache = (edge_index_gcn_all, edge_index_gat_all)
 
         return edge_index_gcn_all, edge_index_gat_all
+
+
+class GraphTransformerBlock(nn.Module):
+    """Residual graph transformer block for residue-level energy features."""
+    def __init__(self, hidden_dim, heads, edge_dim, dropout_rate):
+        super().__init__()
+        if hidden_dim % heads != 0:
+            raise ValueError(f"hidden_dim ({hidden_dim}) must be divisible by heads ({heads})")
+        self.conv = TransformerConv(
+            hidden_dim,
+            hidden_dim // heads,
+            heads=heads,
+            concat=True,
+            dropout=dropout_rate,
+            edge_dim=edge_dim,
+            beta=True,
+        )
+        self.norm1 = nn.LayerNorm(hidden_dim)
+        self.norm2 = nn.LayerNorm(hidden_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(hidden_dim, 2 * hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(2 * hidden_dim, hidden_dim),
+        )
+        self.dropout = nn.Dropout(dropout_rate)
+
+    def forward(self, x, edge_index, edge_attr):
+        h = self.conv(x, edge_index, edge_attr)
+        x = self.norm1(x + self.dropout(h))
+        h = self.ff(x)
+        return self.norm2(x + self.dropout(h))
+
+
+class PEMGraphTransformer(torch.nn.Module):
+    """Protein energy model using Graph Transformer message passing."""
+    def __init__(
+        self,
+        layers=None,
+        gaussian_coef=None,
+        dropout_rate=0.2,
+        light_attention=False,
+        emb_projection="mlp",
+        gt_hidden_dim=None,
+        gt_heads=None,
+        gt_edge_cutoff=None,
+        gt_edge_rbf_dim=None,
+    ):
+        super().__init__()
+        self.gaussian_coef = gaussian_coef
+        self.hidden_dim = gt_hidden_dim or CFG.gt_hidden_dim
+        self.heads = gt_heads or CFG.gt_heads
+        self.layers = layers or CFG.gt_layers
+        self.edge_cutoff = gt_edge_cutoff or CFG.gt_edge_cutoff
+        self.edge_rbf_dim = gt_edge_rbf_dim or CFG.gt_edge_rbf_dim
+        self.edge_dim = self.edge_rbf_dim + 2
+
+        self.one_hot_index = -20
+        self.llm_index = -1044
+        self.non_bonded_index = 16
+        self.bonded_dim = 32
+
+        self.emb_projection_type = emb_projection
+        if emb_projection == "mlp":
+            self.emb_projector = MLPProjection(
+                input_dim=CFG.emb_input_dim,
+                hidden_dim=CFG.emb_proj_hidden,
+                output_dim=CFG.emb_proj_dim,
+                dropout=dropout_rate,
+            )
+            emb_dim = CFG.emb_proj_dim
+        elif emb_projection == "low_rank":
+            self.emb_projector = LowRankProjection(
+                input_dim=CFG.emb_input_dim,
+                rank=CFG.emb_proj_rank,
+                output_dim=CFG.emb_proj_dim,
+            )
+            emb_dim = CFG.emb_proj_dim
+        else:
+            self.emb_projector = None
+            emb_dim = CFG.emb_input_dim
+
+        node_dim = self.non_bonded_index + self.bonded_dim + 20 + emb_dim
+        self.input_proj = nn.Sequential(
+            nn.Linear(node_dim, self.hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+        )
+        self.blocks = nn.ModuleList([
+            GraphTransformerBlock(self.hidden_dim, self.heads, self.edge_dim, dropout_rate)
+            for _ in range(self.layers)
+        ])
+        self.node_norm = Normalization_layer(self.hidden_dim, affine=True)
+
+        self.light_attention = light_attention
+        if self.light_attention:
+            self.LA = LightAttention(embeddings_dim=self.hidden_dim)
+
+        self.fc1 = nn.Linear(self.hidden_dim, 128)
+        self.fc2 = nn.Linear(128, 1)
+        self.energy_epsilon = 1
+
+    def forward(self, x, f_type='Default', ca_coords=None):
+        B, N, _ = x.shape
+        flat_x = x.reshape(B * N, -1)
+
+        dist_features = flat_x[:, :self.non_bonded_index]
+        bonded_features = flat_x[:, self.non_bonded_index:self.non_bonded_index + self.bonded_dim]
+        one_hot = flat_x[:, self.one_hot_index:]
+        emb_features = flat_x[:, self.llm_index:self.one_hot_index]
+        if self.emb_projector is not None:
+            emb_features = self.emb_projector(emb_features)
+
+        h = torch.cat([dist_features, bonded_features, emb_features, one_hot], dim=-1)
+        h = self.input_proj(h)
+        edge_index, edge_attr = self.get_edge_index_and_attr(x, ca_coords)
+        for block in self.blocks:
+            h = block(h, edge_index, edge_attr)
+
+        h = h.reshape(B, N, -1)
+        h = self.node_norm(h)
+        if self.light_attention:
+            h = h.swapaxes(1, 2)
+            h = self.LA(h)
+            h = h.swapaxes(1, 2)
+
+        h = h.reshape(B * N, -1)
+        h = F.relu(self.fc1(h))
+        h = self.fc2(h).reshape(B, N, 1)
+        if f_type == 'Default':
+            return self.get_energy(h)
+        elif f_type == 'A_inference':
+            return h
+        raise ValueError(f"Unsupported f_type: {f_type}")
+
+    def get_energy(self, Fh):
+        return torch.sum(Fh, dim=(1, 2))
+
+    def get_edge_index_and_attr(self, x, ca_coords=None):
+        B, N = x.shape[0], x.shape[1]
+        device = x.device
+        offsets = torch.arange(B, device=device).unsqueeze(1) * N
+        local_src_parts = []
+        local_dst_parts = []
+
+        if ca_coords is not None:
+            dists = torch.cdist(ca_coords, ca_coords)
+            mask = (dists < self.edge_cutoff) & (dists > 0)
+            batch_idx, src_idx, dst_idx = torch.where(mask)
+            src = batch_idx * N + src_idx
+            dst = batch_idx * N + dst_idx
+            local_src_parts.append(src)
+            local_dst_parts.append(dst)
+        else:
+            arange = torch.arange(N, device=device)
+            src_grid, dst_grid = torch.meshgrid(arange, arange, indexing='ij')
+            mask = src_grid != dst_grid
+            src = (src_grid[mask].unsqueeze(0) + offsets).reshape(-1)
+            dst = (dst_grid[mask].unsqueeze(0) + offsets).reshape(-1)
+            local_src_parts.append(src)
+            local_dst_parts.append(dst)
+
+        if N > 1:
+            seq = torch.arange(N - 1, device=device)
+            seq_src = torch.cat([seq, seq + 1])
+            seq_dst = torch.cat([seq + 1, seq])
+            seq_src = (seq_src.unsqueeze(0) + offsets).reshape(-1)
+            seq_dst = (seq_dst.unsqueeze(0) + offsets).reshape(-1)
+            local_src_parts.append(seq_src)
+            local_dst_parts.append(seq_dst)
+
+        edge_index = torch.stack([torch.cat(local_src_parts), torch.cat(local_dst_parts)], dim=0)
+        edge_pairs = torch.unique(edge_index.t(), dim=0)
+        edge_index = edge_pairs.t().contiguous()
+        edge_attr = self.get_edge_attr(edge_index, ca_coords, B, N, device)
+        return edge_index, edge_attr
+
+    def get_edge_attr(self, edge_index, ca_coords, B, N, device):
+        src = edge_index[0]
+        dst = edge_index[1]
+        batch_idx = src // N
+        local_src = src % N
+        local_dst = dst % N
+        if ca_coords is not None:
+            delta = ca_coords[batch_idx, local_src] - ca_coords[batch_idx, local_dst]
+            dist = torch.norm(delta, dim=-1)
+        else:
+            dist = torch.zeros(src.shape[0], device=device)
+
+        centers = torch.linspace(0.0, float(self.edge_cutoff), self.edge_rbf_dim, device=device)
+        width = max(float(self.edge_cutoff) / max(self.edge_rbf_dim - 1, 1), 1e-6)
+        rbf = torch.exp(-((dist.unsqueeze(-1) - centers) / width) ** 2)
+        seq_sep = torch.abs(local_src - local_dst).float()
+        seq_sep_norm = (seq_sep / max(N - 1, 1)).unsqueeze(-1)
+        bonded = (seq_sep == 1).float().unsqueeze(-1)
+        return torch.cat([rbf, seq_sep_norm, bonded], dim=-1)
+
+
+def build_energy_model(
+    model_arch=None,
+    layers=None,
+    gaussian_coef=None,
+    dropout_rate=None,
+    light_attention=None,
+    emb_projection=None,
+    gat_cutoff=None,
+):
+    """Build a DeepPEF energy model while keeping train/eval scripts architecture-agnostic."""
+    model_arch = model_arch or CFG.model_arch
+    layers = CFG.num_layers if layers is None else layers
+    gaussian_coef = CFG.gaussian_coef if gaussian_coef is None else gaussian_coef
+    dropout_rate = CFG.dropout_rate if dropout_rate is None else dropout_rate
+    light_attention = CFG.light_attention if light_attention is None else light_attention
+    emb_projection = CFG.emb_projection if emb_projection is None else emb_projection
+    gat_cutoff = CFG.gat_cutoff if gat_cutoff is None else gat_cutoff
+
+    if model_arch == "pem":
+        return PEM(
+            layers=layers,
+            gaussian_coef=gaussian_coef,
+            dropout_rate=dropout_rate,
+            light_attention=light_attention,
+            emb_projection=emb_projection,
+            gat_cutoff=gat_cutoff,
+        )
+    if model_arch == "graph_transformer":
+        return PEMGraphTransformer(
+            layers=CFG.gt_layers,
+            gaussian_coef=gaussian_coef,
+            dropout_rate=dropout_rate,
+            light_attention=light_attention,
+            emb_projection=emb_projection,
+            gt_hidden_dim=CFG.gt_hidden_dim,
+            gt_heads=CFG.gt_heads,
+            gt_edge_cutoff=CFG.gt_edge_cutoff,
+            gt_edge_rbf_dim=CFG.gt_edge_rbf_dim,
+        )
+    raise ValueError(f"Unsupported model_arch: {model_arch}")
     
 class PEMSM(torch.nn.Module):
   """Score matching Protein energy model"""

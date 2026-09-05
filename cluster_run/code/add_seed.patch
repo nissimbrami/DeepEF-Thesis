@@ -1,0 +1,38 @@
+diff --git a/Megascale-fineTuning/train.py b/Megascale-fineTuning/train.py
+index 79c5529..ca26bb2 100644
+--- a/Megascale-fineTuning/train.py
++++ b/Megascale-fineTuning/train.py
+@@ -21,6 +21,7 @@ import wandb
+ from tqdm import tqdm
+ from sklearn.model_selection import KFold
+ import gc
++import random
+ import pandas as pd
+ 
+ # Constants
+@@ -50,6 +51,7 @@ MODEL_NAME += 'kf' # pnas data clearning
+ import argparse as _argparse
+ _p = _argparse.ArgumentParser(add_help=False)
+ _p.add_argument('--loss_mode', default='dg', choices=['dg', 'ddg', 'joint', 'ddg_head'])
++_p.add_argument('--seed', type=int, default=42, help='global RNG seed for python/numpy/torch and KFold/train_test_split random_state (reproducibility / seed-ensemble)')
+ _p.add_argument('--ddg_weight', type=float, default=1.0)
+ _p.add_argument('--epochs', type=int, default=None, help='override EPOCHS (freeze-phase) for a cheap pilot')
+ _p.add_argument('--max_folds', type=int, default=None, help='run only the first N folds (pilot)')
+@@ -82,6 +84,17 @@ DG_LENGTH_NORM = _a.dg_length_norm
+ AFFINE_CALIB = _a.affine_calib
+ DESIGNED_WEIGHT = _a.designed_weight
+ 
++# --seed: single knob for full reproducibility + seed-ensemble. Overrides the hardcoded
++# RANDOM_SEED so KFold/train_test_split random_state below all follow --seed too.
++RANDOM_SEED = _a.seed
++def set_seed(seed):
++    """Seed python, numpy and torch (CPU+all CUDA devices) for reproducible runs."""
++    random.seed(seed)
++    np.random.seed(seed)
++    torch.manual_seed(seed)
++    torch.cuda.manual_seed_all(seed)
++set_seed(RANDOM_SEED)
++
+ import re as _re
+ def is_designed(name):
+     """EXP-19: Rocklin/Tsuboyama de-novo DESIGNED mini-proteins by name (HHH/HEEH/EEHEE/EHEE topologies,

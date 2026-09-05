@@ -21,6 +21,7 @@ import wandb
 from tqdm import tqdm
 from sklearn.model_selection import KFold
 import gc
+import random
 import pandas as pd
 
 # Constants
@@ -50,6 +51,7 @@ MODEL_NAME += 'kf' # pnas data clearning
 import argparse as _argparse
 _p = _argparse.ArgumentParser(add_help=False)
 _p.add_argument('--loss_mode', default='dg', choices=['dg', 'ddg', 'joint', 'ddg_head'])
+_p.add_argument('--seed', type=int, default=42, help='global RNG seed for python/numpy/torch and KFold/train_test_split random_state (reproducibility / seed-ensemble)')
 _p.add_argument('--ddg_weight', type=float, default=1.0)
 _p.add_argument('--epochs', type=int, default=None, help='override EPOCHS (freeze-phase) for a cheap pilot')
 _p.add_argument('--max_folds', type=int, default=None, help='run only the first N folds (pilot)')
@@ -71,9 +73,11 @@ _p.add_argument('--dg_length_norm', default='none', choices=['none', 'n', 'sqrtn
 _p.add_argument('--affine_calib', action='store_true', help='lever 3: after training, fit a global affine (a,b) on TRAIN predictions and write a sidecar for evaluate.py (fixes RMSE; does not change PCC)')
 _p.add_argument('--designed_weight', type=float, default=1.0, help='EXP-19: oversample DESIGNED-fold minis (HHH/HEEH/EEHEE/EHEE/TrROS/v2_) by this factor via WeightedRandomSampler (1.0=off=uniform). Tests whether more gradient on designed folds fixes the EXP-14 slope-collapse.')
 _p.add_argument('--wt_anchor_weight', type=float, default=0.0, help='WS-1 Arm A: weight of the WT/absolute-dG anchor loss L1(pred_dG(WT), exp_dG(WT)). In ddg mode the absolute scale is free (only differences are supervised) so pred WT abs-dG is at chance (EXP-20/22); this term pins the per-protein baseline = attacks the calibration offset. 0 = off.')
+_p.add_argument('--slope_weight', type=float, default=0.0, help='Agent-E SLOPE term: weight of abs(std(pred_ddg) - std(true_ddg)) computed WITHIN the current protein/minibatch (per-protein ddg = output - wt_dg vs delta_g - delta_g_wt; WT = row 0). Penalises the model under-reacting/compressing the spread of ddG within a protein (per-protein slope a_p). 0 = off = bit-identical to baseline.')
 _a, _ = _p.parse_known_args()
 READOUT = _a.readout
 WT_ANCHOR_WEIGHT = _a.wt_anchor_weight
+SLOPE_WEIGHT = _a.slope_weight
 VAL_FRAC = _a.val_frac
 POOLED_CORR_WEIGHT = _a.pooled_corr_weight
 POOLED_WINDOW = _a.pooled_window
@@ -81,6 +85,17 @@ POOLED_CAP = _a.pooled_cap
 DG_LENGTH_NORM = _a.dg_length_norm
 AFFINE_CALIB = _a.affine_calib
 DESIGNED_WEIGHT = _a.designed_weight
+
+# --seed: single knob for full reproducibility + seed-ensemble. Overrides the hardcoded
+# RANDOM_SEED so KFold/train_test_split random_state below all follow --seed too.
+RANDOM_SEED = _a.seed
+def set_seed(seed):
+    """Seed python, numpy and torch (CPU+all CUDA devices) for reproducible runs."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+set_seed(RANDOM_SEED)
 
 import re as _re
 def is_designed(name):
@@ -412,8 +427,21 @@ class Trainer():
                         reg_loss = REG_LAMBDA * sum([F.mse_loss(param,torch.zeros_like(param)) for param in self.model.parameters()])
                     energys = torch.cat((u_energy,f_energy),dim=0)
                     energy_reg = E_REG_LAMBDA * (F.mse_loss(energys,torch.zeros_like(energys)))
+                    # Agent-E SLOPE term (thesis contribution): penalise the mismatch between the
+                    # spread of predicted vs true ddG WITHIN this protein/minibatch. ddG uses the
+                    # exact WS-1 convention (WT = row 0; ddg = output - wt_dg vs delta_g - delta_g_wt).
+                    # Guarded: when SLOPE_WEIGHT == 0 NOTHING is built, so the autograd graph + loss
+                    # value are bit-identical to baseline. unbiased=False for determinism; skip <2 vars.
+                    if SLOPE_WEIGHT > 0 and output.numel() >= 2:
+                        wt_dg_slope, _, _ = self.get_wt_deltaG(batch)
+                        delta_g_wt_slope = batch['delta_g'][0, 0].to(self.device)
+                        slope_pred_ddg = output - wt_dg_slope
+                        slope_true_ddg = delta_g - delta_g_wt_slope
+                        slope_loss = torch.abs(slope_pred_ddg.std(unbiased=False) - slope_true_ddg.std(unbiased=False))
                     data_loss = l1_loss if LOSS_MODE == 'dg' else (ddg_loss if LOSS_MODE == 'ddg' else l1_loss + DDG_WEIGHT * ddg_loss)
                     loss = data_loss + reg_loss + energy_reg + WT_ANCHOR_WEIGHT * wt_anchor_loss
+                    if SLOPE_WEIGHT > 0 and output.numel() >= 2:
+                        loss = loss + SLOPE_WEIGHT * slope_loss
                     loss.backward()
                     self.optimizer.step()
                     train_pc_corr = torch.corrcoef(torch.cat((output[None,:],delta_g[None,:])))[0, 1]

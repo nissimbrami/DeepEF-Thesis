@@ -1,7 +1,7 @@
 # CHECKLIST.md — ship gate for `cluster_run/`
 
 Every line must read **PASS** before the package is offered for approval. Filled in
-2026-09-05 against the assembled package (18 files, 184 K). Evidence is the actual command
+2026-09-05 against the assembled package (19 files, 192 K). Evidence is the actual command
 output, not a claim. Verifier: `_clusterdev/verify_pkg.py` (dev-only, not shipped).
 
 Snapshot: built against `shaharec/main` (`origin/main`) commit `0ef6d3d`; local run branch
@@ -13,7 +13,7 @@ Snapshot: built against `shaharec/main` (`origin/main`) commit `0ef6d3d`; local 
 
 | # | Check | Result | Evidence |
 |---|---|---|---|
-| A1 | Exactly the intended file set, nothing more/less | **PASS** | verifier `completeness`: MISSING none, EXTRA none. 18 files: README, CHECKLIST, 6 docs, 4 code, 6 scripts |
+| A1 | Exactly the intended file set, nothing more/less | **PASS** | verifier `completeness`: MISSING none, EXTRA none. 19 files: README, CHECKLIST, 7 docs (HANDOVER, RUNBOOK, STATE, ORIENTATION, COMPUTE_PLAN, BUILD, STATUS), 4 code, 6 scripts |
 | A2 | No empty / placeholder files | **PASS** | verifier `sizes`: smallest is `01_data_check.sh`=1610 B; none 0 B |
 | A3 | No CRLF — every file LF-only | **PASS** | verifier `CRLF (bytes 0x0d)`: "NONE (all LF)"; `file scripts/*.sh` → "ASCII text" |
 | A4 | No absolute Windows / WSL / home / mnt paths | **PASS** | verifier `forbidden paths`: no hit for the Windows username, the WSL home path, or the drive-mount prefix. The one UNC-path hit is STATE.md:52 quoting that path as the mistake NOT to make (intentional) |

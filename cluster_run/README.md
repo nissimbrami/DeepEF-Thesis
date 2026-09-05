@@ -11,9 +11,9 @@ depend on, the surrounding `Megascale-fineTuning/` tree (`preflight.py` imports
 `pnas_train.build_energy_model`; the scripts call `Megascale-fineTuning/train.py` and
 `run_calib_eval.sh`). Run the package from inside a checkout of that repo, not in isolation.
 
-**If you are an agent starting with no context: read `docs/RUNBOOK.md` first (again after every
-compaction), then `docs/ORIENTATION.md` in full, then `docs/BUILD.md`. Do not run anything before
-you have read all three.**
+**If you are an agent starting with no context: read `docs/HANDOVER.md` first (it is written for
+exactly that), then `docs/RUNBOOK.md` (again after every compaction), then `docs/ORIENTATION.md`
+in full. Do not run anything before you have read them.**
 
 ---
 
@@ -24,6 +24,7 @@ the Ben-Gurion University CS SLURM cluster.
 
 | File | What it is |
 |---|---|
+| `docs/HANDOVER.md` | **The zero-context entry point for the cluster agent.** What to receive from Nissim, the two repos and the read-only rule, the first sixty minutes step-by-step, the phase gates, and what to report. **Read first if you are the cluster operator.** |
 | `docs/RUNBOOK.md` | **The preflight checklist. Re-read at the start of every session and after every context compaction, before any command.** The run card, the currency check, the six numbers and their qualifiers, the predictions register, and the operational mistakes already paid for |
 | `docs/STATE.md` | The measured state: results to date, decisions taken, and what is still missing before training can start |
 | `docs/ORIENTATION.md` | The context. What the project is, the research goal, the settled facts with their sources, the hard rules, and the procedure with its gates. **Read first.** |
@@ -59,13 +60,14 @@ pooled or per-protein, ΔG or ΔΔG, which split and which selection.
 
 ## Start here
 
-0. `docs/RUNBOOK.md` — **read this first, and again after every compaction.** It is short and it is what stops you measuring the wrong thing
-1. `docs/ORIENTATION.md` — read fully; save sections 2, 3 and 7 to memory
-2. `docs/STATE.md` — the measured state and the decisions already taken
-3. `docs/COMPUTE_PLAN.md` — the experiment design; it replaces ORIENTATION §6
-4. `docs/STATUS.md` — what is already tested and what is not
-5. `docs/BUILD.md` — build B1, then B2
-6. Report what you found before building anything further
+0. `docs/HANDOVER.md` — **the cluster operator starts here**: prerequisites, the repos, the first sixty minutes, the phase gates
+1. `docs/RUNBOOK.md` — **read this early, and again after every compaction.** It is short and it is what stops you measuring the wrong thing
+2. `docs/ORIENTATION.md` — read fully; save sections 2, 3 and 7 to memory
+3. `docs/STATE.md` — the measured state and the decisions already taken
+4. `docs/COMPUTE_PLAN.md` — the experiment design; it replaces ORIENTATION §6
+5. `docs/STATUS.md` — what is already tested and what is not
+6. `docs/BUILD.md` — build B1, then B2
+7. Report what you found before building anything further
 
 **One thing to internalise before you start:** on the laptop this was a sequential ladder because
 each run cost ten hours. Here it is a factorial design, because the constraint is no longer time

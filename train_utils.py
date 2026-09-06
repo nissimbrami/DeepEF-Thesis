@@ -7,6 +7,10 @@ import numpy as np
 from tqdm import tqdm
 import gc
 from model.model_cfg import CFG
+# W6 (item 19): the amino-acid descriptor block. Depends ONLY on the committed CSV --
+# never on rdkit, which must never enter esm2_env_py38.
+from aa_descriptors import (aa_descriptor_mode, desc_or_none, descriptor_dim,
+                            keeps_one_hot)
 
 # amino acid one hot map
 AA_MAP = {
@@ -273,6 +277,23 @@ def _solv_or_none(x, one_hot, mask, folded):
     return solvation_features(x, one_hot, mask, folded=folded)
 
 
+def _desc_or_none(one_hot):
+    """W6: the [N,K] descriptor block, or None when --aa_descriptors none (default)."""
+    return desc_or_none(one_hot, CFG)
+
+
+def _onehot_block(one_hot):
+    """The trailing 20 columns. Under pca16_only the alphabet is removed by ZEROING
+    rather than deleting: hydro_net slices emb and one-hot RIGHT-ANCHORED, so deleting
+    the columns would silently re-point x[:, -20:] into the ProtT5 embedding and slide
+    the 1024-wide llm window left into Fb. Every shape check would still pass and every
+    number would be wrong. Zeroing carries the same information -- a constant column is
+    a bias the following Linear already has."""
+    if keeps_one_hot(aa_descriptor_mode(CFG)):
+        return one_hot
+    return torch.zeros_like(one_hot)
+
+
 def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     """Get graph representation of protein 
     Args:
@@ -297,10 +318,10 @@ def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     D = F.normalize(D,p=2,dim=0)
     emb = F.normalize(emb,p=2,dim=0)
     _S = _solv_or_none(x, one_hot, mask, folded=True)
-    if _S is None:
-        Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
-    else:
-        Fh = torch.cat([D,Fb,_S,emb,one_hot],dim=1) #N,16+32+3+emb_size
+    _Dsc = _desc_or_none(one_hot)                     # W6: [N,K] or None
+    _oh = _onehot_block(one_hot)                      # W6: zeroed under pca16_only
+    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + [emb, _oh]
+    Fh = torch.cat(_blocks, dim=1)  # N,16+32[+3][+K]+emb_size+20
     
     return Fh
 
@@ -380,7 +401,15 @@ def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     D = F.normalize(D,p=2,dim=0)
     emb = F.normalize(_unfolded_emb(emb),p=2,dim=0)   # U2: unfolded pass only
     _S = _solv_or_none(x, one_hot, mask, folded=False)   # W5: burial is ZERO unfolded
-    Fh = torch.cat([D,Fb,emb,one_hot],dim=1) if _S is None else torch.cat([D,Fb,_S,emb,one_hot],dim=1)
+    # W6: the descriptor block is IDENTICAL in both states, by design -- valine is
+    # valine in the coil. It therefore cancels in E_u - E_f for a linear readout and
+    # contributes only through the nonlinearity and message passing. That is honest
+    # physics, NOT the W5 cancellation bug: burial was supposed to differ and did not;
+    # chemistry is supposed not to differ, and does not.
+    _Dsc = _desc_or_none(one_hot)
+    _oh = _onehot_block(one_hot)
+    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + [emb, _oh]
+    Fh = torch.cat(_blocks, dim=1)
 
     return Fh
 
@@ -430,7 +459,10 @@ def _flory_unfolded_graph(x, one_hot, emb, mask, gaussian_coef):
     D = F.normalize(D, p=2, dim=0)
     emb = F.normalize(_unfolded_emb(emb), p=2, dim=0)   # U2: unfolded pass only
     _S = _solv_or_none(x, one_hot, mask, folded=False)   # W5: burial is ZERO unfolded
-    Fh = torch.cat([D, Fb, emb, one_hot], dim=1) if _S is None else torch.cat([D, Fb, _S, emb, one_hot], dim=1)
+    _Dsc = _desc_or_none(one_hot)                        # W6: state-independent
+    _oh = _onehot_block(one_hot)
+    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + [emb, _oh]
+    Fh = torch.cat(_blocks, dim=1)
 
     return Fh
 

@@ -290,6 +290,31 @@ class LowRankProjection(nn.Module):
         return self.up(self.down(x))
 
 
+def _aa_desc_mode(cfg):
+    """W6: the active descriptor mode, or 'none' if the module is absent.
+    A flag set while the module is missing is a HARD ERROR, never a silent fallback --
+    a run that quietly ignored --aa_descriptors would be reported as a descriptor
+    result and would be a lie."""
+    requested = getattr(cfg, 'aa_descriptors', 'none') or 'none'
+    try:
+        from aa_descriptors import aa_descriptor_mode
+    except ImportError:
+        if requested != 'none':
+            raise ImportError(
+                "W6: --aa_descriptors %s was requested but aa_descriptors.py is not "
+                "importable. Copy it to the repo root beside train_utils.py." % requested)
+        return 'none'
+    return aa_descriptor_mode(cfg)
+
+
+def _aa_desc_dim(mode, cfg):
+    """W6: K, read from the committed CSV. 0 when off."""
+    if mode == 'none':
+        return 0
+    from aa_descriptors import descriptor_dim
+    return descriptor_dim(mode, cfg)
+
+
 class PEM(torch.nn.Module):
     """Protein energy model"""
 
@@ -342,10 +367,18 @@ class PEM(torch.nn.Module):
         self.solv_dim = 3 if getattr(CFG, 'burial_features', False) else 0
         self.solv_start = 48                      # after D(16) + Fb(32)
         _sd = self.solv_dim
-        self.fc1_gcn = nn.Linear(52 + _sd + proj_extra, 64) # 52 = 32(dist) + 20(one-hot) [+ solv] [+ proj_extra]
+        # W6: the descriptor block sits immediately after the solvation block, so it
+        # starts at 48 + solv_dim. K comes from the committed CSV, never hard-coded.
+        self.desc_mode = _aa_desc_mode(CFG)
+        self.desc_dim = _aa_desc_dim(self.desc_mode, CFG)
+        self.desc_start = self.solv_start + self.solv_dim
+        _dd = self.desc_dim
+        # ONLY fc1_* grow. fc2_* project back to FIXED internal widths, so inst_norm1,
+        # inst_norm2 and fc_in_dim must NOT change -- widening them was a real bug.
+        self.fc1_gcn = nn.Linear(52 + _sd + _dd + proj_extra, 64) # 52 = 32(dist) + 20(one-hot) [+ solv] [+ proj_extra]
         self.fc2_gcn = nn.Linear(64, gcn_dim_in)
         # Fully connected layers - GAT
-        self.fc1_gat = nn.Linear(36 + _sd + proj_extra, 64) # 36 = 16(dist) + 20(one-hot) [+ solv] [+ proj_extra]
+        self.fc1_gat = nn.Linear(36 + _sd + _dd + proj_extra, 64) # 36 = 16(dist) + 20(one-hot) [+ solv] [+ proj_extra]
         self.fc2_gat = nn.Linear(64, gat_dim_in)
         # normalization layers
         self.inst_norm1 = Normalization_layer(36 + proj_extra, affine=True)
@@ -399,10 +432,17 @@ class PEM(torch.nn.Module):
         B, N, _ = x.shape
         x = x.reshape(B * N,-1)
         # split features to 2 graphs, bonded and non-bonded
+        # W5 + W6: extend this branch, never bypass it. NOTE the GCN slice is x[:, :32]
+        # -- D(16) plus only HALF of Fb. That is the model as trained; widening it to
+        # :48 feeds 71 dims into a 55-dim layer. Do not "fix" it here.
+        _extra = []
         if self.solv_dim:
-            _solv = x[:, self.solv_start:self.solv_start + self.solv_dim]
-            x_gcn = torch.cat((x[:,:self.non_bonded_index + self.non_bonded_index], _solv, x[:,self.one_hot_index:]),dim=-1) # B*N,52+3
-            x_gat = torch.cat((x[:,:self.non_bonded_index], _solv, x[:,self.one_hot_index:]),dim=-1) # B*N,36+3
+            _extra.append(x[:, self.solv_start:self.solv_start + self.solv_dim])
+        if getattr(self, 'desc_dim', 0):
+            _extra.append(x[:, self.desc_start:self.desc_start + self.desc_dim])
+        if _extra:
+            x_gcn = torch.cat((x[:,:self.non_bonded_index + self.non_bonded_index], *_extra, x[:,self.one_hot_index:]),dim=-1)
+            x_gat = torch.cat((x[:,:self.non_bonded_index], *_extra, x[:,self.one_hot_index:]),dim=-1)
         else:
             x_gcn = torch.cat((x[:,:self.non_bonded_index+ self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
             x_gat = torch.cat((x[:,:self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,36
@@ -453,9 +493,11 @@ class PEM(torch.nn.Module):
         
     def forward_gat(self, x, edge_index_gat, B, N):
         """forward function for the graph model"""
-        if getattr(self, 'solv_dim', 0):
-            # W5: the input is wider than fc2_gat's fixed output, so the residual must
-            # be taken AFTER the projection or h1 + identity is a shape error.
+        if getattr(self, 'solv_dim', 0) or getattr(self, 'desc_dim', 0):
+            # W5 + W6: the input is wider than fc2_gat's fixed output, so the residual
+            # must be taken AFTER the projection or h1 + identity is a shape error.
+            # W6 extends this same branch rather than adding a second one: the real
+            # condition is "is the input wider than baseline", and either block widens it.
             x = self.fc1_gat(x)
             x = F.relu(x)
             x = self.fc2_gat(x)

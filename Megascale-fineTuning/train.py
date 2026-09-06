@@ -76,6 +76,9 @@ _p.add_argument('--wt_anchor_weight', type=float, default=0.0, help='WS-1 Arm A:
 _p.add_argument('--slope_weight', type=float, default=0.0, help='Agent-E SLOPE term: weight of abs(std(pred_ddg) - std(true_ddg)) computed WITHIN the current protein/minibatch (per-protein ddg = output - wt_dg vs delta_g - delta_g_wt; WT = row 0). Penalises the model under-reacting/compressing the spread of ddG within a protein (per-protein slope a_p). 0 = off = bit-identical to baseline.')
 _p.add_argument('--flory_unfolded', action='store_true', help="Lever D (coil): replace the tridiagonal-mask unfolded reference with an analytic Flory random-coil, d(i,j)=b*|i-j|^nu, b = protein mean CA-CA bond length. Value-only, shape-identical, no new parameters. Default OFF reproduces the tridiagonal baseline bit-for-bit.")
 _p.add_argument('--flory_nu', type=float, default=0.5, help='Lever D coil scaling exponent, must be in (0,1]. 0.5 = ideal chain; ~0.588 = self-avoiding walk. Only read when --flory_unfolded is set.')
+_p.add_argument('--coil_channels', type=str, default='broadcast', choices=['broadcast','ca_only','offset'], help="U3: how the one residue-level coil distance becomes 16 atom-pair channels. broadcast (default, bit-identical) puts the same d in all 16, which makes folded and unfolded trivially separable after the row-sum. ca_only gives d to the CA-CA channel and re-zeroes the other 15 AFTER the kernel. offset adds a fixed per-channel intra-residue offset. Only read when --flory_unfolded is set.")
+_p.add_argument('--coil_b', type=str, default='fitted', choices=['fitted','fixed'], help="U4: the coil effective segment length. fitted (default, bit-identical) uses the protein's own mean folded CA-CA distance, which re-injects folded geometry into the reference state the lever exists to remove. fixed uses 5.82 A, converted to model coordinate units. Only read when --flory_unfolded is set.")
+_p.add_argument('--coil_offsets_path', type=str, default='', help="U3 offset arm: JSON from scripts/measure_coil_offsets.py, already in model units, overriding the built-in fallback table.")
 _p.add_argument('--unfolded_emb', type=str, default='full', choices=['full', 'zero', 'mean'], help="U2 / Lever D: what the ProtT5 embedding contributes to the UNFOLDED reference state only. full=current behaviour (bit-identical default). zero=the unfolded state is fold-blind. mean=per-column mean broadcast back, keeping global scale but removing per-residue identity. Chosen as factor D by the W0 channel ablation: zeroing this block drops var(E_u) across proteins to 0.331 of baseline and corr(E_u,wt_err) from 0.420 to 0.119, whereas the Flory coil raises var(E_u) to 1.175.")
 _p.add_argument('--burial_features', action='store_true', help="W5: add a 3-dim solvation block (burial, Kyte-Doolittle hydropathy, burial*hydropathy) between Fb and emb. Burial is ZERO in the unfolded state -- the delta-ASA between states IS the hydrophobic driving force, and computing it from the same coordinates in both states makes the column cancel exactly in E_u-E_f. Normalised by a constant, never by N. Default off = bit-identical.")
 _p.add_argument('--burial_mode', type=str, default='count', choices=['count', 'hse'], help="W5 arm: 'count' = Cbeta neighbours within 10A; 'hse' = half-sphere exposure, the standard neighbour-count burial measure, which is direction-aware and needs only CA and CB -- exactly what this backbone-only dataset has. Only read when --burial_features is set.")
@@ -98,6 +101,10 @@ DESIGNED_WEIGHT = _a.designed_weight
 # them here is what makes the flag reachable from the command line.
 CFG.flory_unfolded = _a.flory_unfolded
 CFG.flory_nu = _a.flory_nu
+# U3/U4: read inside _flory_unfolded_graph only, i.e. only when --flory_unfolded.
+CFG.coil_channels = _a.coil_channels
+CFG.coil_b = _a.coil_b
+CFG.coil_offsets_path = _a.coil_offsets_path or None
 # U2 (factor D): train_utils._unfolded_emb reads this off CFG at call time.
 CFG.unfolded_emb = _a.unfolded_emb
 # W5: train_utils reads these off CFG at call time.
@@ -182,6 +189,8 @@ config = {
     'wt_anchor_weight': WT_ANCHOR_WEIGHT,
     'flory_unfolded': _a.flory_unfolded,
     'flory_nu': _a.flory_nu,
+    'coil_channels': _a.coil_channels,
+    'coil_b': _a.coil_b,
     'unfolded_emb': _a.unfolded_emb,
     'burial_features': _a.burial_features,
     'burial_mode': _a.burial_mode,

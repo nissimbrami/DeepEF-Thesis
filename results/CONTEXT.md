@@ -367,3 +367,122 @@ git push origin current-vers
   `map_location` and `weights_only=False`.
 - `slurm.bgu.ac.il` round-robins across login nodes — a tmux session lives on one node
   only.
+
+---
+
+# CHECKPOINT 2 — 2026-09-06 21:10Z — THE COIL FINDING WAS REVERSED
+
+**Read after any compaction, in this order:**
+1. `results/CONTEXT.md` — this file, both CHECKPOINT sections
+2. `results/w0.json` (ddG metric) **and** `results/w0_dg.json` (dG metric) — they disagree, and the disagreement IS the finding
+3. `cluster_run/docs/AUTOPILOT.md` — the S0-S9 state machine
+4. `~/auto/autopilot.log` and `~/auto/STATUS.txt` (grep `PROBLEM:`)
+
+## The correction that matters most
+
+CHECKPOINT 1 recorded "the Flory coil makes it WORSE, r_coil = 1.175". **That conclusion
+was drawn on the wrong metric and is now superseded.**
+
+The coil replaces the unfolded distance map with `d(i,j) = b*|i-j|^nu`, a function of
+SEQUENCE SEPARATION ONLY. A point mutation changes neither chain length nor positions,
+so that matrix is IDENTICAL for wild type and mutant and **cancels exactly** in
+`output - output[0]`. Scoring a ΔG lever by a ΔΔG metric measures the cancellation, not
+the lever. The project's own COMPUTE_PLAN line 171 predicted this.
+
+**Re-scored on absolute wild-type ΔG** (`scripts/w0_dg.py`, 28 test proteins,
+calib_ctrl_repro2 e14, no training):
+
+| condition | MAE | corr | std(err) = std(b_p) |
+|---|---|---|---|
+| base | 4.9650 | 0.3464 | 1.0385 |
+| **coil, b fixed 5.82 A** | **3.9521** | 0.3404 | 1.1264 |
+| coil, b fitted | 5.7446 | 0.4065 | 1.1269 |
+| coil, ca_only | 5.5463 | 0.4532 | 1.1073 |
+| unfolded_emb zero | 3.1315 | 0.0510 | 0.9999 |
+
+**The coil with a FIXED b improves absolute ΔG MAE by 1.01 (20%).** It is the strongest
+geometric lever on `b_p` we have, and it was nearly discarded.
+
+**This also settles U4 empirically:** `fitted` HURTS (+0.78) and `fixed` HELPS (-1.01).
+Fitting `b` to the protein's own folded mean CA-CA distance re-injects folded geometry
+into the reference state the lever exists to remove. Use `--coil_b fixed`.
+
+**Caveat to carry:** `noemb` has the lowest MAE (3.13) but destroys the across-protein
+correlation (0.35 -> 0.05). It removes the offset by removing the signal. The coil keeps
+corr while cutting MAE. Do not read MAE alone.
+
+## What this changes downstream
+
+- Factor D of the running 48-run factorial stays `--unfolded_emb` — that decision was
+  made on the ΔΔG metric and is still correct FOR ΔΔG. Do not re-open it.
+- **A ΔG arm is now justified**: `--loss_mode dg --flory_unfolded --coil_b fixed`.
+  Better ΔG means smaller `b_p`, which closes the pooled->PP gap. The coil helps ΔΔG
+  INDIRECTLY, through calibration.
+- Every geometric unfolded-state lever must be scored on ΔG, never ΔΔG.
+
+## Rule to keep
+
+**Score a lever on the metric it acts on.** ΔΔG cancels anything that is identical
+between wild type and mutant — chain length, positions, and therefore every purely
+geometric reference-state change. ΔG does not.
+
+---
+
+# CHECKPOINT 3 — 2026-09-06 21:15Z — WAKE-UP INSTRUCTIONS
+
+## If you are a fresh agent, read exactly these, in this order
+
+1. **This file**, all three CHECKPOINT sections. CHECKPOINT 2 supersedes part of CHECKPOINT 1 — read both and note the correction.
+2. `results/w0.json` — the ddG-metric ablation. Decided factor D.
+3. `results/w0_dg.json` — the SAME levers on the dG metric. **They disagree, and the disagreement is the finding.**
+4. `results/fix3_block_std.json` — the slope-term measurement.
+5. `cluster_run/docs/AUTOPILOT.md` — the S0-S9 state machine and the four halts.
+6. `~/auto/autopilot.log` (tail) and `~/auto/STATUS.txt` (grep `PROBLEM:`).
+
+Do NOT re-derive anything recorded here. A decision already written was made with evidence
+that is on disk; re-deciding without that evidence is how a stale premise gets re-adopted.
+
+## WHAT WE ARE WAITING FOR — one thing only
+
+**The 48-run calibration factorial.** The account is capped at **8 rtx_6000 and ZERO of
+every other card type** (`MaxTRESPA` on account `keasar`, applies regardless of QOS —
+`--qos normal` does NOT bypass it; that claim was wrong and is corrected). So roughly 5-8
+run concurrently and the rest queue. Expect **~1.5 days** for all 48, and it cannot be
+accelerated without an admin raising the cap:
+
+    sacctmgr modify account keasar set MaxTRESPA=gres/gpu:rtx_6000=8,gres/gpu:rtx_4090=8
+
+Nothing else is waiting on compute. All code work runs in parallel on login nodes.
+
+## Live state as of this checkpoint
+
+- 5 training runs on GPU, 99 queued (48 trainings + 51 chained evals).
+- **0 factorial eval CSVs so far.** A finished training run is NOT a result — completion
+  is defined by a non-empty CSV in `eval_results/`. Three separate 7h+ runs once reached
+  COMPLETED with no CSV.
+- The autopilot runs under tmux (`tmux attach -t autopilot`). It died once because
+  `results/` did not exist and the atomic state write failed; the directory now exists and
+  the lock is pid-aware and self-reclaiming. If it is dead again:
+  `tmux new-session -d -s autopilot "bash /home/nissimb/auto/run_autopilot.sh"`
+- Six workers are applying the remaining items in parallel: U5/U6, W7 edge features,
+  monitor+autodebug, the end-to-end verification suite, the 100k catalogue, and W8 built
+  generically.
+
+## The rule that produced the two biggest findings
+
+**Score a lever on the metric it acts on.** ddG cancels anything identical between wild
+type and mutant — chain length, positions, and therefore every purely geometric
+reference-state change. The Flory coil looked harmful on ddG (r=1.175) and turns out to
+be our strongest geometric lever on `b_p` when scored on absolute dG (MAE 4.965 -> 3.952
+with `--coil_b fixed`). It was nearly discarded on the wrong measurement.
+
+## Standing site rules (paid for in wasted runs)
+
+- `export WANDB_MODE=disabled` before EVERY submission.
+- `--qos normal --gres=gpu:rtx_6000:1`; never select a GPU by partition name.
+- Never `ise-pheno`, never 2080/1080. All seeds of one cell on one node class.
+- Tensors in `data/` were saved on CUDA: load with `map_location` and `weights_only=False`.
+- `class PEM(torch.nn.Module):` — an anchor written `nn.Module` silently matches nothing.
+- After ANY change to the feature vector run `python scripts/gate_g4_cpu.py`. It must
+  print `baseline ... dG=-0.0030 width=1092`. A moved baseline means every run in flight
+  is invalidated — revert, do not debug in place.

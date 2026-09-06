@@ -373,6 +373,184 @@ def _unfolded_emb(emb):
     raise ValueError("CFG.unfolded_emb must be one of full|zero|mean; got %r" % (mode,))
 
 
+# ---------------------------------------------------------------------------
+# U3 / U4 -- the Flory coil's two open design choices, promoted from silent
+# defaults to explicit arms. Both are read ONLY inside _flory_unfolded_graph,
+# i.e. only when CFG.flory_unfolded is True. With CFG.coil_channels='broadcast'
+# and CFG.coil_b='fitted' the coil is bit-identical to the pre-U3/U4 code.
+# ---------------------------------------------------------------------------
+
+# get_dist_matrix reshapes to (N_i, N_atoms_i, N_j, N_atoms_j), swaps axes 1<->2 to
+# (N_i, N_j, N_atoms_i, N_atoms_j), then flattens the last two. So the 16-wide
+# channel index is atom_i*4 + atom_j with atom order (N=0, CA=1, C=2, CB=3), and
+# CA-CA is channel 1*4+1 = 5. Verified by scripts/verify_coil_channels.py, which
+# rebuilds get_dist_matrix verbatim and asserts channel c == ||atom_{c//4} - atom_{c%4}||.
+_CA_CA_CHANNEL = 5
+
+# U4: experimentally calibrated random-coil effective segment length.
+#
+# *** UNITS. READ THIS. *** train.normalize_batch does
+#     batch['coords'] = batch['coords'] * NANO_TO_ANGSTROM      # NANO_TO_ANGSTROM = 0.1
+# BEFORE get_graph / get_unfolded_graph are ever called, so despite the constant's
+# name the coordinates the coil sees are TEN TIMES SMALLER than Angstrom. The
+# 'fitted' b measured on those coordinates is ~0.38, not ~3.8. Writing a literal
+# 5.82 here would therefore make the 'fixed' arm about 15x too large, the coil
+# distances would saturate the Gaussian kernel to ~0 everywhere, and the arm would
+# be measuring "coil switched off" while being reported as "coil with a fixed b".
+#
+# So the constant is stored in Angstrom, where it is checkable against the
+# literature, and converted ONCE to the model's coordinate scale. If the coordinate
+# scaling in normalize_batch ever changes, change _COIL_COORD_SCALE with it --
+# scripts/gate_u3u4.py test 8b pins the two together by asserting that fixed b is
+# within a factor of ~3 of the fitted b measured on real coordinates.
+_COIL_B_FIXED_ANGSTROM = 5.82
+_COIL_COORD_SCALE = 0.1          # == train.NANO_TO_ANGSTROM, applied in normalize_batch
+_COIL_B_FIXED = _COIL_B_FIXED_ANGSTROM * _COIL_COORD_SCALE   # 0.582 in model units
+
+# U3 'offset' arm: per-channel additive offset relative to the CA-CA channel,
+# offset[c] = <d(atom_i, atom_j)> - <d(CA, CA)> over the FOLDED set at matched |i-j|.
+#
+# UNITS: this table is in ANGSTROM, and _coil_channel_offsets multiplies it by
+# _COIL_COORD_SCALE to reach the model's coordinate scale -- same reason as
+# _COIL_B_FIXED above. measure_coil_offsets.py measures in model units and reports
+# BOTH, so read its header before pasting.
+#
+# These are NOT invented -- scripts/measure_coil_offsets.py measures them on the
+# training proteins and prints a drop-in replacement for this literal, and
+# --coil_offsets_path makes the measured file OVERRIDE this table at run time. The
+# values below are the rigid-geometry fallback (see REPORT.md "Assumptions"): add_cb
+# builds CB as a FIXED linear function of N/CA/C, so the intra-residue legs are
+# constant by construction and dominate the offsets.
+# Produced by the idealised-alpha-helix rigid-backbone calculation documented in
+# REPORT.md ("The fallback offset table"), pooled over |i-j| = 4, 8, 16. The four
+# diagonal channels (N-N, CA-CA, C-C, CB-CB) come out at exactly 0, as they must:
+# two parallel legs cancel. The table is NOT antisymmetric -- offset[N-CA] != -offset[CA-N]
+# -- because the helix advances along the chain, and that asymmetry is real, not a bug.
+_COIL_OFFSETS_FALLBACK_ANGSTROM = [
+    # atom_i = N        (channels  0.. 3): N-N,   N-CA,  N-C,   N-CB
+    0.0000, 0.4097, 0.9409, 0.7053,
+    # atom_i = CA       (channels  4.. 7): CA-N,  CA-CA, CA-C,  CA-CB
+    -0.2649, 0.0000, 0.4132, 0.2945,
+    # atom_i = C        (channels  8..11): C-N,   C-CA,  C-C,   C-CB
+    -0.3783, -0.2616, 0.0000, 0.0953,
+    # atom_i = CB       (channels 12..15): CB-N,  CB-CA, CB-C,  CB-CB
+    -0.3410, -0.0886, 0.3807, 0.0000,
+]
+
+_COIL_OFFSETS_CACHE = {}
+
+
+def _coil_channel_offsets(device, dtype):
+    """[16] additive per-channel offset for the U3 'offset' arm.
+
+    Source order, highest priority first:
+      1. CFG.coil_offsets       -- an explicit 16-long sequence, ALREADY in model units
+      2. CFG.coil_offsets_path  -- a JSON file written by measure_coil_offsets.py; its
+                                   'offsets' key is ALREADY in model units (the script
+                                   measures on the coordinates the model actually sees)
+      3. _COIL_OFFSETS_FALLBACK_ANGSTROM -- in ANGSTROM, so it is scaled here.
+
+    Cached per (device, dtype): built once, not once per protein per forward pass.
+    """
+    key = (str(device), str(dtype))
+    if key in _COIL_OFFSETS_CACHE:
+        return _COIL_OFFSETS_CACHE[key]
+    vals = getattr(CFG, 'coil_offsets', None)
+    if vals is None:
+        path = getattr(CFG, 'coil_offsets_path', None)
+        if path:
+            import json as _json
+            with open(path) as _fh:
+                vals = _json.load(_fh)
+            if isinstance(vals, dict):
+                vals = vals['offsets']
+    if vals is None:
+        # Only the built-in fallback is stored in Angstrom; both override paths supply
+        # model units directly. Keeping the conversion HERE, on exactly one branch, is
+        # what stops a double-scaling bug.
+        vals = [v * _COIL_COORD_SCALE for v in _COIL_OFFSETS_FALLBACK_ANGSTROM]
+    vals = [float(v) for v in vals]
+    if len(vals) != 16:
+        raise ValueError('[U3] coil offsets must have exactly 16 entries '
+                         '(channel = atom_i*4 + atom_j); got %d' % len(vals))
+    t = torch.tensor(vals, device=device, dtype=dtype)
+    _COIL_OFFSETS_CACHE[key] = t
+    return t
+
+
+def _coil_bond_length(ca, N, dev, dtype):
+    """U4 -- the coil's effective segment length b.
+
+    'fitted' (default, current behaviour): the protein's OWN mean CA-CA neighbour
+    distance. This scales the coil to the protein, but it re-injects folded geometry
+    into the reference state, which is the very thing the lever exists to remove.
+
+    'fixed': b = 5.82 A, the experimentally calibrated random-coil value, identical for
+    every protein. If the two arms differ, the fitted version is leaking folded
+    geometry, and the ARM ITSELF is the measurement of that leak.
+    """
+    mode = getattr(CFG, 'coil_b', 'fitted')
+    if mode == 'fixed':
+        return torch.tensor(_COIL_B_FIXED, device=dev, dtype=dtype)
+    if mode != 'fitted':
+        raise ValueError("CFG.coil_b must be one of fitted|fixed; got %r" % (mode,))
+    # 'fitted' -- VERBATIM the pre-U4 arithmetic, so the default is bit-identical.
+    if N > 1:
+        b = torch.linalg.norm(ca[1:] - ca[:-1], dim=-1).mean()
+        b = torch.clamp(b, min=1e-3)
+    else:
+        b = torch.tensor(3.8, device=dev)
+    return b
+
+
+def _coil_expand_channels(d_coil, n_atom_dist):
+    """U3 -- how the ONE residue-level coil distance becomes 16 atom-pair channels.
+
+    The defect: 'broadcast' puts the same d in all 16 channels, so in the coil state
+    all 16 are identical. After D.sum(dim=1) the unfolded feature vector has 16 equal
+    entries while the folded one does not, so folded and unfolded live on different
+    sub-manifolds and are TRIVIALLY SEPARABLE. The network can then detect which state
+    it is in instead of computing an energy, and E_u - E_f stops being a free-energy
+    difference.
+
+    Arms:
+      broadcast : current behaviour -- the same d in all 16 channels. Bit-identical default.
+      ca_only   : only the CA-CA channel (index 5) carries d; the other 15 are exactly
+                  zero, so ONLY the channel the residue-level coil actually describes is
+                  populated. This is the honest arm: a CA-level coil has nothing to say
+                  about N-CB.
+      offset    : channel c carries d + offset[c], with offset measured on the FOLDED
+                  set (see _coil_channel_offsets). This keeps all 16 channels alive and
+                  DIFFERENT, so the two states share a sub-manifold, at the cost of
+                  asserting that the rigid intra-residue geometry survives unfolding --
+                  which for a covalent backbone it does.
+
+    Returns RAW distances [N, N, 16] BEFORE the Gaussian kernel, at exactly the point
+    where the pre-U3 code called .expand(). The offset arm is clamped at >= 0: a negative
+    offset on a short separation could otherwise produce a negative "distance", and the
+    kernel exp(coef*d^2) is even in d, so a clamp -- not an abs -- is the conservative
+    choice (abs would fold a small negative back up into a spurious positive distance).
+    """
+    mode = getattr(CFG, 'coil_channels', 'broadcast')
+    N = d_coil.shape[0]
+    if mode == 'broadcast':
+        # VERBATIM the pre-U3 line, so the default is bit-identical.
+        return d_coil.unsqueeze(-1).expand(N, N, n_atom_dist).contiguous()
+    if mode == 'ca_only':
+        D = torch.zeros(N, N, n_atom_dist, device=d_coil.device, dtype=d_coil.dtype)
+        D[:, :, _CA_CA_CHANNEL] = d_coil
+        return D
+    if mode == 'offset':
+        off = _coil_channel_offsets(d_coil.device, d_coil.dtype)  # [16]
+        if off.shape[0] != n_atom_dist:
+            raise ValueError('[U3] offset arm expects %d channels; the offset table has %d'
+                             % (n_atom_dist, off.shape[0]))
+        return torch.clamp(d_coil.unsqueeze(-1) + off.view(1, 1, -1), min=0.0).contiguous()
+    raise ValueError("CFG.coil_channels must be one of broadcast|ca_only|offset; got %r"
+                     % (mode,))
+
+
+
 def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     """Get graph representation of a unfolded protein.
 
@@ -439,16 +617,21 @@ def _flory_unfolded_graph(x, one_hot, emb, mask, gaussian_coef):
     # Effective bond length b: mean CA-CA neighbor distance so the coil is scaled to THIS protein
     # rather than an arbitrary constant. CA is atom index 1 (N=0, CA=1, C=2, CB=3).
     ca = x[:, 1, :]
-    if N > 1:
-        b = torch.linalg.norm(ca[1:] - ca[:-1], dim=-1).mean()
-        b = torch.clamp(b, min=1e-3)
-    else:
-        b = torch.tensor(3.8, device=dev)
+    b = _coil_bond_length(ca, N, dev, x.dtype)   # U4: 'fitted' (default) | 'fixed' 5.82 A
     d_coil = b * torch.pow(sep + 1e-6, nu)  # [N,N] analytic expected coil distance
-    # Broadcast the scalar coil distance across all atom-atom channels (coil model is residue-level).
-    D = d_coil.unsqueeze(-1).expand(N, N, n_atom_dist).contiguous()  # [N,N,16] RAW distances
+    # U3: how the ONE residue-level coil distance becomes 16 atom-pair channels.
+    # 'broadcast' (default) is the pre-U3 line verbatim and is bit-identical.
+    D = _coil_expand_channels(d_coil, n_atom_dist)  # [N,N,16] RAW distances
     # SAME kernel as folded/baseline unfolded path (train_utils.py get_graph line 208).
     D = torch.relu(torch.exp(gaussian_coef * D ** 2))
+    # U3 'ca_only': the kernel maps raw distance 0 -> exp(0) = 1.0, i.e. "fully in
+    # contact", which is the OPPOSITE of "this channel is absent". The 15 non-CA
+    # channels must therefore be re-zeroed AFTER the kernel. Without this line
+    # ca_only feeds a CONSTANT 1.0 into 15 of 16 channels -- a worse shortcut than
+    # the broadcast defect it exists to remove.
+    if getattr(CFG, 'coil_channels', 'broadcast') == 'ca_only':
+        _nonca = [c for c in range(D.shape[-1]) if c != _CA_CA_CHANNEL]
+        D[:, :, _nonca] = 0
     # remove masks values (identical to baseline)
     mask_index = torch.where(mask == 0)
     D[mask_index[0], :, :] = 0

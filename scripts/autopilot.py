@@ -145,17 +145,26 @@ def eval_csv_for(tag):
 
 
 def calib_diag(csv):
-    rc, out = sh('python cluster_run/code/calib_diag.py "%s" 2>&1' % csv, timeout=300)
+    # calib_diag takes --csv, not a positional argument. Verified against its --help:
+    # the positional form exits 2 and every cell would have silently scored as unparsed.
+    rc, out = sh('python cluster_run/code/calib_diag.py --csv "%s" 2>&1' % csv, timeout=300)
     if rc != 0:
         return None
+    # Parse the [ALL] block only -- the file also prints a [DESIGNED] block with the
+    # same labels, and a looser pattern would silently pick up whichever came last.
     g = {}
-    for key, pat in (('pooled', r'pooled[^0-9\-]*(-?\d+\.\d+)'),
-                     ('pp', r'per[- ]protein[^0-9\-]*(-?\d+\.\d+)'),
-                     ('std_b', r'std\(b\)[^0-9\-]*(-?\d+\.\d+)')):
-        m = re.search(pat, out, re.I)
+    pats = (('pooled', r'\[ALL\]\s+pooled ddG PCC\s*=\s*(-?\d+\.\d+)'),
+            ('pp', r'\[ALL\]\s+PP \(mean per-protein\)\s*=\s*(-?\d+\.\d+)'),
+            ('std_b', r'\[ALL\]\s+std\(b\).*?=\s*(-?\d+\.\d+)'),
+            ('offset_removed', r'\[ALL\]\s+pooled OFFSET-removed PCC\s*=\s*(-?\d+\.\d+)'),
+            ('slope_med', r'\[ALL\]\s+slope a_p\s+min/med/max\s*=\s*-?\d+\.\d+\s*/\s*(-?\d+\.\d+)'),
+            ('slope_min', r'\[ALL\]\s+slope a_p\s+min/med/max\s*=\s*(-?\d+\.\d+)'),
+            ('designed_pooled', r'\[DESIGNED\]\s+pooled ddG PCC\s*=\s*(-?\d+\.\d+)'))
+    for key, pat in pats:
+        m = re.search(pat, out)
         if m:
             g[key] = float(m.group(1))
-    return g or None
+    return g if 'pooled' in g else None
 
 
 # ---------------------------------------------------------------- factorial parsing
@@ -236,7 +245,10 @@ def write_tsv(rows):
             f.write('\t'.join([r['tag'], 'done', r.get('node_class', '?'),
                                str(r['seed']), '15', '?', '%.4f' % r.get('pooled', float('nan')),
                                '%.4f' % r.get('pp', float('nan')), '?',
-                               '%.4f' % r.get('std_b', float('nan')), '?', '?', '?', '?',
+                               '%.4f' % r.get('std_b', float('nan')),
+                               '%.3f' % r.get('slope_med', float('nan')),
+                               '%.3f' % r.get('slope_min', float('nan')),
+                               '%.4f' % r.get('designed_pooled', float('nan')), '?',
                                'A=%d B=%d C=%d D=%d' % (r['A'], r['B'], r['C'], r['D'])]) + '\n')
             new += 1
     return new
@@ -333,11 +345,40 @@ def main():
     d = os.path.dirname(lock)
     if not os.path.isdir(d):
         os.makedirs(d)
+    # mkdir is atomic, so it excludes a second copy -- but a crash leaves the directory
+    # behind and would block every restart forever. So the lock records its pid and a
+    # stale lock (no such process) is reclaimed. Verified necessary: the first launch
+    # died and its lock blocked the wrapper's restart.
+    pidfile = os.path.join(lock, 'pid')
     try:
-        os.mkdir(lock)          # mkdir is atomic; a second copy cannot start
+        os.mkdir(lock)
     except OSError:
-        print('another autopilot holds %s -- refusing to start a second' % lock)
-        sys.exit(1)
+        holder = None
+        try:
+            with open(pidfile) as f:
+                holder = int(f.read().strip())
+        except Exception:
+            pass
+        alive = False
+        if holder:
+            try:
+                os.kill(holder, 0)
+                alive = True
+            except OSError:
+                alive = False
+        if alive:
+            print('autopilot pid %d holds %s -- refusing to start a second' % (holder, lock))
+            sys.exit(1)
+        log('reclaiming stale lock (holder %s is gone)' % holder)
+        try:
+            os.remove(pidfile)
+        except Exception:
+            pass
+    try:
+        with open(pidfile, 'w') as f:
+            f.write(str(os.getpid()))
+    except Exception:
+        pass
     try:
         st = load_state()
         log('start; state=%s go=%s' % (st['state'], A.go))
@@ -347,6 +388,10 @@ def main():
                 break
             time.sleep(POLL_SECONDS)
     finally:
+        try:
+            os.remove(pidfile)
+        except Exception:
+            pass
         try:
             os.rmdir(lock)
         except Exception:

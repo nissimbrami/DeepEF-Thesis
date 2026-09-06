@@ -74,6 +74,8 @@ _p.add_argument('--affine_calib', action='store_true', help='lever 3: after trai
 _p.add_argument('--designed_weight', type=float, default=1.0, help='EXP-19: oversample DESIGNED-fold minis (HHH/HEEH/EEHEE/EHEE/TrROS/v2_) by this factor via WeightedRandomSampler (1.0=off=uniform). Tests whether more gradient on designed folds fixes the EXP-14 slope-collapse.')
 _p.add_argument('--wt_anchor_weight', type=float, default=0.0, help='WS-1 Arm A: weight of the WT/absolute-dG anchor loss L1(pred_dG(WT), exp_dG(WT)). In ddg mode the absolute scale is free (only differences are supervised) so pred WT abs-dG is at chance (EXP-20/22); this term pins the per-protein baseline = attacks the calibration offset. 0 = off.')
 _p.add_argument('--slope_weight', type=float, default=0.0, help='Agent-E SLOPE term: weight of abs(std(pred_ddg) - std(true_ddg)) computed WITHIN the current protein/minibatch (per-protein ddg = output - wt_dg vs delta_g - delta_g_wt; WT = row 0). Penalises the model under-reacting/compressing the spread of ddG within a protein (per-protein slope a_p). 0 = off = bit-identical to baseline.')
+_p.add_argument('--flory_unfolded', action='store_true', help="Lever D (coil): replace the tridiagonal-mask unfolded reference with an analytic Flory random-coil, d(i,j)=b*|i-j|^nu, b = protein mean CA-CA bond length. Value-only, shape-identical, no new parameters. Default OFF reproduces the tridiagonal baseline bit-for-bit.")
+_p.add_argument('--flory_nu', type=float, default=0.5, help='Lever D coil scaling exponent, must be in (0,1]. 0.5 = ideal chain; ~0.588 = self-avoiding walk. Only read when --flory_unfolded is set.')
 _a, _ = _p.parse_known_args()
 READOUT = _a.readout
 WT_ANCHOR_WEIGHT = _a.wt_anchor_weight
@@ -85,6 +87,12 @@ POOLED_CAP = _a.pooled_cap
 DG_LENGTH_NORM = _a.dg_length_norm
 AFFINE_CALIB = _a.affine_calib
 DESIGNED_WEIGHT = _a.designed_weight
+# Lever D (coil): train_utils.get_unfolded_graph reads these off CFG at call time, so setting
+# them here is what makes the flag reachable from the command line.
+CFG.flory_unfolded = _a.flory_unfolded
+CFG.flory_nu = _a.flory_nu
+if _a.flory_unfolded and not (0.0 < _a.flory_nu <= 1.0):
+    raise ValueError('--flory_nu must be in (0, 1]; got %s' % _a.flory_nu)
 
 # --seed: single knob for full reproducibility + seed-ensemble. Overrides the hardcoded
 # RANDOM_SEED so KFold/train_test_split random_state below all follow --seed too.
@@ -153,6 +161,8 @@ config = {
     'light_attention': LIGHT_ATTENTION,
     'loss_mode': LOSS_MODE,
     'wt_anchor_weight': WT_ANCHOR_WEIGHT,
+    'flory_unfolded': _a.flory_unfolded,
+    'flory_nu': _a.flory_nu,
     'designed_weight': DESIGNED_WEIGHT,
     'pooled_corr_weight': POOLED_CORR_WEIGHT,
     'val_frac': VAL_FRAC,

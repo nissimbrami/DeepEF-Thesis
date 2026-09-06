@@ -108,8 +108,8 @@ Items 2, 4, 6 and 7 are what stand between here and the first cluster run.
 |---|---|
 | **WT anchor** | Exists: `--wt_anchor_weight` in `train.py`. Already run at 0.3 and 1.0 by Shahar; reduces `std(b)` 0.29 → 0.25 |
 | **Designed reweight** | Exists: `--designed_weight`. Combined with the anchor it gave the largest offset reduction (0.19) **and** the largest slope collapse |
-| **Slope term** | **Does not exist. Nobody has written it.** This is the thesis's own contribution |
-| **Coil (Flory unfolded state)** | Implemented in the v5 bundle, but v5 is not synchronised with `train.py` |
+| **Slope term** | **IMPLEMENTED** (corrected 2026-09-06): `--slope_weight` in `train.py` lines 76/80/433-444, default 0.0, guarded bit-identical at 0. Not yet run |
+| **Coil (Flory unfolded state)** | **IMPLEMENTED** (corrected 2026-09-06): `train_utils.py::_flory_unfolded_graph`, reached via `get_unfolded_graph`. The CLI flags were missing and were added 2026-09-06 (`--flory_unfolded`, `--flory_nu`). Not yet run |
 
 **Do not enable any of them before σ is known.** Running a lever without a measured noise floor
 is how this project already lost seven hours once.
@@ -140,6 +140,8 @@ on results rather than working.
 
 ## 5. Standing reminders
 
+- **The code is newer than this document.** When `STATE.md` and the code disagree, the code wins.
+  Check before re-implementing anything: a lever described here as missing may already exist.
 - **Read `RUNBOOK.md` after every compaction, before any command.** Two runs have already been
   lost to stale premises; its run card is what stops a third.
 - The design on the cluster is a **factorial, not a ladder**. See `COMPUTE_PLAN.md`. Running

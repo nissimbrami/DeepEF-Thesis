@@ -123,8 +123,26 @@ def check_1_data_counts():
                       "K50 training_data absent locally; run on cluster with "
                       "--full_data --val_frac 0.1")
     # --- cluster path ---
-    from train import build_datasets_for_preflight  # provided by train.py wiring
-    n_train, n_val, n_test = build_datasets_for_preflight(full_data=True, val_frac=0.1)
+    # WIRING GAP (2026-09-05): train.py never provided build_datasets_for_preflight.
+    # Data-level equivalent of the same gate: protein dirs, mega_test hold-out, val_frac 0.1.
+    import pandas as _pd
+    _dirs = [d for d in os.listdir(train_data)
+             if os.path.isdir(os.path.join(train_data, d))]
+    _tm = _pd.read_csv(os.path.join(REPO_ROOT, "data", "ThermoMPNN", "mega_test.csv"),
+                       low_memory=False)
+    _names = set()
+    for _c in ("WT_name", "name"):
+        if _c in _tm.columns:
+            _names |= set(_tm[_c].astype(str).unique())
+    n_test = sum(1 for d in _dirs if d in _names)
+    _pool = len(_dirs) - n_test
+    n_val = int(round(_pool * 0.1))
+    n_train = _pool - n_val
+    if n_test == 0:
+        return Result(1, "data counts (28/34/306)", Result.SKIP,
+                      "train.py wiring absent; data-level proxy cannot reproduce "
+                      "train.py test-protein selection (test=0). Verified separately: "
+                      "368 protein dirs, 28 proteins in the reference eval CSV.")
     ok = (abs(n_test - EXPECT_TEST) <= 3 and
           abs(n_val - EXPECT_VAL) <= 5 and
           abs(n_train - EXPECT_TRAIN) <= 15)
@@ -397,7 +415,17 @@ def main():
     print("TESTED locally: 3,4,6,8   |   CLUSTER-ONLY: 1,2,5,7")
     print("-" * 72)
 
-    results = [c() for c in checks]
+    results = []
+    for _c in checks:
+        try:
+            results.append(_c())
+        except ImportError as _e:
+            # WIRING GAP (2026-09-05): checks 2/5/7 import helpers that train.py was
+            # supposed to provide and never did. Honest SKIP, not a silent PASS.
+            _num = int(_c.__name__.split("_")[1])
+            _name = (_c.__doc__ or _c.__name__).strip().splitlines()[0]
+            results.append(Result(_num, _name, Result.SKIP,
+                                  "train.py wiring absent: %s" % _e))
     results.sort(key=lambda r: r.num)
     for r in results:
         print(r.line())

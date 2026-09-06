@@ -76,6 +76,9 @@ _p.add_argument('--wt_anchor_weight', type=float, default=0.0, help='WS-1 Arm A:
 _p.add_argument('--slope_weight', type=float, default=0.0, help='Agent-E SLOPE term: weight of abs(std(pred_ddg) - std(true_ddg)) computed WITHIN the current protein/minibatch (per-protein ddg = output - wt_dg vs delta_g - delta_g_wt; WT = row 0). Penalises the model under-reacting/compressing the spread of ddG within a protein (per-protein slope a_p). 0 = off = bit-identical to baseline.')
 _p.add_argument('--flory_unfolded', action='store_true', help="Lever D (coil): replace the tridiagonal-mask unfolded reference with an analytic Flory random-coil, d(i,j)=b*|i-j|^nu, b = protein mean CA-CA bond length. Value-only, shape-identical, no new parameters. Default OFF reproduces the tridiagonal baseline bit-for-bit.")
 _p.add_argument('--flory_nu', type=float, default=0.5, help='Lever D coil scaling exponent, must be in (0,1]. 0.5 = ideal chain; ~0.588 = self-avoiding walk. Only read when --flory_unfolded is set.')
+_p.add_argument('--unfolded_emb', type=str, default='full', choices=['full', 'zero', 'mean'], help="U2 / Lever D: what the ProtT5 embedding contributes to the UNFOLDED reference state only. full=current behaviour (bit-identical default). zero=the unfolded state is fold-blind. mean=per-column mean broadcast back, keeping global scale but removing per-residue identity. Chosen as factor D by the W0 channel ablation: zeroing this block drops var(E_u) across proteins to 0.331 of baseline and corr(E_u,wt_err) from 0.420 to 0.119, whereas the Flory coil raises var(E_u) to 1.175.")
+_p.add_argument('--burial_features', action='store_true', help="W5: add a 3-dim solvation block (burial, Kyte-Doolittle hydropathy, burial*hydropathy) between Fb and emb. Burial is ZERO in the unfolded state -- the delta-ASA between states IS the hydrophobic driving force, and computing it from the same coordinates in both states makes the column cancel exactly in E_u-E_f. Normalised by a constant, never by N. Default off = bit-identical.")
+_p.add_argument('--burial_mode', type=str, default='count', choices=['count', 'hse'], help="W5 arm: 'count' = Cbeta neighbours within 10A; 'hse' = half-sphere exposure, the standard neighbour-count burial measure, which is direction-aware and needs only CA and CB -- exactly what this backbone-only dataset has. Only read when --burial_features is set.")
 _a, _ = _p.parse_known_args()
 READOUT = _a.readout
 WT_ANCHOR_WEIGHT = _a.wt_anchor_weight
@@ -91,6 +94,11 @@ DESIGNED_WEIGHT = _a.designed_weight
 # them here is what makes the flag reachable from the command line.
 CFG.flory_unfolded = _a.flory_unfolded
 CFG.flory_nu = _a.flory_nu
+# U2 (factor D): train_utils._unfolded_emb reads this off CFG at call time.
+CFG.unfolded_emb = _a.unfolded_emb
+# W5: train_utils reads these off CFG at call time.
+CFG.burial_features = _a.burial_features
+CFG.burial_mode = _a.burial_mode
 if _a.flory_unfolded and not (0.0 < _a.flory_nu <= 1.0):
     raise ValueError('--flory_nu must be in (0, 1]; got %s' % _a.flory_nu)
 
@@ -163,6 +171,9 @@ config = {
     'wt_anchor_weight': WT_ANCHOR_WEIGHT,
     'flory_unfolded': _a.flory_unfolded,
     'flory_nu': _a.flory_nu,
+    'unfolded_emb': _a.unfolded_emb,
+    'burial_features': _a.burial_features,
+    'burial_mode': _a.burial_mode,
     'designed_weight': DESIGNED_WEIGHT,
     'pooled_corr_weight': POOLED_CORR_WEIGHT,
     'val_frac': VAL_FRAC,

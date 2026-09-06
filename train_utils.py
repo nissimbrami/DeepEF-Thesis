@@ -193,6 +193,86 @@ def diff_data(model, optimizer, dataloader, device,epoch,N,valid_loader):
         torch.save(all_Xn_int,"./all_Xn_int.pt")
         torch.save(all_Xn,"./all_Xn_padded.pt")
 
+# --- W5: solvation and burial -------------------------------------------------
+# The dominant force in protein folding had no representation in this model at all.
+# DeepDDG (5700 curated mutations, beating eleven methods) found the SASA of the
+# mutated residue to be its single most important input.
+#
+# Kyte-Doolittle hydropathy, index order VERIFIED against AA_MAP above
+# (alphabetical ACDEFGHIKLMNPQRSTVWY), not assumed.
+_KD = torch.tensor([1.8, 2.5, -3.5, -3.5, 2.8, -0.4, -3.2, 4.5, -3.9, 3.8,
+                    1.9, -3.5, -1.6, -3.5, -4.5, -0.8, -0.7, 4.2, -0.9, -1.3])
+_KD_NORM = (_KD + 4.5) / 9.0          # -> [0,1]
+_BURIAL_CAP = 30.0                    # a CONSTANT, never N -- see below
+_BURIAL_R = 10.0
+
+
+def compute_burial(x, mask, radius=_BURIAL_R, cap=_BURIAL_CAP):
+    """Cbeta neighbour-count burial -> [N,1] in [0,1].
+
+    x is [N,4,3] with atom order (N, CA, C, CB); glycine has no CB and the loader
+    stores CA there, which is the standard substitute.
+
+    Normalised by a CONSTANT, never by N. Burial is a LOCAL quantity -- neighbours
+    within 10 A do not scale with chain length -- and dividing by N would inject a
+    per-protein length confound into the one feature meant to fix a per-protein
+    problem. An earlier implementation did exactly that.
+    """
+    cb = x[:, 3, :]
+    d = torch.cdist(cb, cb)
+    v = (mask > 0).float()
+    w = (d < radius).float() * v.unsqueeze(0) * v.unsqueeze(1)
+    w = w - torch.diag_embed(torch.diagonal(w))        # exclude self
+    return (w.sum(1, keepdim=True) / cap).clamp(0.0, 1.0) * v.unsqueeze(1)
+
+
+def compute_hse(x, mask, radius=_BURIAL_R, cap=_BURIAL_CAP):
+    """Half-sphere exposure: neighbours in the CA->CB hemisphere only.
+
+    HSE is the standard neighbour-count burial measure and is DIRECTION-AWARE,
+    where a raw count is not. It needs only CA and CB, which is exactly what this
+    backbone-only dataset has. Run as an arm against compute_burial.
+    """
+    ca, cb = x[:, 1, :], x[:, 3, :]
+    up = cb - ca
+    up = up / up.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+    diff = cb.unsqueeze(0) - cb.unsqueeze(1)           # [N,N,3] j - i
+    d = diff.norm(dim=-1)
+    v = (mask > 0).float()
+    near = (d < radius).float() * v.unsqueeze(0) * v.unsqueeze(1)
+    near = near - torch.diag_embed(torch.diagonal(near))
+    same_side = ((diff * up.unsqueeze(1)).sum(-1) > 0).float()
+    return ((near * same_side).sum(1, keepdim=True) / cap).clamp(0.0, 1.0) * v.unsqueeze(1)
+
+
+def solvation_features(x, one_hot, mask, folded=True):
+    """[N,3] = burial, hydrophobicity, burial*hydrophobicity.
+
+    Burial is ZERO in the unfolded state. An extended chain buries nothing, and
+    that DIFFERENCE is the hydrophobic driving force. A previous implementation
+    used the same coordinates in both states, so the column was bit-identical and
+    cancelled exactly in E_u - E_f -- the feature could not express the thing it
+    was named for.
+
+    The product term matters: a linear layer cannot construct a product from its
+    factors, and buried x hydrophobic is what carries the driving force.
+    """
+    hyd = one_hot @ _KD_NORM.to(one_hot.device).to(one_hot.dtype).unsqueeze(1)
+    if folded:
+        fn = compute_hse if getattr(CFG, 'burial_mode', 'count') == 'hse' else compute_burial
+        bur = fn(x, mask).to(one_hot.dtype)
+    else:
+        bur = torch.zeros_like(hyd)
+    return torch.cat([bur, hyd, bur * hyd], dim=1)
+
+
+def _solv_or_none(x, one_hot, mask, folded):
+    """Returns the [N,3] block, or None when the lever is off (bit-identical)."""
+    if not getattr(CFG, 'burial_features', False):
+        return None
+    return solvation_features(x, one_hot, mask, folded=folded)
+
+
 def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     """Get graph representation of protein 
     Args:
@@ -216,9 +296,47 @@ def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
     emb = F.normalize(emb,p=2,dim=0)
-    Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
+    _S = _solv_or_none(x, one_hot, mask, folded=True)
+    if _S is None:
+        Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
+    else:
+        Fh = torch.cat([D,Fb,_S,emb,one_hot],dim=1) #N,16+32+3+emb_size
     
     return Fh
+
+def _unfolded_emb(emb):
+    """U2 -- make the unfolded reference state fold-blind.
+
+    An unfolded chain has no fold; it should not know which family it came from.
+    Fold-family memorisation is the diagnosed failure (WT dG correlation 0.86
+    in-distribution, ~0.07 out-of-distribution).
+
+    Measured by the W0 channel ablation on 28 test proteins, calib_ctrl_repro2 e14:
+    zeroing this block in the unfolded pass drops var(E_u) across proteins to 0.331
+    of baseline and corr(E_u, wt_err) from 0.420 to 0.119. The Flory coil, by
+    contrast, RAISES var(E_u) to 1.175 of baseline -- it touches D and Fb, which
+    were not the cause. Hence factor D of the calibration factorial is this flag.
+
+    Modes:
+      full  current behaviour, returned unchanged (default; bit-identical)
+      zero  the block is all zeros
+      mean  per-column mean over residues, broadcast back: keeps whatever global
+            scale ProtT5 contributes while removing per-residue identity. If zero
+            hurts but mean helps, the embedding was carrying scale, not identity.
+
+    Applied BEFORE F.normalize(emb, p=2, dim=0), so that 'mean' is normalised the
+    same way every other input is. For 'zero' the order is immaterial: F.normalize
+    of a zero tensor is zero (it clamps the denominator by eps).
+    """
+    mode = getattr(CFG, 'unfolded_emb', 'full')
+    if mode == 'full':
+        return emb
+    if mode == 'zero':
+        return torch.zeros_like(emb)
+    if mode == 'mean':
+        return emb.mean(dim=0, keepdim=True).expand_as(emb)
+    raise ValueError("CFG.unfolded_emb must be one of full|zero|mean; got %r" % (mode,))
+
 
 def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     """Get graph representation of a unfolded protein.
@@ -246,8 +364,9 @@ def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     # sum over the atoms
     D = D.sum(dim=1) #N,16
     D = F.normalize(D,p=2,dim=0)
-    emb = F.normalize(emb,p=2,dim=0)
-    Fh = torch.cat([D,Fb,emb,one_hot],dim=1) #N,16+32+emb_size
+    emb = F.normalize(_unfolded_emb(emb),p=2,dim=0)   # U2: unfolded pass only
+    _S = _solv_or_none(x, one_hot, mask, folded=False)   # W5: burial is ZERO unfolded
+    Fh = torch.cat([D,Fb,emb,one_hot],dim=1) if _S is None else torch.cat([D,Fb,_S,emb,one_hot],dim=1)
 
     return Fh
 
@@ -295,8 +414,9 @@ def _flory_unfolded_graph(x, one_hot, emb, mask, gaussian_coef):
     Fb = get_bonded_features(D)  # N,32
     D = D.sum(dim=1)  # N,16
     D = F.normalize(D, p=2, dim=0)
-    emb = F.normalize(emb, p=2, dim=0)
-    Fh = torch.cat([D, Fb, emb, one_hot], dim=1)  # N,16+32+emb_size
+    emb = F.normalize(_unfolded_emb(emb), p=2, dim=0)   # U2: unfolded pass only
+    _S = _solv_or_none(x, one_hot, mask, folded=False)   # W5: burial is ZERO unfolded
+    Fh = torch.cat([D, Fb, emb, one_hot], dim=1) if _S is None else torch.cat([D, Fb, _S, emb, one_hot], dim=1)
 
     return Fh
 

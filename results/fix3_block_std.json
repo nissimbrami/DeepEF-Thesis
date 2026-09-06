@@ -1,0 +1,5132 @@
+{
+  "schema": "fix3.v1",
+  "summary": {
+    "n_proteins": 332,
+    "n_skipped": 530,
+    "mini_batch_size": 64,
+    "ratio_median": 0.9007584871122228,
+    "ratio_mean": 0.8928383251483786,
+    "ratio_q25": 0.8630626523513387,
+    "ratio_q75": 0.9265474972602933,
+    "ratio_min": 0.6912812842622653,
+    "ratio_max": 0.9776195553584998,
+    "frac_below_0.7": 0.0030120481927710845,
+    "frac_above_0.9": 0.5090361445783133,
+    "position_monotonicity_median": 1.0,
+    "position_ordered": true
+  },
+  "verdict": "ratio median 0.901 >= 0.9: blocks are representative of the protein. The slope term is fine as written. Record and move on.",
+  "action": "none",
+  "per_protein": [
+    {
+      "name": "1A0N",
+      "n_variants": 2196,
+      "n_blocks": 34,
+      "protein_std": 1.1034129430533899,
+      "mean_block_std": 0.9494137643193042,
+      "ratio": 0.8604337753117745,
+      "position_monotonicity": 0.9995425434583715
+    },
+    {
+      "name": "1A32",
+      "n_variants": 1199,
+      "n_blocks": 18,
+      "protein_std": 0.6563192817659179,
+      "mean_block_std": 0.5978452474624204,
+      "ratio": 0.9109061154714745,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1AOY",
+      "n_variants": 1291,
+      "n_blocks": 20,
+      "protein_std": 1.0980080251899682,
+      "mean_block_std": 0.9847427732332911,
+      "ratio": 0.8968447867791486,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1BK2",
+      "n_variants": 1855,
+      "n_blocks": 28,
+      "protein_std": 1.0872018808147819,
+      "mean_block_std": 0.9887128521537883,
+      "ratio": 0.9094105424218151,
+      "position_monotonicity": 0.9994579945799458
+    },
+    {
+      "name": "1CSQ",
+      "n_variants": 2529,
+      "n_blocks": 39,
+      "protein_std": 0.9938164763495348,
+      "mean_block_std": 0.8463960188022218,
+      "ratio": 0.8516622927315366,
+      "position_monotonicity": 0.999603017070266
+    },
+    {
+      "name": "1E0L",
+      "n_variants": 621,
+      "n_blocks": 9,
+      "protein_std": 0.8263387730229249,
+      "mean_block_std": 0.6870456744289737,
+      "ratio": 0.831433422778424,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1E6H",
+      "n_variants": 1091,
+      "n_blocks": 17,
+      "protein_std": 1.4080557190877456,
+      "mean_block_std": 1.1094045193020325,
+      "ratio": 0.7878981664310813,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1EM7",
+      "n_variants": 1995,
+      "n_blocks": 31,
+      "protein_std": 1.204168524554116,
+      "mean_block_std": 1.0816673539580264,
+      "ratio": 0.8982690810312869,
+      "position_monotonicity": 0.9994962216624685
+    },
+    {
+      "name": "1ENH",
+      "n_variants": 906,
+      "n_blocks": 14,
+      "protein_std": 1.0387846782062464,
+      "mean_block_std": 0.9248464533965832,
+      "ratio": 0.8903158400387561,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1F0M",
+      "n_variants": 1242,
+      "n_blocks": 19,
+      "protein_std": 1.2856811977921239,
+      "mean_block_std": 1.1748910650308944,
+      "ratio": 0.9138276790922296,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1GB4",
+      "n_variants": 2095,
+      "n_blocks": 32,
+      "protein_std": 0.6678242660384969,
+      "mean_block_std": 0.6013257939299617,
+      "ratio": 0.9004251934374875,
+      "position_monotonicity": 0.9995203836930455
+    },
+    {
+      "name": "1GJS",
+      "n_variants": 816,
+      "n_blocks": 12,
+      "protein_std": 0.9411567047948571,
+      "mean_block_std": 0.9111193419400124,
+      "ratio": 0.9680846317071162,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1GL5",
+      "n_variants": 1076,
+      "n_blocks": 16,
+      "protein_std": 1.0919676844579738,
+      "mean_block_std": 0.9105684727372368,
+      "ratio": 0.8338785897214723,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1GYZ",
+      "n_variants": 1125,
+      "n_blocks": 17,
+      "protein_std": 0.7278525766233058,
+      "mean_block_std": 0.6284987041657029,
+      "ratio": 0.8634972580319342,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1H8K",
+      "n_variants": 2979,
+      "n_blocks": 46,
+      "protein_std": 1.2478377993221659,
+      "mean_block_std": 1.0813424597059937,
+      "ratio": 0.866572931428577,
+      "position_monotonicity": 0.9993252361673415
+    },
+    {
+      "name": "1H92",
+      "n_variants": 987,
+      "n_blocks": 15,
+      "protein_std": 0.9765742233035175,
+      "mean_block_std": 0.9206537266292975,
+      "ratio": 0.9427380988154138,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1I2T",
+      "n_variants": 1097,
+      "n_blocks": 17,
+      "protein_std": 0.8845988234724477,
+      "mean_block_std": 0.8041898499617953,
+      "ratio": 0.9091011977666769,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1I6C",
+      "n_variants": 690,
+      "n_blocks": 10,
+      "protein_std": 0.7914472663559324,
+      "mean_block_std": 0.6661029577067922,
+      "ratio": 0.8416264557634217,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1IFY",
+      "n_variants": 802,
+      "n_blocks": 12,
+      "protein_std": 1.0654747986143382,
+      "mean_block_std": 0.9924169203881256,
+      "ratio": 0.9314316224830232,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1JIC",
+      "n_variants": 1012,
+      "n_blocks": 15,
+      "protein_std": 1.126727566325504,
+      "mean_block_std": 1.052912503011263,
+      "ratio": 0.934487212774098,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1K1V",
+      "n_variants": 764,
+      "n_blocks": 11,
+      "protein_std": 0.7197945920343306,
+      "mean_block_std": 0.6762615282914367,
+      "ratio": 0.9395201572439467,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1LP1",
+      "n_variants": 1039,
+      "n_blocks": 16,
+      "protein_std": 0.7680421201952319,
+      "mean_block_std": 0.6762816393629176,
+      "ratio": 0.8805267596404879,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1MJC",
+      "n_variants": 2554,
+      "n_blocks": 39,
+      "protein_std": 0.7213187881009797,
+      "mean_block_std": 0.4986341782009461,
+      "ratio": 0.6912812842622653,
+      "position_monotonicity": 0.9996069182389937
+    },
+    {
+      "name": "1O6X",
+      "n_variants": 1360,
+      "n_blocks": 21,
+      "protein_std": 1.1587079229192878,
+      "mean_block_std": 1.0082737483713335,
+      "ratio": 0.8701707552245389,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1OPS",
+      "n_variants": 2606,
+      "n_blocks": 40,
+      "protein_std": 1.443303458947268,
+      "mean_block_std": 1.267968472029929,
+      "ratio": 0.8785182798319996,
+      "position_monotonicity": 0.9992280972597453
+    },
+    {
+      "name": "1ORC",
+      "n_variants": 1199,
+      "n_blocks": 18,
+      "protein_std": 1.28891556421722,
+      "mean_block_std": 1.1177963637724833,
+      "ratio": 0.8672378507985041,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1PGA",
+      "n_variants": 3950,
+      "n_blocks": 61,
+      "protein_std": 1.1260197465820279,
+      "mean_block_std": 1.0111353298024488,
+      "ratio": 0.8979729999155837,
+      "position_monotonicity": 0.999236641221374
+    },
+    {
+      "name": "1PGX",
+      "n_variants": 2160,
+      "n_blocks": 33,
+      "protein_std": 1.0656666783247035,
+      "mean_block_std": 0.8948106235809679,
+      "ratio": 0.8396721430641593,
+      "position_monotonicity": 0.9995348837209302
+    },
+    {
+      "name": "1PSE",
+      "n_variants": 1217,
+      "n_blocks": 19,
+      "protein_std": 0.673511593009668,
+      "mean_block_std": 0.5548189615786557,
+      "ratio": 0.8237704700811164,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1PV0",
+      "n_variants": 838,
+      "n_blocks": 13,
+      "protein_std": 0.9516574151266106,
+      "mean_block_std": 0.8207662118766478,
+      "ratio": 0.8624597453143905,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1PWT",
+      "n_variants": 989,
+      "n_blocks": 15,
+      "protein_std": 1.309538475510935,
+      "mean_block_std": 1.1072487442423402,
+      "ratio": 0.8455259352424384,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1QKH",
+      "n_variants": 1271,
+      "n_blocks": 19,
+      "protein_std": 0.8072611103326376,
+      "mean_block_std": 0.7393826793152328,
+      "ratio": 0.9159151479631726,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1QKX",
+      "n_variants": 960,
+      "n_blocks": 15,
+      "protein_std": 1.3689759797771055,
+      "mean_block_std": 1.2150586143171622,
+      "ratio": 0.8875675192745136,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1QLY",
+      "n_variants": 1064,
+      "n_blocks": 16,
+      "protein_std": 1.435428826724547,
+      "mean_block_std": 1.2301975056727323,
+      "ratio": 0.8570243837723919,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1QP2",
+      "n_variants": 1082,
+      "n_blocks": 16,
+      "protein_std": 1.1240589766842943,
+      "mean_block_std": 1.0272401521279464,
+      "ratio": 0.9138667751740747,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1R69",
+      "n_variants": 1126,
+      "n_blocks": 17,
+      "protein_std": 1.2276080294246432,
+      "mean_block_std": 1.1273308704202312,
+      "ratio": 0.9183150023453251,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1S1N",
+      "n_variants": 2221,
+      "n_blocks": 34,
+      "protein_std": 1.295268945393032,
+      "mean_block_std": 1.131459176533607,
+      "ratio": 0.873532234797987,
+      "position_monotonicity": 0.9995477159656264
+    },
+    {
+      "name": "1SF0",
+      "n_variants": 1085,
+      "n_blocks": 16,
+      "protein_std": 0.7787251809823853,
+      "mean_block_std": 0.6420929559122526,
+      "ratio": 0.8245437178520835,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1SIF",
+      "n_variants": 2670,
+      "n_blocks": 41,
+      "protein_std": 1.1851648975823494,
+      "mean_block_std": 1.070486523713502,
+      "ratio": 0.9032384657166416,
+      "position_monotonicity": 0.999624060150376
+    },
+    {
+      "name": "1SRM",
+      "n_variants": 1029,
+      "n_blocks": 16,
+      "protein_std": 1.2466871665557289,
+      "mean_block_std": 1.0573413454396925,
+      "ratio": 0.8481208227729259,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1TG0",
+      "n_variants": 1078,
+      "n_blocks": 16,
+      "protein_std": 1.1529310946155549,
+      "mean_block_std": 1.0435046697572259,
+      "ratio": 0.9050884954275457,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1TUC",
+      "n_variants": 1043,
+      "n_blocks": 16,
+      "protein_std": 1.0843635005247754,
+      "mean_block_std": 0.8492611287333047,
+      "ratio": 0.7831885971100159,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1TUD",
+      "n_variants": 1049,
+      "n_blocks": 16,
+      "protein_std": 1.3547438088864945,
+      "mean_block_std": 1.1528582658277953,
+      "ratio": 0.8509788037159327,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1UBQ",
+      "n_variants": 5407,
+      "n_blocks": 84,
+      "protein_std": 1.2376617821166718,
+      "mean_block_std": 1.0792648790684005,
+      "ratio": 0.8720192338997671,
+      "position_monotonicity": 0.9994431037683311
+    },
+    {
+      "name": "1UCS",
+      "n_variants": 1135,
+      "n_blocks": 17,
+      "protein_std": 1.8854615584817676,
+      "mean_block_std": 1.6845026354577748,
+      "ratio": 0.8934165896302807,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1UFM",
+      "n_variants": 1357,
+      "n_blocks": 21,
+      "protein_std": 1.0721829924491322,
+      "mean_block_std": 0.930796249818704,
+      "ratio": 0.8681318920127005,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1URF",
+      "n_variants": 1305,
+      "n_blocks": 20,
+      "protein_std": 0.7910980963834032,
+      "mean_block_std": 0.7194709409746446,
+      "ratio": 0.9094585668500399,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1UZC",
+      "n_variants": 1166,
+      "n_blocks": 18,
+      "protein_std": 0.8352919416093689,
+      "mean_block_std": 0.7131545684471706,
+      "ratio": 0.8537788202207788,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1V1C",
+      "n_variants": 1213,
+      "n_blocks": 18,
+      "protein_std": 1.2354737379472527,
+      "mean_block_std": 0.9875705550433008,
+      "ratio": 0.7993456475118245,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1VII",
+      "n_variants": 637,
+      "n_blocks": 9,
+      "protein_std": 0.8162382516698992,
+      "mean_block_std": 0.7584285956819194,
+      "ratio": 0.9291755123339173,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1W4F",
+      "n_variants": 659,
+      "n_blocks": 10,
+      "protein_std": 1.1094061372380644,
+      "mean_block_std": 1.048458632251655,
+      "ratio": 0.9450629458945107,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1W4G",
+      "n_variants": 670,
+      "n_blocks": 10,
+      "protein_std": 0.7746737949143951,
+      "mean_block_std": 0.7352428000528388,
+      "ratio": 0.9490998725909999,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1W4H",
+      "n_variants": 801,
+      "n_blocks": 12,
+      "protein_std": 0.7971566702851322,
+      "mean_block_std": 0.7235456826847093,
+      "ratio": 0.9076580672979966,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1WCL",
+      "n_variants": 1310,
+      "n_blocks": 20,
+      "protein_std": 1.068468466801553,
+      "mean_block_std": 0.967999853449145,
+      "ratio": 0.9059695101221288,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1WR4",
+      "n_variants": 452,
+      "n_blocks": 7,
+      "protein_std": 0.5477605769834801,
+      "mean_block_std": 0.46336316188796983,
+      "ratio": 0.8459228016001311,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1Y0M",
+      "n_variants": 1095,
+      "n_blocks": 17,
+      "protein_std": 1.0652628041738157,
+      "mean_block_std": 0.8928451869579042,
+      "ratio": 0.8381454636918134,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1YEZ",
+      "n_variants": 1118,
+      "n_blocks": 17,
+      "protein_std": 0.6370695282077927,
+      "mean_block_std": 0.5640717759208435,
+      "ratio": 0.8854163493075757,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1YP5",
+      "n_variants": 702,
+      "n_blocks": 10,
+      "protein_std": 0.8332717712258512,
+      "mean_block_std": 0.7622198530253759,
+      "ratio": 0.9147313989816928,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1YRF",
+      "n_variants": 616,
+      "n_blocks": 9,
+      "protein_std": 0.8713952612005571,
+      "mean_block_std": 0.8129038319672823,
+      "ratio": 0.9328761219648031,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1YU5",
+      "n_variants": 1205,
+      "n_blocks": 18,
+      "protein_std": 0.865298943097288,
+      "mean_block_std": 0.7700878767371355,
+      "ratio": 0.8899674301931423,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1ZHC",
+      "n_variants": 1058,
+      "n_blocks": 16,
+      "protein_std": 0.6387030791421743,
+      "mean_block_std": 0.6228847905479783,
+      "ratio": 0.9752337367537963,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "1ZLM",
+      "n_variants": 1032,
+      "n_blocks": 16,
+      "protein_std": 1.0872303699108643,
+      "mean_block_std": 0.9695484458760268,
+      "ratio": 0.8917598999331802,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2AMI",
+      "n_variants": 1336,
+      "n_blocks": 20,
+      "protein_std": 0.8127284377198214,
+      "mean_block_std": 0.7224274604865631,
+      "ratio": 0.8888915743041977,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2B88",
+      "n_variants": 2942,
+      "n_blocks": 45,
+      "protein_std": 0.8356577661949477,
+      "mean_block_std": 0.7457523738403632,
+      "ratio": 0.8924136219496215,
+      "position_monotonicity": 0.9993185689948892
+    },
+    {
+      "name": "2B89",
+      "n_variants": 969,
+      "n_blocks": 15,
+      "protein_std": 0.6785810652967218,
+      "mean_block_std": 0.6065211659802139,
+      "ratio": 0.8938079722501564,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2BTH",
+      "n_variants": 800,
+      "n_blocks": 12,
+      "protein_std": 0.73509674656325,
+      "mean_block_std": 0.6577469945882611,
+      "ratio": 0.8947760926209821,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2BTT",
+      "n_variants": 946,
+      "n_blocks": 14,
+      "protein_std": 1.033347529787727,
+      "mean_block_std": 0.8596728697324367,
+      "ratio": 0.8319300573632116,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2CDT",
+      "n_variants": 934,
+      "n_blocks": 14,
+      "protein_std": 1.2522585993885262,
+      "mean_block_std": 1.1074956235009248,
+      "ratio": 0.8843984972766098,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2CJJ",
+      "n_variants": 767,
+      "n_blocks": 11,
+      "protein_std": 0.6743295412357413,
+      "mean_block_std": 0.5985849910035521,
+      "ratio": 0.8876742814894575,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2D1U",
+      "n_variants": 1216,
+      "n_blocks": 19,
+      "protein_std": 0.8903664401093735,
+      "mean_block_std": 0.8605161513112047,
+      "ratio": 0.9664741532772709,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2EXD",
+      "n_variants": 1064,
+      "n_blocks": 16,
+      "protein_std": 0.8395984537960758,
+      "mean_block_std": 0.7301899641825956,
+      "ratio": 0.8696895055978109,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2GP8",
+      "n_variants": 727,
+      "n_blocks": 11,
+      "protein_std": 0.5396339119645251,
+      "mean_block_std": 0.44424581300025207,
+      "ratio": 0.8232355364454119,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2HBB",
+      "n_variants": 3919,
+      "n_blocks": 61,
+      "protein_std": 1.042741731108781,
+      "mean_block_std": 0.9438697268872147,
+      "ratio": 0.9051807352944122,
+      "position_monotonicity": 0.9989769820971867
+    },
+    {
+      "name": "2JN4",
+      "n_variants": 1071,
+      "n_blocks": 16,
+      "protein_std": 1.236476839445901,
+      "mean_block_std": 1.0590607413630606,
+      "ratio": 0.856514823065877,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2JT1",
+      "n_variants": 1268,
+      "n_blocks": 19,
+      "protein_std": 0.9321979111151261,
+      "mean_block_std": 0.8286372561452456,
+      "ratio": 0.8889070081201987,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2JTV",
+      "n_variants": 1060,
+      "n_blocks": 16,
+      "protein_std": 1.1709967716183156,
+      "mean_block_std": 1.0122832611373587,
+      "ratio": 0.8644628966298386,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2JVD",
+      "n_variants": 706,
+      "n_blocks": 11,
+      "protein_std": 0.8116170252290981,
+      "mean_block_std": 0.7171627668163809,
+      "ratio": 0.883622132758914,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2JVG",
+      "n_variants": 1029,
+      "n_blocks": 16,
+      "protein_std": 0.6805131664054349,
+      "mean_block_std": 0.6094257718510945,
+      "ratio": 0.8955385464033945,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2JWS",
+      "n_variants": 906,
+      "n_blocks": 14,
+      "protein_std": 1.1554456247536367,
+      "mean_block_std": 1.0828013132930039,
+      "ratio": 0.9371287493722416,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2JWT",
+      "n_variants": 935,
+      "n_blocks": 14,
+      "protein_std": 0.9587453645531503,
+      "mean_block_std": 0.8842285813775952,
+      "ratio": 0.9222767734472587,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2JZ2",
+      "n_variants": 1029,
+      "n_blocks": 16,
+      "protein_std": 1.3278335563486676,
+      "mean_block_std": 1.172696895848509,
+      "ratio": 0.8831655821933285,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2K1B",
+      "n_variants": 933,
+      "n_blocks": 14,
+      "protein_std": 0.8473041345219076,
+      "mean_block_std": 0.7297582130188405,
+      "ratio": 0.861270685797618,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2K28",
+      "n_variants": 919,
+      "n_blocks": 14,
+      "protein_std": 0.9587416114309467,
+      "mean_block_std": 0.8362790255664001,
+      "ratio": 0.8722673717251429,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2K2A",
+      "n_variants": 1145,
+      "n_blocks": 17,
+      "protein_std": 0.7978242122693253,
+      "mean_block_std": 0.7267148056502992,
+      "ratio": 0.9108708340440521,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2K52",
+      "n_variants": 2693,
+      "n_blocks": 42,
+      "protein_std": 0.856967198067753,
+      "mean_block_std": 0.7520709185010879,
+      "ratio": 0.877595922220617,
+      "position_monotonicity": 0.9996272828922848
+    },
+    {
+      "name": "2K5H",
+      "n_variants": 3434,
+      "n_blocks": 53,
+      "protein_std": 1.2307210015696775,
+      "mean_block_std": 1.0440718524988526,
+      "ratio": 0.8483416234607436,
+      "position_monotonicity": 0.9994150336355659
+    },
+    {
+      "name": "2K5N",
+      "n_variants": 1240,
+      "n_blocks": 19,
+      "protein_std": 1.4992407572195732,
+      "mean_block_std": 1.3217094823472302,
+      "ratio": 0.8815858800413185,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2K5P",
+      "n_variants": 1213,
+      "n_blocks": 18,
+      "protein_std": 1.055579903797047,
+      "mean_block_std": 0.9303451292438649,
+      "ratio": 0.8813592660274246,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2K9D",
+      "n_variants": 827,
+      "n_blocks": 12,
+      "protein_std": 0.9827510418915505,
+      "mean_block_std": 0.9254598524917347,
+      "ratio": 0.9417032524437272,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KCF",
+      "n_variants": 636,
+      "n_blocks": 9,
+      "protein_std": 0.8283653155680668,
+      "mean_block_std": 0.7096391208130867,
+      "ratio": 0.8566741116224048,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KCM",
+      "n_variants": 1201,
+      "n_blocks": 18,
+      "protein_std": 1.569669397119989,
+      "mean_block_std": 1.4449578660252962,
+      "ratio": 0.9205491733969509,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KFV",
+      "n_variants": 1241,
+      "n_blocks": 19,
+      "protein_std": 0.8358728659319463,
+      "mean_block_std": 0.7403954843656653,
+      "ratio": 0.8857752351371884,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KGT",
+      "n_variants": 1129,
+      "n_blocks": 17,
+      "protein_std": 0.9721504597517081,
+      "mean_block_std": 0.8133838854563604,
+      "ratio": 0.8366851831393493,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KR3",
+      "n_variants": 1093,
+      "n_blocks": 17,
+      "protein_std": 1.1927717368301218,
+      "mean_block_std": 0.9821208571096676,
+      "ratio": 0.8233938035115802,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KRS",
+      "n_variants": 2385,
+      "n_blocks": 37,
+      "protein_std": 1.017062327003357,
+      "mean_block_std": 0.8973401000396166,
+      "ratio": 0.8822862436400664,
+      "position_monotonicity": 0.999578947368421
+    },
+    {
+      "name": "2KRU",
+      "n_variants": 894,
+      "n_blocks": 13,
+      "protein_std": 1.2119349782915327,
+      "mean_block_std": 1.1399024037087364,
+      "ratio": 0.9405639940483104,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KT8",
+      "n_variants": 2477,
+      "n_blocks": 38,
+      "protein_std": 1.1365587844601635,
+      "mean_block_std": 0.9417135051948158,
+      "ratio": 0.8285655947326171,
+      "position_monotonicity": 0.9995946493717065
+    },
+    {
+      "name": "2KVS",
+      "n_variants": 1206,
+      "n_blocks": 18,
+      "protein_std": 1.147324477697056,
+      "mean_block_std": 1.0647132468379106,
+      "ratio": 0.9279966282729668,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KVT",
+      "n_variants": 927,
+      "n_blocks": 14,
+      "protein_std": 1.2335250844448762,
+      "mean_block_std": 1.0174217955254012,
+      "ratio": 0.824808354816126,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KWH",
+      "n_variants": 979,
+      "n_blocks": 15,
+      "protein_std": 0.721411431485532,
+      "mean_block_std": 0.6613228695787056,
+      "ratio": 0.9167069451850909,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KXD",
+      "n_variants": 1172,
+      "n_blocks": 18,
+      "protein_std": 1.3629251660772486,
+      "mean_block_std": 1.1013548441253331,
+      "ratio": 0.8080816698801129,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KYB",
+      "n_variants": 2173,
+      "n_blocks": 33,
+      "protein_std": 1.222272313491034,
+      "mean_block_std": 1.054323662212265,
+      "ratio": 0.8625930985877632,
+      "position_monotonicity": 0.9995376791493297
+    },
+    {
+      "name": "2KZI",
+      "n_variants": 972,
+      "n_blocks": 15,
+      "protein_std": 0.6912129838935822,
+      "mean_block_std": 0.596668298438218,
+      "ratio": 0.8632191702725305,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2KZJ",
+      "n_variants": 935,
+      "n_blocks": 14,
+      "protein_std": 0.959143312442077,
+      "mean_block_std": 0.869468424295982,
+      "ratio": 0.9065052250452819,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2L09",
+      "n_variants": 914,
+      "n_blocks": 14,
+      "protein_std": 0.9381855590453972,
+      "mean_block_std": 0.8759752269788493,
+      "ratio": 0.9336908019242517,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2L2D",
+      "n_variants": 639,
+      "n_blocks": 9,
+      "protein_std": 0.8450721170940189,
+      "mean_block_std": 0.7637043326328774,
+      "ratio": 0.903714981461057,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2L2P",
+      "n_variants": 1028,
+      "n_blocks": 16,
+      "protein_std": 0.8712920410152576,
+      "mean_block_std": 0.7771981674171082,
+      "ratio": 0.8920065039403916,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2L33",
+      "n_variants": 1333,
+      "n_blocks": 20,
+      "protein_std": 0.8139501462379639,
+      "mean_block_std": 0.697063514469513,
+      "ratio": 0.8563958341813747,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2L6Q",
+      "n_variants": 1044,
+      "n_blocks": 16,
+      "protein_std": 0.9798375681229531,
+      "mean_block_std": 0.8583641931042784,
+      "ratio": 0.8760270283865745,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2L7F",
+      "n_variants": 899,
+      "n_blocks": 14,
+      "protein_std": 0.9987864820526179,
+      "mean_block_std": 0.9298149683665269,
+      "ratio": 0.9309446864515558,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2L7M",
+      "n_variants": 937,
+      "n_blocks": 14,
+      "protein_std": 1.0082548586402824,
+      "mean_block_std": 0.9717830334949473,
+      "ratio": 0.9638267796750115,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2L9R",
+      "n_variants": 1153,
+      "n_blocks": 18,
+      "protein_std": 0.5169830112692075,
+      "mean_block_std": 0.4441479499313024,
+      "ratio": 0.8591151744830201,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LC2",
+      "n_variants": 1208,
+      "n_blocks": 18,
+      "protein_std": 0.9966341657311755,
+      "mean_block_std": 0.8596532689975354,
+      "ratio": 0.8625564911943945,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LCL",
+      "n_variants": 972,
+      "n_blocks": 15,
+      "protein_std": 0.6697217384221652,
+      "mean_block_std": 0.6238433482289581,
+      "ratio": 0.93149634010493,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LGW",
+      "n_variants": 1218,
+      "n_blocks": 19,
+      "protein_std": 1.2792246515009644,
+      "mean_block_std": 1.1322114576977742,
+      "ratio": 0.8850763283597656,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LHC",
+      "n_variants": 633,
+      "n_blocks": 9,
+      "protein_std": 0.6580375526424979,
+      "mean_block_std": 0.6417089719855233,
+      "ratio": 0.975185944037079,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LHR",
+      "n_variants": 942,
+      "n_blocks": 14,
+      "protein_std": 0.8009826310935709,
+      "mean_block_std": 0.7688043642229702,
+      "ratio": 0.95982651106096,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LJ3",
+      "n_variants": 1008,
+      "n_blocks": 15,
+      "protein_std": 1.3109444232380203,
+      "mean_block_std": 1.1336344733661214,
+      "ratio": 0.8647464021137181,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LO1",
+      "n_variants": 1219,
+      "n_blocks": 19,
+      "protein_std": 1.2108323953089333,
+      "mean_block_std": 1.0466031860500264,
+      "ratio": 0.8643666870037738,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LP5",
+      "n_variants": 1076,
+      "n_blocks": 16,
+      "protein_std": 1.1481721794245385,
+      "mean_block_std": 1.0517815054597053,
+      "ratio": 0.9160485894953978,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LQK",
+      "n_variants": 989,
+      "n_blocks": 15,
+      "protein_std": 0.6715873192348055,
+      "mean_block_std": 0.6169299408011454,
+      "ratio": 0.9186146360000725,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LSS",
+      "n_variants": 2445,
+      "n_blocks": 38,
+      "protein_std": 1.3696726759722222,
+      "mean_block_std": 1.1712351957783993,
+      "ratio": 0.8551205089544713,
+      "position_monotonicity": 0.9995893223819302
+    },
+    {
+      "name": "2LUM",
+      "n_variants": 956,
+      "n_blocks": 14,
+      "protein_std": 1.479606061875594,
+      "mean_block_std": 1.2758311125416955,
+      "ratio": 0.8622775652354471,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LVN",
+      "n_variants": 724,
+      "n_blocks": 11,
+      "protein_std": 0.9824071722861862,
+      "mean_block_std": 0.9274104575438206,
+      "ratio": 0.9440184108037594,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LX2",
+      "n_variants": 720,
+      "n_blocks": 11,
+      "protein_std": 1.7709718889769257,
+      "mean_block_std": 1.6773942373422661,
+      "ratio": 0.9471602840129109,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LXK",
+      "n_variants": 2493,
+      "n_blocks": 38,
+      "protein_std": 0.9109851045249348,
+      "mean_block_std": 0.7736087001115394,
+      "ratio": 0.8492001639422687,
+      "position_monotonicity": 0.999597261377366
+    },
+    {
+      "name": "2LYP",
+      "n_variants": 2435,
+      "n_blocks": 38,
+      "protein_std": 0.8769108696785328,
+      "mean_block_std": 0.7958172200798794,
+      "ratio": 0.907523498222366,
+      "position_monotonicity": 0.9995876288659794
+    },
+    {
+      "name": "2LYQ",
+      "n_variants": 1179,
+      "n_blocks": 18,
+      "protein_std": 1.0153439840271226,
+      "mean_block_std": 0.9520988398629454,
+      "ratio": 0.9377106230409421,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2LYR",
+      "n_variants": 1181,
+      "n_blocks": 18,
+      "protein_std": 0.9996356322765815,
+      "mean_block_std": 0.9047102778463495,
+      "ratio": 0.9050400452272316,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M0C",
+      "n_variants": 836,
+      "n_blocks": 13,
+      "protein_std": 1.185137078679306,
+      "mean_block_std": 1.1116890176926382,
+      "ratio": 0.9380256830133802,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M0Y",
+      "n_variants": 1212,
+      "n_blocks": 18,
+      "protein_std": 0.99330354135377,
+      "mean_block_std": 0.8501092166131122,
+      "ratio": 0.8558403158962882,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M2J",
+      "n_variants": 1350,
+      "n_blocks": 21,
+      "protein_std": 0.8600455377643625,
+      "mean_block_std": 0.7635764651919927,
+      "ratio": 0.887832599163138,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M2L",
+      "n_variants": 896,
+      "n_blocks": 14,
+      "protein_std": 0.9595987078227021,
+      "mean_block_std": 0.8440153318477289,
+      "ratio": 0.8795503005238221,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M6Y",
+      "n_variants": 1072,
+      "n_blocks": 16,
+      "protein_std": 0.7464708225715305,
+      "mean_block_std": 0.6756141295575134,
+      "ratio": 0.9050777460130034,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M7O",
+      "n_variants": 1135,
+      "n_blocks": 17,
+      "protein_std": 0.6855804842659388,
+      "mean_block_std": 0.6236607011143322,
+      "ratio": 0.9096826928819234,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M8E",
+      "n_variants": 640,
+      "n_blocks": 10,
+      "protein_std": 0.9611299663076545,
+      "mean_block_std": 0.9238857602054219,
+      "ratio": 0.9612495631102705,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M8I",
+      "n_variants": 759,
+      "n_blocks": 11,
+      "protein_std": 0.842456864029949,
+      "mean_block_std": 0.5967722801990317,
+      "ratio": 0.7083713192677088,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M8J",
+      "n_variants": 779,
+      "n_blocks": 12,
+      "protein_std": 0.9146171347083984,
+      "mean_block_std": 0.7056252696961859,
+      "ratio": 0.7714979775894488,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M8U",
+      "n_variants": 1277,
+      "n_blocks": 19,
+      "protein_std": 0.6607975473192906,
+      "mean_block_std": 0.5783075250786331,
+      "ratio": 0.8751659678894069,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M9E",
+      "n_variants": 479,
+      "n_blocks": 7,
+      "protein_std": 1.0005348968654297,
+      "mean_block_std": 0.9146486617558338,
+      "ratio": 0.9141596806081742,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M9F",
+      "n_variants": 596,
+      "n_blocks": 9,
+      "protein_std": 0.9900514138089257,
+      "mean_block_std": 0.9379889677291264,
+      "ratio": 0.9474144015617284,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2M9I",
+      "n_variants": 609,
+      "n_blocks": 9,
+      "protein_std": 0.5780830848133497,
+      "mean_block_std": 0.5346799297647782,
+      "ratio": 0.9249188288175125,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MA4",
+      "n_variants": 1242,
+      "n_blocks": 19,
+      "protein_std": 1.1359088044641823,
+      "mean_block_std": 0.891126383774774,
+      "ratio": 0.7845052175602476,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MC5",
+      "n_variants": 1125,
+      "n_blocks": 17,
+      "protein_std": 0.657606533570918,
+      "mean_block_std": 0.6010148196585723,
+      "ratio": 0.9139428959060931,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MCH",
+      "n_variants": 1145,
+      "n_blocks": 17,
+      "protein_std": 1.0601054189191104,
+      "mean_block_std": 0.8055219042168135,
+      "ratio": 0.7598507561994431,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MCK",
+      "n_variants": 950,
+      "n_blocks": 14,
+      "protein_std": 0.9661603955349162,
+      "mean_block_std": 0.8266904841757213,
+      "ratio": 0.8556451785813709,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MH8",
+      "n_variants": 779,
+      "n_blocks": 12,
+      "protein_std": 0.622906662123886,
+      "mean_block_std": 0.5455511681272907,
+      "ratio": 0.875815272656033,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MI6",
+      "n_variants": 1023,
+      "n_blocks": 15,
+      "protein_std": 1.4383064706504527,
+      "mean_block_std": 1.3635635215336894,
+      "ratio": 0.9480340590535188,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MKX",
+      "n_variants": 1783,
+      "n_blocks": 27,
+      "protein_std": 1.1485773397235257,
+      "mean_block_std": 1.0089306480917994,
+      "ratio": 0.8784176852510945,
+      "position_monotonicity": 0.9994359842075579
+    },
+    {
+      "name": "2MKY",
+      "n_variants": 1014,
+      "n_blocks": 15,
+      "protein_std": 1.0543557238518666,
+      "mean_block_std": 0.9826944397327518,
+      "ratio": 0.9320331056227253,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MLB",
+      "n_variants": 1329,
+      "n_blocks": 20,
+      "protein_std": 0.8196210372837176,
+      "mean_block_std": 0.732559359195903,
+      "ratio": 0.8937781314443279,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MW9",
+      "n_variants": 669,
+      "n_blocks": 10,
+      "protein_std": 0.9372434625077338,
+      "mean_block_std": 0.7664821595459141,
+      "ratio": 0.8178047542685201,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MWA",
+      "n_variants": 659,
+      "n_blocks": 10,
+      "protein_std": 0.7214362526916362,
+      "mean_block_std": 0.6041094577294001,
+      "ratio": 0.8373705306262379,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MWB",
+      "n_variants": 676,
+      "n_blocks": 10,
+      "protein_std": 0.8257511026662161,
+      "mean_block_std": 0.6943513986910806,
+      "ratio": 0.8408725055881038,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MXD",
+      "n_variants": 997,
+      "n_blocks": 15,
+      "protein_std": 1.1401713081567817,
+      "mean_block_std": 1.0311512000972411,
+      "ratio": 0.9043826947059525,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2MYX",
+      "n_variants": 958,
+      "n_blocks": 14,
+      "protein_std": 1.044370517931598,
+      "mean_block_std": 0.947295862032976,
+      "ratio": 0.9070496014279675,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2N4R",
+      "n_variants": 657,
+      "n_blocks": 10,
+      "protein_std": 0.668375112010822,
+      "mean_block_std": 0.5480084911291214,
+      "ratio": 0.8199115755229502,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2N88",
+      "n_variants": 891,
+      "n_blocks": 13,
+      "protein_std": 1.0789211603353996,
+      "mean_block_std": 0.9534833545259681,
+      "ratio": 0.8837377461663304,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2O2W",
+      "n_variants": 1214,
+      "n_blocks": 18,
+      "protein_std": 1.2082593895511098,
+      "mean_block_std": 1.0169303157161051,
+      "ratio": 0.841649007249936,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2OCH",
+      "n_variants": 1076,
+      "n_blocks": 16,
+      "protein_std": 0.6719019975532856,
+      "mean_block_std": 0.6438439164361367,
+      "ratio": 0.95824081306601,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2OP7",
+      "n_variants": 688,
+      "n_blocks": 10,
+      "protein_std": 0.9347559675746139,
+      "mean_block_std": 0.8012311437846957,
+      "ratio": 0.8571554197868654,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2PTL",
+      "n_variants": 2343,
+      "n_blocks": 36,
+      "protein_std": 1.1549769941135846,
+      "mean_block_std": 1.035382558323838,
+      "ratio": 0.8964529714450874,
+      "position_monotonicity": 0.9995713673381912
+    },
+    {
+      "name": "2QFF",
+      "n_variants": 1216,
+      "n_blocks": 19,
+      "protein_std": 0.876495250718259,
+      "mean_block_std": 0.8001222945838101,
+      "ratio": 0.9128655220072628,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2RJV",
+      "n_variants": 1190,
+      "n_blocks": 18,
+      "protein_std": 0.8913011051000762,
+      "mean_block_std": 0.8061754884782265,
+      "ratio": 0.9044928631471946,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2ROT",
+      "n_variants": 2565,
+      "n_blocks": 40,
+      "protein_std": 0.9297419533589667,
+      "mean_block_std": 0.7802590632495063,
+      "ratio": 0.8392210983172165,
+      "position_monotonicity": 0.9996086105675147
+    },
+    {
+      "name": "2RRT",
+      "n_variants": 1274,
+      "n_blocks": 19,
+      "protein_std": 0.9908822866040636,
+      "mean_block_std": 0.8275168680000797,
+      "ratio": 0.8351313563552868,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2RRU",
+      "n_variants": 711,
+      "n_blocks": 11,
+      "protein_std": 0.8125412174063559,
+      "mean_block_std": 0.6898446462463406,
+      "ratio": 0.848996495769575,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2RU9",
+      "n_variants": 1128,
+      "n_blocks": 17,
+      "protein_std": 0.901497415635146,
+      "mean_block_std": 0.818285327142263,
+      "ratio": 0.9076956993445663,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2WNM",
+      "n_variants": 1051,
+      "n_blocks": 16,
+      "protein_std": 0.9426709283175048,
+      "mean_block_std": 0.8093692675942328,
+      "ratio": 0.8585915225356625,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2WQG",
+      "n_variants": 657,
+      "n_blocks": 10,
+      "protein_std": 0.8513239155664484,
+      "mean_block_std": 0.7878643925727824,
+      "ratio": 0.9254578406252787,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2WXC",
+      "n_variants": 786,
+      "n_blocks": 12,
+      "protein_std": 0.8124906051834686,
+      "mean_block_std": 0.7180019035377257,
+      "ratio": 0.8837048686557966,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2YSB",
+      "n_variants": 681,
+      "n_blocks": 10,
+      "protein_std": 0.8504932860933848,
+      "mean_block_std": 0.7130669627869735,
+      "ratio": 0.8384157458342101,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2YSF",
+      "n_variants": 537,
+      "n_blocks": 8,
+      "protein_std": 0.7254580402746419,
+      "mean_block_std": 0.6692756219402802,
+      "ratio": 0.9225559367801723,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "2ZW1",
+      "n_variants": 2131,
+      "n_blocks": 33,
+      "protein_std": 1.2371534780250801,
+      "mean_block_std": 1.0927255374133036,
+      "ratio": 0.8832578631696264,
+      "position_monotonicity": 0.9995285242809995
+    },
+    {
+      "name": "3CQT",
+      "n_variants": 1054,
+      "n_blocks": 16,
+      "protein_std": 1.375112526111905,
+      "mean_block_std": 1.2352734163341341,
+      "ratio": 0.8983071515076935,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "3DKM",
+      "n_variants": 1238,
+      "n_blocks": 19,
+      "protein_std": 0.9958826667913735,
+      "mean_block_std": 0.8435273438749432,
+      "ratio": 0.8470147859814624,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "3I35",
+      "n_variants": 1049,
+      "n_blocks": 16,
+      "protein_std": 1.3760356903123496,
+      "mean_block_std": 1.229135269386994,
+      "ratio": 0.8932437421793831,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "3L1X",
+      "n_variants": 1111,
+      "n_blocks": 17,
+      "protein_std": 1.0824158707435378,
+      "mean_block_std": 0.9313360654266019,
+      "ratio": 0.8604235124405968,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "3MYC",
+      "n_variants": 1167,
+      "n_blocks": 18,
+      "protein_std": 0.7801399061329043,
+      "mean_block_std": 0.7024582768765826,
+      "ratio": 0.9004260278885312,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "3V1A",
+      "n_variants": 833,
+      "n_blocks": 13,
+      "protein_std": 0.8001392343739235,
+      "mean_block_std": 0.7310686863968782,
+      "ratio": 0.9136768389677951,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "3ZGK",
+      "n_variants": 1305,
+      "n_blocks": 20,
+      "protein_std": 1.0584540677354566,
+      "mean_block_std": 0.9141898787313802,
+      "ratio": 0.8637029292043565,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "4C26",
+      "n_variants": 1159,
+      "n_blocks": 18,
+      "protein_std": 1.280651283841143,
+      "mean_block_std": 1.0794135174654653,
+      "ratio": 0.8428629487864239,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "4G3O",
+      "n_variants": 807,
+      "n_blocks": 12,
+      "protein_std": 0.9486319054113704,
+      "mean_block_std": 0.8620076035960264,
+      "ratio": 0.9086850217442562,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "4HCK",
+      "n_variants": 1038,
+      "n_blocks": 16,
+      "protein_std": 1.4884032691823752,
+      "mean_block_std": 1.348781423675853,
+      "ratio": 0.9061935374656758,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "4UZW",
+      "n_variants": 773,
+      "n_blocks": 12,
+      "protein_std": 1.1030579545172257,
+      "mean_block_std": 0.9729079444165097,
+      "ratio": 0.8820098168299066,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5AHT",
+      "n_variants": 559,
+      "n_blocks": 8,
+      "protein_std": 0.6345242196182601,
+      "mean_block_std": 0.5223430052028445,
+      "ratio": 0.8232042041154779,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5ECA",
+      "n_variants": 2240,
+      "n_blocks": 35,
+      "protein_std": 1.0035582383459627,
+      "mean_block_std": 0.8171191003730676,
+      "ratio": 0.8142219047693943,
+      "position_monotonicity": 0.9995515695067264
+    },
+    {
+      "name": "5FWB",
+      "n_variants": 2266,
+      "n_blocks": 35,
+      "protein_std": 0.924910372503383,
+      "mean_block_std": 0.7442448630450027,
+      "ratio": 0.8046670090104114,
+      "position_monotonicity": 0.9995567375886525
+    },
+    {
+      "name": "5GU9",
+      "n_variants": 2421,
+      "n_blocks": 37,
+      "protein_std": 1.105781459894508,
+      "mean_block_std": 0.9896675001056752,
+      "ratio": 0.8949937541908958,
+      "position_monotonicity": 0.9995852343425964
+    },
+    {
+      "name": "5JRT",
+      "n_variants": 1122,
+      "n_blocks": 17,
+      "protein_std": 0.9634265335411031,
+      "mean_block_std": 0.9119036024941272,
+      "ratio": 0.946521162482829,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5KPH",
+      "n_variants": 1291,
+      "n_blocks": 20,
+      "protein_std": 0.9279094201269922,
+      "mean_block_std": 0.8567924459256746,
+      "ratio": 0.9233578486663229,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5LXJ",
+      "n_variants": 855,
+      "n_blocks": 13,
+      "protein_std": 1.0249270747109078,
+      "mean_block_std": 0.9407932643131741,
+      "ratio": 0.9179123935022747,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5OAO",
+      "n_variants": 989,
+      "n_blocks": 15,
+      "protein_std": 0.6368597398975935,
+      "mean_block_std": 0.601670760768576,
+      "ratio": 0.9447461082487709,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5UBS",
+      "n_variants": 1029,
+      "n_blocks": 16,
+      "protein_std": 1.073153473570989,
+      "mean_block_std": 0.9054422173610399,
+      "ratio": 0.8437210889772563,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5UCE",
+      "n_variants": 991,
+      "n_blocks": 15,
+      "protein_std": 0.9388130835187587,
+      "mean_block_std": 0.8518529468967629,
+      "ratio": 0.907372257429497,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5UP5",
+      "n_variants": 653,
+      "n_blocks": 10,
+      "protein_std": 0.9661323752034545,
+      "mean_block_std": 0.8932693209015927,
+      "ratio": 0.9245827423115618,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5UYO",
+      "n_variants": 755,
+      "n_blocks": 11,
+      "protein_std": 0.8774204128929576,
+      "mean_block_std": 0.8004301473050252,
+      "ratio": 0.9122538472360284,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5VNT",
+      "n_variants": 1150,
+      "n_blocks": 17,
+      "protein_std": 0.4738803196238721,
+      "mean_block_std": 0.42700926565984054,
+      "ratio": 0.9010909463359145,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5XR0",
+      "n_variants": 654,
+      "n_blocks": 10,
+      "protein_std": 1.6313977673138869,
+      "mean_block_std": 1.5896278024945665,
+      "ratio": 0.9743962106261215,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "5Z2S",
+      "n_variants": 649,
+      "n_blocks": 10,
+      "protein_std": 0.7920376372724703,
+      "mean_block_std": 0.7045783390269158,
+      "ratio": 0.8895768406325525,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6ACV",
+      "n_variants": 1156,
+      "n_blocks": 18,
+      "protein_std": 1.0717131788405025,
+      "mean_block_std": 0.792115831862564,
+      "ratio": 0.739111776827791,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6EWS",
+      "n_variants": 1035,
+      "n_blocks": 16,
+      "protein_std": 1.2301196992611192,
+      "mean_block_std": 1.1181845263113819,
+      "ratio": 0.9090046496963083,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6EWT",
+      "n_variants": 1024,
+      "n_blocks": 16,
+      "protein_std": 1.3150293705410692,
+      "mean_block_std": 1.154198032607432,
+      "ratio": 0.8776975316775905,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6EWU",
+      "n_variants": 1009,
+      "n_blocks": 15,
+      "protein_std": 1.2122892295340086,
+      "mean_block_std": 1.1442752213092686,
+      "ratio": 0.9438962200044589,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6FVC",
+      "n_variants": 781,
+      "n_blocks": 12,
+      "protein_std": 0.69219077749733,
+      "mean_block_std": 0.6446128770753233,
+      "ratio": 0.9312647582592355,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6IWS",
+      "n_variants": 1155,
+      "n_blocks": 18,
+      "protein_std": 1.2763961649681996,
+      "mean_block_std": 1.0819449481353496,
+      "ratio": 0.847656063086264,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6M3N",
+      "n_variants": 1219,
+      "n_blocks": 19,
+      "protein_std": 0.9301361418664034,
+      "mean_block_std": 0.879383683893046,
+      "ratio": 0.945435452200021,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6NMW",
+      "n_variants": 1018,
+      "n_blocks": 15,
+      "protein_std": 1.4338296899670442,
+      "mean_block_std": 1.300515510630143,
+      "ratio": 0.907022305180495,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6NS8",
+      "n_variants": 1308,
+      "n_blocks": 20,
+      "protein_std": 0.7663256399419063,
+      "mean_block_std": 0.6759504672125223,
+      "ratio": 0.8820668812070086,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6OBK",
+      "n_variants": 701,
+      "n_blocks": 10,
+      "protein_std": 1.049877974717401,
+      "mean_block_std": 0.9481329068511626,
+      "ratio": 0.9030886728587431,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6SCW",
+      "n_variants": 1051,
+      "n_blocks": 16,
+      "protein_std": 1.289358562391835,
+      "mean_block_std": 1.031018598545261,
+      "ratio": 0.799636833863081,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6SOW",
+      "n_variants": 939,
+      "n_blocks": 14,
+      "protein_std": 0.955322533931173,
+      "mean_block_std": 0.862322384700645,
+      "ratio": 0.9026505228052872,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "6YSE",
+      "n_variants": 568,
+      "n_blocks": 8,
+      "protein_std": 0.6015188715514239,
+      "mean_block_std": 0.5689080169255412,
+      "ratio": 0.9457858162591415,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "7BPM",
+      "n_variants": 1304,
+      "n_blocks": 20,
+      "protein_std": 0.685696774183222,
+      "mean_block_std": 0.614980975096592,
+      "ratio": 0.8968701593049433,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "7JJK",
+      "n_variants": 1014,
+      "n_blocks": 15,
+      "protein_std": 0.8710859292911483,
+      "mean_block_std": 0.7963417164235705,
+      "ratio": 0.9141942139641708,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_0019",
+      "n_variants": 743,
+      "n_blocks": 11,
+      "protein_std": 0.9571871739347838,
+      "mean_block_std": 0.9174031498377356,
+      "ratio": 0.9584365261252876,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_0094",
+      "n_variants": 794,
+      "n_blocks": 12,
+      "protein_std": 0.7346591083900023,
+      "mean_block_std": 0.6979861022657644,
+      "ratio": 0.9500816015136512,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_0130",
+      "n_variants": 769,
+      "n_blocks": 12,
+      "protein_std": 0.6563594494597932,
+      "mean_block_std": 0.6262262306951022,
+      "ratio": 0.9540903710771717,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_0146",
+      "n_variants": 789,
+      "n_blocks": 12,
+      "protein_std": 0.6272112628108782,
+      "mean_block_std": 0.5704122849702117,
+      "ratio": 0.9094420314040295,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_0602",
+      "n_variants": 818,
+      "n_blocks": 12,
+      "protein_std": 0.7852031451214909,
+      "mean_block_std": 0.7082448793553343,
+      "ratio": 0.9019893562012552,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_0657",
+      "n_variants": 752,
+      "n_blocks": 11,
+      "protein_std": 1.0092549778687367,
+      "mean_block_std": 0.8076981121198319,
+      "ratio": 0.8002914326223722,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_0809",
+      "n_variants": 693,
+      "n_blocks": 10,
+      "protein_std": 1.0272240642684178,
+      "mean_block_std": 0.9611968531830181,
+      "ratio": 0.9357226788369449,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_1049",
+      "n_variants": 814,
+      "n_blocks": 12,
+      "protein_std": 0.8631361613497427,
+      "mean_block_std": 0.8065514113290965,
+      "ratio": 0.9344428462687036,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_1367",
+      "n_variants": 777,
+      "n_blocks": 12,
+      "protein_std": 1.0072491574979117,
+      "mean_block_std": 0.9723104056421444,
+      "ratio": 0.9653127018318308,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_1498",
+      "n_variants": 805,
+      "n_blocks": 12,
+      "protein_std": 0.5805905340450915,
+      "mean_block_std": 0.5417781021490182,
+      "ratio": 0.9331500780323454,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_1587",
+      "n_variants": 764,
+      "n_blocks": 11,
+      "protein_std": 0.7120109914863293,
+      "mean_block_std": 0.5917764415620284,
+      "ratio": 0.8311338569741595,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_1615",
+      "n_variants": 764,
+      "n_blocks": 11,
+      "protein_std": 0.9115750056085796,
+      "mean_block_std": 0.8614783430037708,
+      "ratio": 0.9450438391831908,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_1702",
+      "n_variants": 817,
+      "n_blocks": 12,
+      "protein_std": 0.6524027004286176,
+      "mean_block_std": 0.5892971104700274,
+      "ratio": 0.9032720282777327,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_1716",
+      "n_variants": 759,
+      "n_blocks": 11,
+      "protein_std": 0.613415461892702,
+      "mean_block_std": 0.5945835022980505,
+      "ratio": 0.969299828966578,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_1810",
+      "n_variants": 742,
+      "n_blocks": 11,
+      "protein_std": 0.8742209638427463,
+      "mean_block_std": 0.8518173137983321,
+      "ratio": 0.9743730121204871,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd3_1818",
+      "n_variants": 793,
+      "n_blocks": 12,
+      "protein_std": 0.7711725419101769,
+      "mean_block_std": 0.7387041183757398,
+      "ratio": 0.9578973293654705,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0003",
+      "n_variants": 817,
+      "n_blocks": 12,
+      "protein_std": 0.6290194852409482,
+      "mean_block_std": 0.5788048615403011,
+      "ratio": 0.9201700028713543,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0005",
+      "n_variants": 786,
+      "n_blocks": 12,
+      "protein_std": 0.6428761598640303,
+      "mean_block_std": 0.5891818690086487,
+      "ratio": 0.9164780183064525,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0256",
+      "n_variants": 814,
+      "n_blocks": 12,
+      "protein_std": 0.6999085877064656,
+      "mean_block_std": 0.6504433285926856,
+      "ratio": 0.9293261148918419,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0308",
+      "n_variants": 602,
+      "n_blocks": 9,
+      "protein_std": 0.6572384143184358,
+      "mean_block_std": 0.637779290593249,
+      "ratio": 0.9703925952877144,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0363",
+      "n_variants": 803,
+      "n_blocks": 12,
+      "protein_std": 0.8641319770460779,
+      "mean_block_std": 0.8081244837718985,
+      "ratio": 0.9351864127680661,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0371",
+      "n_variants": 817,
+      "n_blocks": 12,
+      "protein_std": 0.8506476139761349,
+      "mean_block_std": 0.7677131511368974,
+      "ratio": 0.9025043255554653,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0469",
+      "n_variants": 794,
+      "n_blocks": 12,
+      "protein_std": 0.5198479658137375,
+      "mean_block_std": 0.4918772329835209,
+      "ratio": 0.9461943978439292,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0470",
+      "n_variants": 796,
+      "n_blocks": 12,
+      "protein_std": 0.6905907944762499,
+      "mean_block_std": 0.6269895458991451,
+      "ratio": 0.9079031329611907,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0481",
+      "n_variants": 809,
+      "n_blocks": 12,
+      "protein_std": 0.5776300663411899,
+      "mean_block_std": 0.5467367644127484,
+      "ratio": 0.9465171504590733,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0647",
+      "n_variants": 812,
+      "n_blocks": 12,
+      "protein_std": 0.929773831071575,
+      "mean_block_std": 0.8663542885833455,
+      "ratio": 0.9317903554941552,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0763",
+      "n_variants": 811,
+      "n_blocks": 12,
+      "protein_std": 0.6025272766917862,
+      "mean_block_std": 0.5631608128054717,
+      "ratio": 0.934664428633906,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0784",
+      "n_variants": 738,
+      "n_blocks": 11,
+      "protein_std": 0.5192438018312502,
+      "mean_block_std": 0.46745260924900867,
+      "ratio": 0.9002565030153731,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EEHEE_rd4_0794",
+      "n_variants": 810,
+      "n_blocks": 12,
+      "protein_std": 0.698698432819237,
+      "mean_block_std": 0.5984181492965085,
+      "ratio": 0.85647558544235,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd1_0101",
+      "n_variants": 736,
+      "n_blocks": 11,
+      "protein_std": 0.8401071561055558,
+      "mean_block_std": 0.7491601524291096,
+      "ratio": 0.8917435674538892,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd1_0407",
+      "n_variants": 730,
+      "n_blocks": 11,
+      "protein_std": 1.012304027046557,
+      "mean_block_std": 0.8426237541018402,
+      "ratio": 0.8323821022032613,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd1_0459",
+      "n_variants": 658,
+      "n_blocks": 10,
+      "protein_std": 0.7028750321854754,
+      "mean_block_std": 0.6686125624797516,
+      "ratio": 0.9512538244541278,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd2_0152",
+      "n_variants": 700,
+      "n_blocks": 10,
+      "protein_std": 0.8823578908532954,
+      "mean_block_std": 0.8245224387137563,
+      "ratio": 0.9344535219335902,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd2_0191",
+      "n_variants": 647,
+      "n_blocks": 10,
+      "protein_std": 0.823387609641631,
+      "mean_block_std": 0.7797980046246682,
+      "ratio": 0.9470606498002385,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd2_0196",
+      "n_variants": 739,
+      "n_blocks": 11,
+      "protein_std": 0.9298243286949643,
+      "mean_block_std": 0.8539633191462812,
+      "ratio": 0.9184136108213513,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd2_0372",
+      "n_variants": 734,
+      "n_blocks": 11,
+      "protein_std": 0.9390039139549798,
+      "mean_block_std": 0.8577448773949072,
+      "ratio": 0.9134625155950431,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd2_0487",
+      "n_variants": 732,
+      "n_blocks": 11,
+      "protein_std": 1.0300782732406342,
+      "mean_block_std": 0.8988803783328556,
+      "ratio": 0.8726330820520766,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd2_0601",
+      "n_variants": 661,
+      "n_blocks": 10,
+      "protein_std": 0.7974264452468559,
+      "mean_block_std": 0.7582905674627968,
+      "ratio": 0.9509222724963128,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd2_0751",
+      "n_variants": 633,
+      "n_blocks": 9,
+      "protein_std": 0.7913755311591378,
+      "mean_block_std": 0.6927950592149431,
+      "ratio": 0.8754314885124099,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd2_1106",
+      "n_variants": 650,
+      "n_blocks": 10,
+      "protein_std": 0.6822156217051718,
+      "mean_block_std": 0.6521241705253111,
+      "ratio": 0.9558915829211764,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd2_1257",
+      "n_variants": 668,
+      "n_blocks": 10,
+      "protein_std": 0.8034059180479921,
+      "mean_block_std": 0.7446947231329311,
+      "ratio": 0.9269221279104968,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd3_0035",
+      "n_variants": 709,
+      "n_blocks": 11,
+      "protein_std": 0.9905652350075561,
+      "mean_block_std": 0.9170483778305205,
+      "ratio": 0.9257829221348811,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd3_0053",
+      "n_variants": 715,
+      "n_blocks": 11,
+      "protein_std": 0.9216997901038063,
+      "mean_block_std": 0.8734439672894968,
+      "ratio": 0.9476447501318463,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0044",
+      "n_variants": 644,
+      "n_blocks": 10,
+      "protein_std": 0.9046566616232006,
+      "mean_block_std": 0.8325921948258742,
+      "ratio": 0.9203405337578313,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0086",
+      "n_variants": 669,
+      "n_blocks": 10,
+      "protein_std": 0.8016277761198692,
+      "mean_block_std": 0.7737944578733913,
+      "ratio": 0.9652789997108134,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0098",
+      "n_variants": 718,
+      "n_blocks": 11,
+      "protein_std": 0.8453758457629363,
+      "mean_block_std": 0.7898879905992863,
+      "ratio": 0.9343630937153482,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0172",
+      "n_variants": 680,
+      "n_blocks": 10,
+      "protein_std": 0.6819519498596885,
+      "mean_block_std": 0.6209254838503224,
+      "ratio": 0.9105120734357863,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0195",
+      "n_variants": 749,
+      "n_blocks": 11,
+      "protein_std": 0.8961204585228186,
+      "mean_block_std": 0.7961226603018615,
+      "ratio": 0.888410316637793,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0325",
+      "n_variants": 726,
+      "n_blocks": 11,
+      "protein_std": 0.6537187732853085,
+      "mean_block_std": 0.5566910465808962,
+      "ratio": 0.8515757376573526,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0394",
+      "n_variants": 665,
+      "n_blocks": 10,
+      "protein_std": 0.7851085678692192,
+      "mean_block_std": 0.7325939202370753,
+      "ratio": 0.93311161057041,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0463",
+      "n_variants": 736,
+      "n_blocks": 11,
+      "protein_std": 1.0226899130921328,
+      "mean_block_std": 0.8916038933411105,
+      "ratio": 0.8718223206536966,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0502",
+      "n_variants": 706,
+      "n_blocks": 11,
+      "protein_std": 0.5328593428191833,
+      "mean_block_std": 0.5117228032872874,
+      "ratio": 0.9603337356907932,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0625",
+      "n_variants": 667,
+      "n_blocks": 10,
+      "protein_std": 0.6013319070886157,
+      "mean_block_std": 0.5616876884850821,
+      "ratio": 0.9340726508335913,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0726",
+      "n_variants": 698,
+      "n_blocks": 10,
+      "protein_std": 0.843049413425632,
+      "mean_block_std": 0.7905246343442559,
+      "ratio": 0.9376966779824354,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0840",
+      "n_variants": 694,
+      "n_blocks": 10,
+      "protein_std": 0.7514235626682079,
+      "mean_block_std": 0.6996050386944249,
+      "ratio": 0.9310395274407126,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0864",
+      "n_variants": 574,
+      "n_blocks": 8,
+      "protein_std": 0.6167493137548679,
+      "mean_block_std": 0.6009527674190349,
+      "ratio": 0.9743874115730085,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "EHEE_rd4_0877",
+      "n_variants": 693,
+      "n_blocks": 10,
+      "protein_std": 0.638532725222874,
+      "mean_block_std": 0.5859047703685857,
+      "ratio": 0.9175798627456111,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_KT_rd6_0007",
+      "n_variants": 800,
+      "n_blocks": 12,
+      "protein_std": 0.44107101547086214,
+      "mean_block_std": 0.40325484081486834,
+      "ratio": 0.9142628435567832,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_KT_rd6_0280",
+      "n_variants": 802,
+      "n_blocks": 12,
+      "protein_std": 0.9831394042508838,
+      "mean_block_std": 0.9569241507286362,
+      "ratio": 0.9733351614136323,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_KT_rd6_0746",
+      "n_variants": 806,
+      "n_blocks": 12,
+      "protein_std": 0.47663379893811036,
+      "mean_block_std": 0.43293455280177867,
+      "ratio": 0.908316938006308,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_KT_rd6_0790",
+      "n_variants": 798,
+      "n_blocks": 12,
+      "protein_std": 0.5447023202284472,
+      "mean_block_std": 0.4418092841930353,
+      "ratio": 0.8111022622553566,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_KT_rd6_0793",
+      "n_variants": 795,
+      "n_blocks": 12,
+      "protein_std": 0.8031787841019508,
+      "mean_block_std": 0.7493760731545575,
+      "ratio": 0.9330127836885643,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_KT_rd6_0872",
+      "n_variants": 790,
+      "n_blocks": 12,
+      "protein_std": 0.49497946590983294,
+      "mean_block_std": 0.4098596997485761,
+      "ratio": 0.8280337427638614,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_KT_rd6_1415",
+      "n_variants": 818,
+      "n_blocks": 12,
+      "protein_std": 0.4458810351145471,
+      "mean_block_std": 0.40652641847388327,
+      "ratio": 0.9117374063004191,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_KT_rd6_3546",
+      "n_variants": 802,
+      "n_blocks": 12,
+      "protein_std": 0.5705883934940709,
+      "mean_block_std": 0.48109403981744486,
+      "ratio": 0.8431542690018703,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_KT_rd6_3632",
+      "n_variants": 797,
+      "n_blocks": 12,
+      "protein_std": 0.42918416751662264,
+      "mean_block_std": 0.3746059285866852,
+      "ratio": 0.8728325901541473,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_rd3_0055",
+      "n_variants": 798,
+      "n_blocks": 12,
+      "protein_std": 0.41011652585431824,
+      "mean_block_std": 0.37427120458110735,
+      "ratio": 0.9125972278280152,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_rd3_0223",
+      "n_variants": 769,
+      "n_blocks": 12,
+      "protein_std": 0.6386785751960644,
+      "mean_block_std": 0.60671365001384,
+      "ratio": 0.9499514678844336,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_rd4_0094",
+      "n_variants": 805,
+      "n_blocks": 12,
+      "protein_std": 0.8390551421568109,
+      "mean_block_std": 0.7714534683024673,
+      "ratio": 0.9194311905644581,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_rd4_0097",
+      "n_variants": 816,
+      "n_blocks": 12,
+      "protein_std": 0.8506623666134958,
+      "mean_block_std": 0.7798292005563264,
+      "ratio": 0.9167317506484298,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HEEH_rd4_0349",
+      "n_variants": 810,
+      "n_blocks": 12,
+      "protein_std": 0.7758837394618849,
+      "mean_block_std": 0.715548965781771,
+      "ratio": 0.9222373525678483,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd1_0142",
+      "n_variants": 803,
+      "n_blocks": 12,
+      "protein_std": 1.070821043219867,
+      "mean_block_std": 1.0121081883629492,
+      "ratio": 0.9451702455525405,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd1_0244",
+      "n_variants": 770,
+      "n_blocks": 12,
+      "protein_std": 1.0139660072124939,
+      "mean_block_std": 0.8881655952122265,
+      "ratio": 0.8759323181394347,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd1_0335",
+      "n_variants": 814,
+      "n_blocks": 12,
+      "protein_std": 0.7279344813527142,
+      "mean_block_std": 0.6743749696774755,
+      "ratio": 0.9264226203768922,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd1_0473",
+      "n_variants": 806,
+      "n_blocks": 12,
+      "protein_std": 0.8274986063872283,
+      "mean_block_std": 0.7476590006896692,
+      "ratio": 0.9035169303231453,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd1_0493",
+      "n_variants": 812,
+      "n_blocks": 12,
+      "protein_std": 0.930513383453712,
+      "mean_block_std": 0.7858169856157433,
+      "ratio": 0.844498316294054,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd1_0516",
+      "n_variants": 796,
+      "n_blocks": 12,
+      "protein_std": 0.5872141082772948,
+      "mean_block_std": 0.4667905462333044,
+      "ratio": 0.7949239291997325,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd1_0578",
+      "n_variants": 793,
+      "n_blocks": 12,
+      "protein_std": 0.7794441595505093,
+      "mean_block_std": 0.7115495150023049,
+      "ratio": 0.9128935104377998,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd1_0598",
+      "n_variants": 786,
+      "n_blocks": 12,
+      "protein_std": 0.640952371742224,
+      "mean_block_std": 0.5561525219768582,
+      "ratio": 0.8676971121350803,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd1_0606",
+      "n_variants": 801,
+      "n_blocks": 12,
+      "protein_std": 0.6860423142772666,
+      "mean_block_std": 0.5807819978842114,
+      "ratio": 0.8465687695897518,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd1_0949",
+      "n_variants": 789,
+      "n_blocks": 12,
+      "protein_std": 0.8774945299411909,
+      "mean_block_std": 0.7647377646222919,
+      "ratio": 0.8715014607253952,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd2_0155",
+      "n_variants": 794,
+      "n_blocks": 12,
+      "protein_std": 0.6709587011886833,
+      "mean_block_std": 0.5540630079761082,
+      "ratio": 0.8257781097324165,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd2_0181",
+      "n_variants": 814,
+      "n_blocks": 12,
+      "protein_std": 1.0628899119122188,
+      "mean_block_std": 0.9248294588447618,
+      "ratio": 0.8701084171369394,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd4_0124",
+      "n_variants": 807,
+      "n_blocks": 12,
+      "protein_std": 0.566351281379732,
+      "mean_block_std": 0.5394784348982423,
+      "ratio": 0.9525509213715864,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd4_0395",
+      "n_variants": 778,
+      "n_blocks": 12,
+      "protein_std": 1.1521252745849435,
+      "mean_block_std": 1.0519581524037833,
+      "ratio": 0.9130588275504626,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd4_0557",
+      "n_variants": 800,
+      "n_blocks": 12,
+      "protein_std": 0.8106663234185255,
+      "mean_block_std": 0.7713149670358527,
+      "ratio": 0.9514580102245634,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd4_0613",
+      "n_variants": 774,
+      "n_blocks": 12,
+      "protein_std": 0.7739884406111701,
+      "mean_block_std": 0.7178007122275906,
+      "ratio": 0.9274049515013278,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd4_0676",
+      "n_variants": 808,
+      "n_blocks": 12,
+      "protein_std": 0.8388078963546978,
+      "mean_block_std": 0.7448661738145065,
+      "ratio": 0.8880056769274056,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd4_0816",
+      "n_variants": 736,
+      "n_blocks": 11,
+      "protein_std": 0.5145634267221116,
+      "mean_block_std": 0.447291790830794,
+      "ratio": 0.8692646379478356,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "HHH_rd4_0870",
+      "n_variants": 809,
+      "n_blocks": 12,
+      "protein_std": 0.9334033016644503,
+      "mean_block_std": 0.8254116496587854,
+      "ratio": 0.88430333188977,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r10_437_TrROS_Hall",
+      "n_variants": 880,
+      "n_blocks": 13,
+      "protein_std": 0.8512299159285621,
+      "mean_block_std": 0.7673286056065547,
+      "ratio": 0.9014351954131171,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r10_490_TrROS_Hall",
+      "n_variants": 887,
+      "n_blocks": 13,
+      "protein_std": 0.5368037537672339,
+      "mean_block_std": 0.48689708043360636,
+      "ratio": 0.9070299471950641,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r10_572_TrROS_Hall",
+      "n_variants": 887,
+      "n_blocks": 13,
+      "protein_std": 0.8271487784896544,
+      "mean_block_std": 0.7825556700576537,
+      "ratio": 0.9460881650415707,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r11_1081_TrROS_Hall",
+      "n_variants": 897,
+      "n_blocks": 14,
+      "protein_std": 0.7698412565335823,
+      "mean_block_std": 0.6713589571619442,
+      "ratio": 0.8720745367491979,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r11_233_TrROS_Hall",
+      "n_variants": 930,
+      "n_blocks": 14,
+      "protein_std": 0.862364714651266,
+      "mean_block_std": 0.7938173870380412,
+      "ratio": 0.920512369710135,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r11_569_TrROS_Hall",
+      "n_variants": 918,
+      "n_blocks": 14,
+      "protein_std": 0.7609593912708609,
+      "mean_block_std": 0.7439287817400937,
+      "ratio": 0.9776195553584998,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r11_797_TrROS_Hall",
+      "n_variants": 930,
+      "n_blocks": 14,
+      "protein_std": 0.7610556285399406,
+      "mean_block_std": 0.6937353974630771,
+      "ratio": 0.9115436131705443,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r11_829_TrROS_Hall",
+      "n_variants": 927,
+      "n_blocks": 14,
+      "protein_std": 0.9066725149251446,
+      "mean_block_std": 0.8272238284506405,
+      "ratio": 0.9123733374877219,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r11_951_TrROS_Hall",
+      "n_variants": 925,
+      "n_blocks": 14,
+      "protein_std": 0.7351236442951988,
+      "mean_block_std": 0.6185553658660018,
+      "ratio": 0.8414303779591294,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r12_757_TrROS_Hall",
+      "n_variants": 981,
+      "n_blocks": 15,
+      "protein_std": 0.6368793503848098,
+      "mean_block_std": 0.6022398199597371,
+      "ratio": 0.945610529837177,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r15_550_TrROS_Hall",
+      "n_variants": 1127,
+      "n_blocks": 17,
+      "protein_std": 0.6771429163392927,
+      "mean_block_std": 0.5558742124142259,
+      "ratio": 0.8209112123912357,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r16_88_TrROS_Hall",
+      "n_variants": 1189,
+      "n_blocks": 18,
+      "protein_std": 0.5159624898978746,
+      "mean_block_std": 0.4130322474931001,
+      "ratio": 0.8005082841871941,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r18_3_TrROS_Hall",
+      "n_variants": 989,
+      "n_blocks": 15,
+      "protein_std": 0.664101599854791,
+      "mean_block_std": 0.5495437740564609,
+      "ratio": 0.8274995485278477,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r3_162_TrROS_Hall",
+      "n_variants": 961,
+      "n_blocks": 15,
+      "protein_std": 0.45489135290707056,
+      "mean_block_std": 0.4035091419562903,
+      "ratio": 0.887045091927089,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r4_412_TrROS_Hall",
+      "n_variants": 869,
+      "n_blocks": 13,
+      "protein_std": 0.7749947093085392,
+      "mean_block_std": 0.7099174549460877,
+      "ratio": 0.9160287759634975,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r4_43_TrROS_Hall",
+      "n_variants": 865,
+      "n_blocks": 13,
+      "protein_std": 0.6564248213705168,
+      "mean_block_std": 0.5717605400133741,
+      "ratio": 0.8710221207352026,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r6_560_TrROS_Hall",
+      "n_variants": 1054,
+      "n_blocks": 16,
+      "protein_std": 0.9680779666705399,
+      "mean_block_std": 0.799476807678486,
+      "ratio": 0.8258392765905879,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r6_831_TrROS_Hall",
+      "n_variants": 1058,
+      "n_blocks": 16,
+      "protein_std": 0.8601435282997945,
+      "mean_block_std": 0.811687521489993,
+      "ratio": 0.9436652079385144,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "r7_587_TrROS_Hall",
+      "n_variants": 896,
+      "n_blocks": 14,
+      "protein_std": 0.838460098288674,
+      "mean_block_std": 0.7587794147933122,
+      "ratio": 0.9049678289306876,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "v2K43S_2KVV",
+      "n_variants": 1006,
+      "n_blocks": 15,
+      "protein_std": 1.0706269712699485,
+      "mean_block_std": 0.8861885701259401,
+      "ratio": 0.8277286056737085,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "v2_2HDZ",
+      "n_variants": 890,
+      "n_blocks": 13,
+      "protein_std": 0.9299881842838044,
+      "mean_block_std": 0.902494952244437,
+      "ratio": 0.970437009304005,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "v2_2LC2",
+      "n_variants": 1064,
+      "n_blocks": 16,
+      "protein_std": 0.8388060154186308,
+      "mean_block_std": 0.7879247007157983,
+      "ratio": 0.9393407846778035,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "v2_2LDM",
+      "n_variants": 969,
+      "n_blocks": 15,
+      "protein_std": 0.6675467260525983,
+      "mean_block_std": 0.5905585837278989,
+      "ratio": 0.8846700323437235,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "v2_2LXE",
+      "n_variants": 1001,
+      "n_blocks": 15,
+      "protein_std": 1.0107692542013749,
+      "mean_block_std": 0.9241058603824771,
+      "ratio": 0.9142599624408125,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "v2_2M5A",
+      "n_variants": 1048,
+      "n_blocks": 16,
+      "protein_std": 0.7609282253819222,
+      "mean_block_std": 0.7015881059790188,
+      "ratio": 0.9220161410452088,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "v2_4UZX",
+      "n_variants": 1098,
+      "n_blocks": 17,
+      "protein_std": 0.8921021216525906,
+      "mean_block_std": 0.7949030933431804,
+      "ratio": 0.8910449533184025,
+      "position_monotonicity": 1.0
+    },
+    {
+      "name": "v2_6IVS",
+      "n_variants": 908,
+      "n_blocks": 14,
+      "protein_std": 0.7518847882129956,
+      "mean_block_std": 0.6510309185320616,
+      "ratio": 0.8658652611916337,
+      "position_monotonicity": 1.0
+    }
+  ],
+  "skipped": [
+    [
+      "1B7I",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1B7J",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1BNZ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1BOD",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1E0M",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1E68",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1EGL",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1EKL",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1GXI",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1IGD",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1IGV",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1MHN",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1MHX",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1MSJ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1OGW",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1PGY",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1Q1H",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1QBF",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1QCV",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1QK9",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1UNC",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1UND",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1V1D",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1V92",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1VZS",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1W4E",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1W4I",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1W4K",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1WR3",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1WR7",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1YG0",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1YIU",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1YZM",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "1ZRJ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2A3D",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2AME",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2BN6",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2BN8",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2BTG",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2C0S",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2CUW",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2CWB",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2DMV",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2EKK",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2FGG",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2HDZ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2HJJ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2I5L",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2J6K",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2JMS",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2JN0",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2JNH",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2JOW",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2JRO",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2JRR",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2JTM",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2JWU",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2JY8",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2K57",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2KI0",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2KIS",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2KLZ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2KNA",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2KQ6",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2KRM",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2KVV",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2L0A",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2L15",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2L32",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2L3X",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2L4J",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2L7K",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2L8D",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LDM",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LGN",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LHD",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LHE",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LHG",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LLV",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LLW",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LMR",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LOJ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LR2",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LT1",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LX3",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LXE",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2LY9",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2M0X",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2M4G",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2M4H",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2M51",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2M5A",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2M5Z",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2M60",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2M7K",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MAZ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MCD",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MDC",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MDI",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MDJ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MDU",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MFI",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MGQ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MI7",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MMP",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MP8",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MPK",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MR9",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MRL",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MSG",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MSJ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MUL",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MWF",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2MWR",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N2U",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N35",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N3S",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N4D",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N4S",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N4T",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N4U",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N4V",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N4W",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N5D",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N78",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N7Y",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N8O",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N8P",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N8S",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N8U",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2N9L",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2ON8",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2ONQ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2PDD",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2PFU",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2RTS",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2YSC",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2YSG",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2YSH",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "2YTY",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "3AME",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "3HGL",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "3I8Z",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "3MYE",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "3NGP",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "3Q9P",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "3QF6",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "3ZOB",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "4AME",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "4CVD",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "4HRS",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "4L5E",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "4UR4",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "4UZX",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5FW9",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5GHB",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5KGZ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5LWC",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5N2O",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5UB0",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5UNK",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5UOI",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5UP1",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5VWE",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5XK5",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5YDX",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5YDY",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "5ZD0",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6A6C",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6AME",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6BV7",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6CQ7",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6H48",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6HQ1",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6IPY",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6IVS",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6L34",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6MRR",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6MSI",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6NJF",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6OKW",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6POR",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6QKP",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6QKQ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6RO9",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6SVC",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6SVE",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6SY2",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6T33",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6TXT",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6XQC",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6Y1H",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "6YDH",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "7JSQ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "7MLL",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "7MSI",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "7NIP",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "8AME",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "8MSI",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "9AME",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run1_0131_0001",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run1_0153_0005",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run2_0290_0001",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run2_0325_0005",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run2_0779_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run2_0955_0005",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run3_0110_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run3_0321_0005",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run3_0498_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run3_0525_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run3_0769_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run3_1140_0005",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run3_1214_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run3_1331_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run5_0050_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run5_1022_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run5_1055_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run6_0126_0007",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run6_0680_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run6_0930_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run6_1429_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run7_0281_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run7_1025_0001",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EA_run7_1572_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd2_0391",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd2_0770",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd3_0144",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd3_0687",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd3_1058",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd3_1136",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd3_1244",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd3_1250",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd3_1558",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd3_1627",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd3_1669",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd3_1817",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0014",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0077",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0134",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0155",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0249",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0323",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0324",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0399",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0418",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0424",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0497",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0536",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0570",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0630",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0642",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0707",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0759",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0848",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0870",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0871",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0940",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0953",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EEHEE_rd4_0998",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd1_0284",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd1_0882",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_0005",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_0251",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_0331",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_0341",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_0461",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_0480",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_0628",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_0801",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_0840",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_0894",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_1260",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd2_1285",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd3_0011",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd3_0016",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd3_0067",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd3_0124",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd3_0133",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd4_0069",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd4_0097",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd4_0300",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd4_0340",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd4_0499",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd4_0510",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "EHEE_rd4_0929",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run1_0874_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run1_1113_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run1_1390_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run1_1392_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run2_0085_0001",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run3_0214_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run3_0396_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run3_0687_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run3_0695_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run3_0818_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run3_1315_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run3_1365_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run4_0178_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run4_0284_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run4_0467_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run4_1050_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run5_0074_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run5_0637_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run5_0650_0005",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run5_1147_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run5_1309_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run6_0608_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run6_0775_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run6_0851_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run6_1254_0005",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run6_1310_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "GG_run6_1641_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_0015",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_0099",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_0200",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_0403",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_0473",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_0595",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_0812",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_0961",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_1075",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_1227",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_1228",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_1376",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_1485",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_1538",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_1591",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_1655",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_1815",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_1930",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_2135",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_2362",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_2366",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_2371",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_2408",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_2513",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_2583",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_2710",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_2853",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_2974",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_3464",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_3504",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_3636",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_3813",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_3976",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_4197",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_4322",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_4516",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_5028",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_5090",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_5115",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_5186",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_5303",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_5432",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_5629",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_5990",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_6469",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_6831",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_6934",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_KT_rd6_7045",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_rd2_0750",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_rd2_0779",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_rd3_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_rd3_0103",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_rd3_0726",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_rd3_0784",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HEEH_rd4_0758",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd1_0033",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd1_0056",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd1_0061",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd1_0196",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd1_0197",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd1_0210",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd1_0756",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd1_0773",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd1_0931",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0058",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0074",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0090",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0114",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0134",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0139",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0158",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0160",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0165",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0182",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd2_0250",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0008",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0053",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0078",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0091",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0134",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0159",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0164",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0185",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0224",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd3_0244",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0017",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0019",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0034",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0067",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0122",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0125",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0140",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0260",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0477",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0518",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0611",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0849",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0909",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "HHH_rd4_0977",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run10_1081_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run1_0254_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run1_0367_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run1_0455_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run1_0461_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run3_1384_0005",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run5_0283_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run5_0666_0001",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run5_0690_0002",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run5_1034_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run5_1341_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run6_0373_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run6_1020_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run6_1081_0004",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run7_0974_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run8_0733_0006",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run8_1063_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run8_1098_0003",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "XX_run8_1203_0001",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r10_1151_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r10_569_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r10_863_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r11_467_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r11_541_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r11_692_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r11_80_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r11_848_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r11_943_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r12_175_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r12_230_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r12_268_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r12_423_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r12_601_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r12_69_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r12_703_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r12_738_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r13_137_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r14_234_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r14_263_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r14_568_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r14_791_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r14_947_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_105_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_133_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_161_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_228_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_232_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_418_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_447_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_464_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_62_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_698_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r15_96_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r16_231_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r16_2_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r16_43_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r16_512_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r16_515_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r16_638_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r16_658_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r16_757_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r17_222_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r17_386_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r18_195_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r20_196_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r2_117_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r2_148_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r2_262_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r2_497_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r3_211_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r3_35_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r4_320_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r5_528_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r5_761_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r6_237_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r6_267_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r6_285_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r6_523_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r6_526_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r6_531_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r6_688_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r6_859_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r6_869_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r6_920_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r7_307_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r7_562_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r8_103_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r8_226_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r8_253_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r8_312_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r8_372_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r9_1045_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r9_1163_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r9_340_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r9_366_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r9_733_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "r9_814_TrROS_Hall",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2K28S_R29S_2M7K",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2R14S_R16S_2L3X",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2R31S_R32S_2N5D",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_1OGW",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_1PGY",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_1PV0",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_1WR7",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_2BN8",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_2J6K",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_2KIS",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_2L15",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_2LLW",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_2M4H",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_2MAZ",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_2MDC",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_2YSB",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_3Q9P",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_5XK5",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_5YDX",
+      "only 0 usable variants (need 128)"
+    ],
+    [
+      "v2_6CQ7",
+      "only 0 usable variants (need 128)"
+    ]
+  ]
+}

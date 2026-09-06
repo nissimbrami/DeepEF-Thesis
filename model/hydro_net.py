@@ -337,10 +337,15 @@ class PEM(torch.nn.Module):
         self.GAT_layers = torch.nn.ModuleList(self.graph_model_gat)
         self.GCN_layers = torch.nn.ModuleList(self.graph_model_gcn)
         # Fully connected layers - GCN
-        self.fc1_gcn = nn.Linear(52 + proj_extra, 64) # 52 = 32(dist) + 20(one-hot) [+ proj_extra]
+        # W5: the solvation block (burial, hydropathy, burial*hydropathy) sits between
+        # Fb and emb, so LEFT-anchored widths grow and RIGHT-anchored indices do not.
+        self.solv_dim = 3 if getattr(CFG, 'burial_features', False) else 0
+        self.solv_start = 48                      # after D(16) + Fb(32)
+        _sd = self.solv_dim
+        self.fc1_gcn = nn.Linear(52 + _sd + proj_extra, 64) # 52 = 32(dist) + 20(one-hot) [+ solv] [+ proj_extra]
         self.fc2_gcn = nn.Linear(64, gcn_dim_in)
         # Fully connected layers - GAT
-        self.fc1_gat = nn.Linear(36 + proj_extra, 64) # 36 = 16(dist) + 20(one-hot) [+ proj_extra]
+        self.fc1_gat = nn.Linear(36 + _sd + proj_extra, 64) # 36 = 16(dist) + 20(one-hot) [+ solv] [+ proj_extra]
         self.fc2_gat = nn.Linear(64, gat_dim_in)
         # normalization layers
         self.inst_norm1 = Normalization_layer(36 + proj_extra, affine=True)
@@ -394,8 +399,13 @@ class PEM(torch.nn.Module):
         B, N, _ = x.shape
         x = x.reshape(B * N,-1)
         # split features to 2 graphs, bonded and non-bonded
-        x_gcn = torch.cat((x[:,:self.non_bonded_index+ self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
-        x_gat = torch.cat((x[:,:self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,36
+        if self.solv_dim:
+            _solv = x[:, self.solv_start:self.solv_start + self.solv_dim]
+            x_gcn = torch.cat((x[:,:self.non_bonded_index + self.non_bonded_index], _solv, x[:,self.one_hot_index:]),dim=-1) # B*N,52+3
+            x_gat = torch.cat((x[:,:self.non_bonded_index], _solv, x[:,self.one_hot_index:]),dim=-1) # B*N,36+3
+        else:
+            x_gcn = torch.cat((x[:,:self.non_bonded_index+ self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,52
+            x_gat = torch.cat((x[:,:self.non_bonded_index],x[:,self.one_hot_index:]),dim=-1) # B*N,36
         x_emb_features = x[:,self.llm_index:self.one_hot_index] # B*N,1024
 
         # Project embeddings and concatenate into GNN input, or keep for post-GNN concat
@@ -443,10 +453,18 @@ class PEM(torch.nn.Module):
         
     def forward_gat(self, x, edge_index_gat, B, N):
         """forward function for the graph model"""
-        identity = x # identity for the residual connection
-        x = self.fc1_gat(x) # N,36->N,64
-        x = F.relu(x)
-        x = self.fc2_gat(x) # N,64->N,36
+        if getattr(self, 'solv_dim', 0):
+            # W5: the input is wider than fc2_gat's fixed output, so the residual must
+            # be taken AFTER the projection or h1 + identity is a shape error.
+            x = self.fc1_gat(x)
+            x = F.relu(x)
+            x = self.fc2_gat(x)
+            identity = x
+        else:
+            identity = x # identity for the residual connection
+            x = self.fc1_gat(x) # N,36->N,64
+            x = F.relu(x)
+            x = self.fc2_gat(x) # N,64->N,36
         # swap axis to use insrance norm
         x = x.reshape(B, N,-1)
         x = self.inst_norm1(x)

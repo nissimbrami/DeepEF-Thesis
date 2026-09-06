@@ -516,13 +516,36 @@ class PEM(torch.nn.Module):
             if self._edge_cache_key == key and self._edge_cache is not None:
                 return self._edge_cache
 
-        # GCN: sequential edges (i, i+1) within each batch element
+        # GCN: chain edges within each batch element.
+        # W7: the baseline set is (i, i+1) DIRECTED FORWARD, so with three layers the
+        # reach along the chain is three residues. An alpha-helix is defined by i->i+4
+        # and a beta-sheet by i->i+2, so secondary structure is currently
+        # unrepresentable. --gcn_span extends the offsets to |i-j| <= span.
+        # U10: at span 1 the baseline is directed. Making all offsets bidirectional
+        # while extending the span would change TWO things at once, so --gcn_bidir is
+        # its own flag and can be set at span 1 to give an honest control arm.
+        # Both default to the historical behaviour and are bit-identical when off.
         dev = x.device
         offsets = torch.arange(B, device=dev).unsqueeze(1) * N  # [B, 1]
-        local_gcn = torch.arange(N - 1, device=dev)
-        gcn_src = (local_gcn.unsqueeze(0) + offsets).reshape(-1)
-        gcn_dst = gcn_src + 1
-        edge_index_gcn_all = torch.stack([gcn_src, gcn_dst])
+        span = int(getattr(CFG, 'gcn_span', 1))
+        bidir = bool(getattr(CFG, 'gcn_bidir', False))
+        if span == 1 and not bidir:
+            local_gcn = torch.arange(N - 1, device=dev)
+            gcn_src = (local_gcn.unsqueeze(0) + offsets).reshape(-1)
+            gcn_dst = gcn_src + 1
+            edge_index_gcn_all = torch.stack([gcn_src, gcn_dst])
+        else:
+            src_parts, dst_parts = [], []
+            for k in range(1, max(1, span) + 1):
+                if N - k <= 0:
+                    continue
+                loc = torch.arange(N - k, device=dev)
+                a = (loc.unsqueeze(0) + offsets).reshape(-1)
+                b = a + k
+                src_parts.append(a); dst_parts.append(b)
+                if bidir:
+                    src_parts.append(b); dst_parts.append(a)
+            edge_index_gcn_all = torch.stack([torch.cat(src_parts), torch.cat(dst_parts)])
 
         # GAT: distance-cutoff or fully connected
         if ca_coords is not None and self.gat_cutoff is not None:

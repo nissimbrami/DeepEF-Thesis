@@ -79,6 +79,8 @@ _p.add_argument('--flory_nu', type=float, default=0.5, help='Lever D coil scalin
 _p.add_argument('--unfolded_emb', type=str, default='full', choices=['full', 'zero', 'mean'], help="U2 / Lever D: what the ProtT5 embedding contributes to the UNFOLDED reference state only. full=current behaviour (bit-identical default). zero=the unfolded state is fold-blind. mean=per-column mean broadcast back, keeping global scale but removing per-residue identity. Chosen as factor D by the W0 channel ablation: zeroing this block drops var(E_u) across proteins to 0.331 of baseline and corr(E_u,wt_err) from 0.420 to 0.119, whereas the Flory coil raises var(E_u) to 1.175.")
 _p.add_argument('--burial_features', action='store_true', help="W5: add a 3-dim solvation block (burial, Kyte-Doolittle hydropathy, burial*hydropathy) between Fb and emb. Burial is ZERO in the unfolded state -- the delta-ASA between states IS the hydrophobic driving force, and computing it from the same coordinates in both states makes the column cancel exactly in E_u-E_f. Normalised by a constant, never by N. Default off = bit-identical.")
 _p.add_argument('--burial_mode', type=str, default='count', choices=['count', 'hse'], help="W5 arm: 'count' = Cbeta neighbours within 10A; 'hse' = half-sphere exposure, the standard neighbour-count burial measure, which is direction-aware and needs only CA and CB -- exactly what this backbone-only dataset has. Only read when --burial_features is set.")
+_p.add_argument('--gcn_span', type=int, default=1, help="W7: extend the GCN chain edge set from (i,i+1) to |i-j| <= span. With three layers the baseline reach is three residues, so an alpha-helix (i->i+4) and a beta-sheet (i->i+2) are unrepresentable. 1 = baseline, bit-identical.")
+_p.add_argument('--gcn_bidir', action='store_true', help="U10: make the chain edges bidirectional. The baseline span-1 edges are directed forward only, so extending the span AND adding reverse edges would change two things at once. Set this at --gcn_span 1 for an honest control arm. Default off = baseline.")
 _a, _ = _p.parse_known_args()
 READOUT = _a.readout
 WT_ANCHOR_WEIGHT = _a.wt_anchor_weight
@@ -99,6 +101,9 @@ CFG.unfolded_emb = _a.unfolded_emb
 # W5: train_utils reads these off CFG at call time.
 CFG.burial_features = _a.burial_features
 CFG.burial_mode = _a.burial_mode
+# W7 / U10: hydro_net.get_edge_index reads these off CFG at call time.
+CFG.gcn_span = _a.gcn_span
+CFG.gcn_bidir = _a.gcn_bidir
 if _a.flory_unfolded and not (0.0 < _a.flory_nu <= 1.0):
     raise ValueError('--flory_nu must be in (0, 1]; got %s' % _a.flory_nu)
 
@@ -174,6 +179,8 @@ config = {
     'unfolded_emb': _a.unfolded_emb,
     'burial_features': _a.burial_features,
     'burial_mode': _a.burial_mode,
+    'gcn_span': _a.gcn_span,
+    'gcn_bidir': _a.gcn_bidir,
     'designed_weight': DESIGNED_WEIGHT,
     'pooled_corr_weight': POOLED_CORR_WEIGHT,
     'val_frac': VAL_FRAC,

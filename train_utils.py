@@ -304,6 +304,20 @@ def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     
     return Fh
 
+
+def rbf_expand(d, n=16, lo=0.0, hi=20.0):
+    """W7: expand a distance into a bank of n radial basis functions.
+
+    CONCATENATE the bank. NEVER sum it. A previous implementation summed the M
+    responses back to the original width and a 5 A contact and a 15 A non-contact
+    both returned 4.649 -- the kernel went flat past 5 A and the model was blind to
+    distance. The assertion k(2A) > k(8A) > k(15A) catches that completely, and is
+    run by scripts/gate_w7.py before any training.
+    """
+    centers = torch.linspace(lo, hi, n, device=d.device, dtype=d.dtype)
+    width = (hi - lo) / n
+    return torch.exp(-((d.unsqueeze(-1) - centers) ** 2) / (2 * width ** 2))
+
 def _unfolded_emb(emb):
     """U2 -- make the unfolded reference state fold-blind.
 

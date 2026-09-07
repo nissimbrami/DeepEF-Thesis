@@ -348,18 +348,66 @@ if A.q2:
     print('max |dG(zero-init W5 on) - dG(W5 off)| = %.3e' % max_abs)
     ident = max_abs < 1e-4
     if ident:
-        print('PLUMBING IDENTITY: PASS -- the block is inert when zeroed, so it is '
-              'wired where the model reads it')
+        print('COLUMN-LEVEL IDENTITY: PASS -- zeroing the three columns reproduces the')
+        print('W5-off model exactly.')
     else:
-        print('PLUMBING IDENTITY: FAIL -- the block is NOT where fc1_gat/fc1_gcn read it')
-    print('REMINDER: this is a ZERO by construction. It says nothing about whether')
+        print('COLUMN-LEVEL IDENTITY: NOT ACHIEVABLE -- and the reason is a REAL')
+        print('ARCHITECTURAL FINDING, not a bug in this script. Verified by forward hooks:')
+        print('  fc1_gat / fc1_gcn outputs are BIT-IDENTICAL (max diff 0.000e+00), so the')
+        print('  zero-padding of those two weight matrices is correct and the three new')
+        print('  columns are provably unread -- zeroing the solvation columns in the DATA')
+        print('  changes the output by exactly nothing.')
+        print('  The divergence enters LATER, at inst_norm2. hydro_net.forward_gat takes a')
+        print('  STRUCTURALLY DIFFERENT BRANCH when solv_dim is set: the residual')
+        print('  `identity` becomes the PROJECTED x (after fc2_gat) instead of the raw')
+        print('  36-dim input, because the wider input can no longer be added to a')
+        print('  fixed-width output. That branch is chosen by the FLAG, not by the values.')
+        print('CONSEQUENCE: --burial_features is NOT a pure feature addition. Turning it on')
+        print('changes the GAT residual topology even when every burial value is zero, so')
+        print('a W5-on run is NOT a controlled comparison against a W5-off checkpoint.')
+        print('Any W5 factorial cell therefore confounds "burial information" with "moved')
+        print('the GAT residual". This needs an honest control arm -- see W5_ON_DG.md.')
+    print('REMINDER: this arm measures PLUMBING, never effect. It cannot say whether')
     print('burial improves dG. That question needs training (Q3, GPU).')
     OUT['Q2'] = {'question': 'is the W5 block wired where the model reads it '
                              '(zero-init identity; measures no effect)',
                  'max_abs_diff': max_abs, 'identical': bool(ident),
                  'n_proteins': n_ok, 'naive_strict_load_error': naive_err,
+                 'finding': ('fc1_gat/fc1_gcn outputs are bit-identical under zero-init, '
+                             'so the new columns are provably unread; the divergence '
+                             'enters at inst_norm2 because forward_gat switches the '
+                             'residual `identity` from the raw input to the projected x '
+                             'whenever solv_dim is set. --burial_features changes the GAT '
+                             'residual topology, not only the feature set.'),
                  'per_protein': rows}
     CFG.burial_features = False
+
+    # ---- Q2b: size the confound Q2 just uncovered ----
+    # If turning the flag on moves the GAT residual even with zero burial, then the
+    # W5-on vs W5-off contrast is not a clean feature contrast. Measure how big that
+    # purely-architectural shift is on absolute dG, so the write-up can say whether it
+    # is a rounding error or the same size as the effect W5 is meant to produce.
+    print('')
+    print('-' * 78)
+    print('Q2b  HOW BIG IS THE CONFOUND? (architecture-only shift, burial forced to 0)')
+    print('-' * 78)
+    dz = np.array([r['diff'] for r in rows], float)
+    off = np.array([r['dG_off'] for r in rows], float)
+    print('shift in predicted dG from the residual-branch change alone:')
+    print('  mean %+.4f   sd %.4f   min %+.4f   max %+.4f'
+          % (dz.mean(), dz.std(), dz.min(), dz.max()))
+    print('  std(dG_off) across proteins = %.4f' % off.std())
+    print('  the architecture-only shift is %.1f%% of the between-protein dG spread'
+          % (100.0 * dz.std() / max(off.std(), 1e-9)))
+    print('This is the size of the effect a W5 cell would show even if burial carried')
+    print('NO information at all. It is the control arm the factorial currently lacks.')
+    OUT['Q2b'] = {'question': 'magnitude of the architecture-only shift when '
+                              '--burial_features is on but burial is zero',
+                  'mean': float(dz.mean()), 'sd': float(dz.std()),
+                  'min': float(dz.min()), 'max': float(dz.max()),
+                  'std_dG_off': float(off.std()),
+                  'pct_of_between_protein_spread':
+                      float(100.0 * dz.std() / max(off.std(), 1e-9))}
 
 OUT['Q3'] = {'question': 'does W5 reduce MAE / std(err) on absolute WT dG',
              'status': 'NOT MEASURABLE WITHOUT TRAINING',

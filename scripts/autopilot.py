@@ -73,13 +73,31 @@ def log(msg):
 
 
 # ---------------------------------------------------------------- state
-def load_state():
-    if os.path.exists(STATE):
-        with open(STATE) as f:
-            return json.load(f)
+def _default_state():
     return {'state': 'S3_FACTORIAL', 'entered': time.strftime('%Y-%m-%dT%H:%MZ'),
             'cells_done': 0, 'cells_total': 16, 'decisions': [], 'blocked': [],
             'retries': {}, 'submitted': []}
+
+
+def load_state():
+    """Return a USABLE state, never a half-one.
+
+    The old version only fell back to the default when the file was ABSENT. A file
+    containing '{}' - which is what an interrupted or truncated write leaves behind -
+    was loaded as-is, and main() then died on KeyError: 'state'. That killed the
+    autopilot silently: the wrapper logged 'driver exited rc=1' and nothing was
+    scored for hours. Merge onto the default so any missing key is filled in.
+    """
+    base = _default_state()
+    if os.path.exists(STATE):
+        try:
+            with open(STATE) as f:
+                loaded = json.load(f)
+        except Exception:
+            loaded = None
+        if isinstance(loaded, dict) and loaded:
+            base.update(loaded)
+    return base
 
 
 def save_state(st):

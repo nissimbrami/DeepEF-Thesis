@@ -203,35 +203,14 @@ def main():
     for c in range(16):
         ai, aj = c // 4, c % 4
         ref = torch.cdist(x[:, ai, :], x[:, aj, :], p=2)
-        # This is a LAYOUT claim -- "channel c holds the (atom_i, atom_j) pair" -- and
-        # it must not be written as torch.equal. MEASURED on this fixture: every
-        # off-diagonal entry agrees to 1.2e-06, while the four DIAGONAL channels
-        # (0/5/10/15, the self-pairs) disagree by 1.4e-03. The cause is not the
-        # layout: get_dist_matrix flattens to (N*4, 3) and runs ONE cdist over all
-        # atoms, and cdist's fused kernel computes a self-distance as
-        # sqrt(x^2 + x^2 - 2x.x), which is a catastrophic cancellation that returns
-        # ~1e-03 instead of exactly 0. Comparing the diagonal therefore measures
-        # cdist's self-distance artifact, not the channel ordering.
-        # So: compare OFF-diagonal entries for the layout, and assert separately that
-        # a self-pair channel's diagonal is near zero.
-        diff = (D16[:, :, c] - ref).abs()
-        eye = torch.eye(diff.shape[0], dtype=diff.dtype, device=diff.device)
-        if float((diff * (1.0 - eye)).max()) > 1e-4:
-            layout_ok = False
-        if ai == aj and float(D16[:, :, c].diagonal().abs().max()) > 1e-2:
+        if not torch.equal(D16[:, :, c], ref):
             layout_ok = False
     check('channel index == atom_i*4 + atom_j', layout_ok,
           'get_dist_matrix layout changed -- ca_only would zero the WRONG channel')
     check('_CA_CA_CHANNEL == 5', TU._CA_CA_CHANNEL == 5,
           'got %r' % (TU._CA_CA_CHANNEL,))
-    # Off-diagonal only, for the reason documented above: the diagonal of a
-    # self-distance matrix carries cdist's artifact, not layout information.
-    _ca_ref = torch.cdist(x[:, 1, :], x[:, 1, :], p=2)
-    _ca_diff = (D16[:, :, TU._CA_CA_CHANNEL] - _ca_ref).abs()
-    _ca_eye = torch.eye(_ca_diff.shape[0], dtype=_ca_diff.dtype, device=_ca_diff.device)
-    _ca_off = float((_ca_diff * (1.0 - _ca_eye)).max())
-    check('D[:,:,5] is the CA-CA matrix (off-diagonal)', _ca_off < 1e-4,
-          'max off-diagonal diff %.3e' % _ca_off)
+    check('D[:,:,5] is the CA-CA matrix',
+          torch.equal(D16[:, :, TU._CA_CA_CHANNEL], torch.cdist(x[:, 1, :], x[:, 1, :], p=2)))
 
     print('\n[2] byte-identity: coil default (broadcast + fitted) == pre-U3/U4 coil')
     for nu in (0.5, 0.588, 1.0):

@@ -6,7 +6,29 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout
 from torch_geometric.nn import GCNConv, GATv2Conv, BatchNorm, TransformerConv
+
+# W7 (edge attributes): scripts/ is not an importable package from every entry point,
+# so locate edge_features.py relative to this file and add it to sys.path. A failed
+# import must NOT break the default path, which never touches these symbols.
+try:
+    import os as _os, sys as _sys
+    _sd = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'scripts')
+    if _sd not in _sys.path:
+        _sys.path.append(_sd)
+    import edge_features as _EF
+except Exception:
+    _EF = None
 from model.model_cfg import CFG
+# U5/U6: coil-consistent edge topology + per-half CA coordinates. Flat import, matching
+# the tree's convention for integrated modules (train_utils does the same with
+# aa_descriptors). Every helper below defaults to CURRENT behaviour and returns the
+# IDENTICAL input object when --coil_edges is off, so the off-path is byte-identical by
+# construction rather than by reconstruction.
+import os as _os, sys as _sys
+_REPO_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+if _REPO_ROOT not in _sys.path:
+    _sys.path.insert(0, _REPO_ROOT)
+import coil_topology as _CT
 # import matplotlib.pyplot as plt
 
 class params():
@@ -355,7 +377,16 @@ class PEM(torch.nn.Module):
         gat_dim_in = 36 + proj_extra  # 36 or 52
         gat_dim_h = 64
         gat_dim_out = 36 + proj_extra
-        self.graph_model_gat = [GAT(gat_dim_in, gat_dim_h, gat_dim_out, 8, dropout_rate) for i in range(layers)]
+        # W7: pairwise edge attributes = src one-hot(20) + dst one-hot(20) + 16 RBF = 56,
+        # handed to GATv2Conv as edge_dim. OFF (the default) leaves edge_dim None, so the
+        # GAT constructor call is the historical one and no edge parameters are created.
+        self.edge_features = bool(getattr(CFG, 'edge_features', False))
+        if self.edge_features and _EF is None:
+            raise RuntimeError('--edge_features requires scripts/edge_features.py, which '
+                               'could not be imported.')
+        self.edge_attr_dim = _EF.edge_attr_dim() if self.edge_features else None
+        self.graph_model_gat = [GAT(gat_dim_in, gat_dim_h, gat_dim_out, 8, dropout_rate,
+                                    edge_dim=self.edge_attr_dim) for i in range(layers)]
         # Gaussian coefficient
         self.gaussian_coef = gaussian_coef
         # graph attention layers
@@ -412,13 +443,20 @@ class PEM(torch.nn.Module):
             self.LA = LightAttention(embeddings_dim=fc_in_dim)
         
     
-    def forward(self,x,f_type = 'Default', ca_coords=None):
+    def forward(self,x,f_type = 'Default', ca_coords=None, n_folded=None):
         """
                 Forward function
              Args:
             x (tensor): [batch, n_nodes, bonded_features+non_bonded_features+LLM_features]
             f_type (str, optional): 'A_inference' or 'defualt', if 'A_inferece' return each amino acid energy . Defaults to 'Default'.
             ca_coords (tensor, optional): [batch, n_nodes, 3] CA atom coordinates for distance-based GAT edges.
+            n_folded (int, optional): U5/U6 -- how many LEADING rows of the batch are the
+                FOLDED state. train.py concatenates [folded; unfolded] along the batch dim
+                and makes ONE model call, so the split is a caller convention and nothing
+                in the tensor marks it. It is passed EXPLICITLY and never inferred as B//2:
+                get_ddg_head calls this with a FOLDED-ONLY batch under f_type='features',
+                and inferring B//2 there would declare half a folded batch unfolded and
+                silently corrupt it. None == 'every row is folded' == today's behaviour.
 
         Returns:
             if f_type == 'A_inference':
@@ -427,7 +465,11 @@ class PEM(torch.nn.Module):
             energy: native and decoy energy
         """
         # Get the edge index
-        edge_index_gcn,edge_index_gat = self.get_edge_index(x, ca_coords=ca_coords)
+        # U6 runs BEFORE the edge build so a CA-cutoff topology is derived from the
+        # per-half coordinates, not from folded coordinates broadcast over both halves.
+        ca_coords = _CT.per_half_ca_coords(ca_coords, x.shape[0], x.shape[1], n_folded, CFG)
+        edge_index_gcn,edge_index_gat = self.get_edge_index(x, ca_coords=ca_coords,
+                                                            n_folded=n_folded)
         # reshape x to [batch_size*n_nodes,features]
         B, N, _ = x.shape
         x = x.reshape(B * N,-1)
@@ -455,8 +497,14 @@ class PEM(torch.nn.Module):
             x_gat = torch.cat((x_gat, x_proj), dim=-1) # B*N, 36+proj_dim
 
         # forward pass through the graph attention and convolution layers
+        # W7: build the [E,56] edge attributes from the RIGHT-ANCHORED one-hot block
+        # x[:, -20:], which no left-anchored W5/W6 block can shift. OFF => None, and
+        # forward_gat then runs the historical path untouched.
+        edge_attr_gat = None
+        if self.edge_features:
+            edge_attr_gat = _EF.build_edge_attr(edge_index_gat, x[:, -20:], ca_coords, N)
         x1 = self.forward_gcn(x_gcn, edge_index_gcn, B, N) # B*N,gcn_in -> B*N,gcn_out
-        x2 = self.forward_gat(x_gat, edge_index_gat, B, N) # B*N,gat_in -> B*N,gat_out
+        x2 = self.forward_gat(x_gat, edge_index_gat, B, N, edge_attr=edge_attr_gat) # B*N,gat_in -> B*N,gat_out
         # concat features
         x = torch.cat((x1,x2),dim=-1) # B*N, gcn_out+gat_out
         # reshape to use instance norm
@@ -491,7 +539,7 @@ class PEM(torch.nn.Module):
         elif(f_type == 'features'): # return per-residue latent features h [B,N,128] for a direct-ddG head
             return h.reshape(B, N, -1)
         
-    def forward_gat(self, x, edge_index_gat, B, N):
+    def forward_gat(self, x, edge_index_gat, B, N, edge_attr=None):
         """forward function for the graph model"""
         if getattr(self, 'solv_dim', 0) or getattr(self, 'desc_dim', 0):
             # W5 + W6: the input is wider than fc2_gat's fixed output, so the residual
@@ -512,7 +560,7 @@ class PEM(torch.nn.Module):
         x = self.inst_norm1(x)
         x = x.reshape(B * N,-1)
         for gat_layer in self.GAT_layers:
-            h1,z = gat_layer(x, edge_index_gat, B, N)
+            h1,z = gat_layer(x, edge_index_gat, B, N, edge_attr=edge_attr)
             x = h1 + identity
 
         return x
@@ -544,7 +592,7 @@ class PEM(torch.nn.Module):
         # E = torch.log(torch.sum(Fh,dim=(1,2)) + self.energy_epsilon)
         return E
   
-    def get_edge_index(self, x, ca_coords=None):
+    def get_edge_index(self, x, ca_coords=None, n_folded=None):
         """Return the edge index for the graph convolution and attention layers.
         The edge index of the gcn is a line from the amino acid to the next amino acid.
         The edge index of the gat uses a distance cutoff on CA atoms when ca_coords
@@ -553,8 +601,13 @@ class PEM(torch.nn.Module):
         B, N = x.shape[0], x.shape[1]
 
         # Cache only when edges depend solely on shape (no ca_coords)
+        # U5: with --coil_edges the edge set additionally depends on WHERE the
+        # folded/unfolded boundary sits and on whether the coil is on, so a (B, N) key
+        # would hand a coil batch the folded-topology edge set out of the cache. That is a
+        # correctness bug, not a performance nicety. edge_cache_key carries both, plus
+        # gcn_span/gcn_bidir which are read off CFG at call time.
         if ca_coords is None:
-            key = (B, N)
+            key = _CT.edge_cache_key(B, N, CFG, n_folded)
             if self._edge_cache_key == key and self._edge_cache is not None:
                 return self._edge_cache
 
@@ -608,8 +661,19 @@ class PEM(torch.nn.Module):
             gat_dst = (local_dst.unsqueeze(0) + offsets).reshape(-1)
             edge_index_gat_all = torch.stack([gat_src, gat_dst])
 
+        # U5: replace the UNFOLDED rows' GAT topology with the bidirectional chain.
+        # A random coil has bonded neighbours and nothing else, so the fully-connected /
+        # CA-cutoff set is exactly the folded CONTACT TOPOLOGY leaking into the reference
+        # state (defect A5). The GCN set is deliberately NOT touched: it is already
+        # chain-local by construction (|i-j| <= gcn_span), carries no folded contacts, and
+        # changing it too would confound U5 with W7/U10.
+        # Off (default) this returns the IDENTICAL object -- byte-identical, and it also
+        # RAISES if --coil_edges is set without --flory_unfolded rather than no-opping.
+        edge_index_gat_all = _CT.apply_coil_edges(
+            edge_index_gat_all, B, N, n_folded, dev, CFG)
+
         if ca_coords is None:
-            self._edge_cache_key = (B, N)
+            self._edge_cache_key = key
             self._edge_cache = (edge_index_gcn_all, edge_index_gat_all)
 
         return edge_index_gcn_all, edge_index_gat_all
@@ -715,8 +779,11 @@ class PEMGraphTransformer(torch.nn.Module):
         self.fc2 = nn.Linear(128, 1)
         self.energy_epsilon = 1
 
-    def forward(self, x, f_type='Default', ca_coords=None):
+    def forward(self, x, f_type='Default', ca_coords=None, n_folded=None):
         B, N, _ = x.shape
+        # U6: per-half coordinates, so the RBF edge features of the unfolded pass are not
+        # the true folded CA distances. See PEM.forward for why n_folded is explicit.
+        ca_coords = _CT.per_half_ca_coords(ca_coords, B, N, n_folded, CFG)
         flat_x = x.reshape(B * N, -1)
 
         dist_features = flat_x[:, :self.non_bonded_index]
@@ -728,7 +795,7 @@ class PEMGraphTransformer(torch.nn.Module):
 
         h = torch.cat([dist_features, bonded_features, emb_features, one_hot], dim=-1)
         h = self.input_proj(h)
-        edge_index, edge_attr = self.get_edge_index_and_attr(x, ca_coords)
+        edge_index, edge_attr = self.get_edge_index_and_attr(x, ca_coords, n_folded=n_folded)
         for block in self.blocks:
             h = block(h, edge_index, edge_attr)
 
@@ -751,7 +818,7 @@ class PEMGraphTransformer(torch.nn.Module):
     def get_energy(self, Fh):
         return torch.sum(Fh, dim=(1, 2))
 
-    def get_edge_index_and_attr(self, x, ca_coords=None):
+    def get_edge_index_and_attr(self, x, ca_coords=None, n_folded=None):
         B, N = x.shape[0], x.shape[1]
         device = x.device
         offsets = torch.arange(B, device=device).unsqueeze(1) * N
@@ -785,6 +852,10 @@ class PEMGraphTransformer(torch.nn.Module):
             local_dst_parts.append(seq_dst)
 
         edge_index = torch.stack([torch.cat(local_src_parts), torch.cat(local_dst_parts)], dim=0)
+        # U5: swap the unfolded rows onto the chain-local set BEFORE the unique(), so the
+        # sequence edges appended above are deduplicated against the coil set exactly as
+        # they are against the baseline set. Identity when --coil_edges is off.
+        edge_index = _CT.apply_coil_edges(edge_index, B, N, n_folded, device, CFG)
         edge_pairs = torch.unique(edge_index.t(), dim=0)
         edge_index = edge_pairs.t().contiguous()
         edge_attr = self.get_edge_attr(edge_index, ca_coords, B, N, device)
@@ -955,20 +1026,34 @@ class PEMSM(torch.nn.Module):
 class GAT(torch.nn.Module):
   
   """Graph Attention Network"""
-  def __init__(self, dim_in, dim_h, dim_out, heads=8, dropout_rate=0.2):
+  def __init__(self, dim_in, dim_h, dim_out, heads=8, dropout_rate=0.2, edge_dim=None):
     super().__init__()
-    self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
-    self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
+    # W7: edge_dim is None on the DEFAULT path, and these two constructor calls are then
+    # character-for-character the historical ones -- same args, same RNG draw order, so
+    # the OFF build is parameter-identical. Only edge_dim not None adds lin_edge.
+    self.edge_dim = edge_dim
+    if edge_dim is None:
+      self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
+      self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
+    else:
+      self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads, edge_dim=edge_dim)
+      self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1, edge_dim=edge_dim)
     # self.bn  = BatchNorm(dim_out)
     self.inst_norm = Normalization_layer(dim_out,affine=True)
     self.dropout = nn.Dropout(dropout_rate)
 
-  def forward(self, x, edge_index, B, N):
+  def forward(self, x, edge_index, B, N, edge_attr=None):
     h=x
     h = self.dropout(x)
-    h = self.gat1(h, edge_index)
-    h = F.elu(h)
-    h = self.gat2(h, edge_index)
+    # W7: with edge_dim None this is the historical two-argument call, unchanged.
+    if self.edge_dim is None or edge_attr is None:
+      h = self.gat1(h, edge_index)
+      h = F.elu(h)
+      h = self.gat2(h, edge_index)
+    else:
+      h = self.gat1(h, edge_index, edge_attr)
+      h = F.elu(h)
+      h = self.gat2(h, edge_index, edge_attr)
     # swap axis to use insrance norm
     h = h.reshape(B,N,-1)
     h = self.inst_norm(h)

@@ -85,7 +85,9 @@ _p.add_argument('--burial_mode', type=str, default='count', choices=['count', 'h
 _p.add_argument('--aa_descriptors', type=str, default='none', choices=['none', 'pca16', 'curated12', 'pca16_only'], help="W6: per-residue physicochemical descriptor block (one_hot @ table, K columns from the committed CSV) between the solvation block and emb, at 48+solv_dim. One-hot asserts all twenty residues are mutually equidistant; descriptors give the alphabet a metric and stop it being closed. pca16/curated12 APPEND to one-hot (identity and metric structure are complementary); pca16_only REPLACES it by ZEROING the trailing 20 columns, never deleting them, because hydro_net slices right-anchored. Default none = byte-identical.")
 _p.add_argument('--aa_descriptor_csv', type=str, default='', help="W6: override the descriptor CSV path. Empty = the per-mode default. The CSV is a COMMITTED artifact; training never calls rdkit.")
 _p.add_argument('--gcn_span', type=int, default=1, help="W7: extend the GCN chain edge set from (i,i+1) to |i-j| <= span. With three layers the baseline reach is three residues, so an alpha-helix (i->i+4) and a beta-sheet (i->i+2) are unrepresentable. 1 = baseline, bit-identical.")
+_p.add_argument('--coil_edges', action='store_true', help="U5: rebuild the UNFOLDED half's GAT edge set as the bidirectional chain (i,i+1)+(i+1,i) instead of reusing the folded fully-connected / CA-cutoff topology. The unfolded node features are already replaced by the coil, but the edges are not, so the coil is only half applied and any coil result measured without this is confounded. Requires --flory_unfolded (RAISES otherwise, never a silent no-op). The GCN set is untouched -- it is already chain-local, so there is no folded contact topology there to remove. Default off = byte-identical.")
 _p.add_argument('--gcn_bidir', action='store_true', help="U10: make the chain edges bidirectional. The baseline span-1 edges are directed forward only, so extending the span AND adding reverse edges would change two things at once. Set this at --gcn_span 1 for an honest control arm. Default off = baseline.")
+_p.add_argument('--edge_features', action='store_true', help="W7: pairwise EDGE ATTRIBUTES on the GAT graph -- src one-hot(20) + dst one-hot(20) + 16 CONCATENATED RBF distance channels = 56 dims, passed to GATv2Conv as edge_dim. The bank is concatenated, never summed: a summed bank returns one number that is flat past ~5A (a 5A contact and a 15A non-contact both read 4.649), leaving the model blind to distance. Default off = byte-identical.")
 _a, _ = _p.parse_known_args()
 READOUT = _a.readout
 WT_ANCHOR_WEIGHT = _a.wt_anchor_weight
@@ -113,12 +115,21 @@ CFG.burial_mode = _a.burial_mode
 # W7 / U10: hydro_net.get_edge_index reads these off CFG at call time.
 CFG.gcn_span = _a.gcn_span
 CFG.gcn_bidir = _a.gcn_bidir
+# W7 (edge attributes): PEM reads this in __init__ to size the GATv2Conv edge channel,
+# so it must be set before the model is constructed -- it is, this block runs at import.
+CFG.edge_features = _a.edge_features
+# U5/U6: hydro_net reads this off CFG at call time, via coil_topology.
+CFG.coil_edges = _a.coil_edges
 # W6: PEM reads aa_descriptors in __init__ to size fc1_gcn/fc1_gat, so this must be set
 # before the model is constructed -- it is, this block runs at import.
 CFG.aa_descriptors = _a.aa_descriptors
 CFG.aa_descriptor_csv = _a.aa_descriptor_csv or None
 if _a.flory_unfolded and not (0.0 < _a.flory_nu <= 1.0):
     raise ValueError('--flory_nu must be in (0, 1]; got %s' % _a.flory_nu)
+# U5: die in the first second, not six hours in. coil_topology raises again on the first
+# forward pass, so removing this line degrades the error message but not the safety.
+from coil_topology import validate_coil_edges_flags as _validate_coil_edges_flags
+_validate_coil_edges_flags(_a.coil_edges, _a.flory_unfolded)
 
 # --seed: single knob for full reproducibility + seed-ensemble. Overrides the hardcoded
 # RANDOM_SEED so KFold/train_test_split random_state below all follow --seed too.
@@ -196,6 +207,7 @@ config = {
     'burial_mode': _a.burial_mode,
     'gcn_span': _a.gcn_span,
     'gcn_bidir': _a.gcn_bidir,
+    'coil_edges': _a.coil_edges,
     'aa_descriptors': _a.aa_descriptors,
     'designed_weight': DESIGNED_WEIGHT,
     'pooled_corr_weight': POOLED_CORR_WEIGHT,
@@ -626,7 +638,11 @@ class Trainer():
 
         all_graph_minibatch = torch.cat([folded_graph_minibatch, unfolded_graph_minibatch], dim=0)
 
-        minibatch_energy = self.model(all_graph_minibatch)
+        # U5/U6: the batch is [folded; unfolded] concatenated along dim 0, and nothing in
+        # the tensor marks the boundary -- so tell the model where it is. This is the only
+        # place the number is known.
+        minibatch_energy = self.model(all_graph_minibatch,
+                                      n_folded=folded_graph_minibatch.size(0))
         folded_energy = minibatch_energy[:minibatch_energy.size(0) // 2]
         unfolded_energy = minibatch_energy[minibatch_energy.size(0) // 2:]
 
@@ -660,7 +676,7 @@ class Trainer():
         batch['masks'] = batch['masks'].to(self.device)
         folded = get_graph(batch['coords'].squeeze(), one_hot_wt[0].squeeze(), prott5_wt[0].squeeze(), batch['masks'].squeeze()).unsqueeze(0)
         unfolded = get_unfolded_graph(batch['coords'].squeeze(), one_hot_wt[0].squeeze(), prott5_wt[0].squeeze(), batch['masks'].squeeze()).unsqueeze(0)
-        energy = self.model(torch.cat([folded, unfolded], dim=0))
+        energy = self.model(torch.cat([folded, unfolded], dim=0), n_folded=folded.size(0))
         folded_energy = energy[:1]
         unfolded_energy = energy[1:]
         return (unfolded_energy - folded_energy) / self._dg_norm(batch), unfolded_energy, folded_energy
@@ -706,6 +722,47 @@ class Trainer():
         self.optimizer.zero_grad(set_to_none=True)
         torch.cuda.empty_cache()
         return wandb_step
+
+
+# ---------------------------------------------------------------------------
+# W7 x U6 -- G3, no silent interaction.
+# --edge_features writes CA distances into the edge channel. If the unfolded half is
+# handed FOLDED coordinates, that channel reports the folded contact map for the
+# unfolded state and directly contradicts the coil lever, so the two flags together
+# would measure nothing. That is a silent scientific error, therefore a hard error.
+#
+# U6 (the per-half ca_coords fix) is owned by another worker and may land
+# concurrently, so this DETECTS the fix rather than assuming its absence: the fix is
+# present only once Trainer.get_deltaG actually threads per-half coordinates into the
+# model. Probed from the live source, never hard-coded to a date or a version.
+def _u6_per_half_available():
+    """True only when the training path builds AND passes per-half ca_coords."""
+    try:
+        import inspect as _inspect
+        _src = _inspect.getsource(Trainer.get_deltaG)
+    except Exception:
+        return False
+    # Both halves are required. Building per-half coords without handing them to the
+    # model, or passing folded coords to both halves, is not the fix.
+    _builds = ('stack_half_coords' in _src) or ('unfolded_reference_coords' in _src)
+    _passes = 'ca_coords=' in _src
+    return bool(_builds and _passes)
+
+
+if getattr(CFG, 'edge_features', False):
+    try:
+        import edge_features as _EF_GUARD
+    except ImportError:
+        _EF_GUARD = None
+    if _EF_GUARD is not None:
+        # Raises RuntimeError when --edge_features meets --flory_unfolded without U6.
+        _EF_GUARD.assert_u6_compatible(True, bool(getattr(CFG, 'flory_unfolded', False)),
+                                       _u6_per_half_available())
+    elif getattr(CFG, 'flory_unfolded', False):
+        raise RuntimeError(
+            '[W7/U6] --edge_features with --flory_unfolded requires the per-half '
+            'ca_coords fix (U6), but scripts/edge_features.py could not be imported '
+            'to verify it. Run the two flags separately.')
 
 
 def train_fold(fold, model = None):

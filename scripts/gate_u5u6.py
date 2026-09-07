@@ -186,7 +186,18 @@ def main():
                         min=1e-3)
     check("coil_bond_length reproduces the coil's own b (torch.equal)",
           torch.equal(CT.coil_bond_length(ca_from_x), b_ref))
-    check("N==1 falls back to 3.8 A", float(CT.coil_bond_length(torch.zeros(1, 3))) == 3.8)
+    # The N==1 fallback. This assertion USED to be float(...) == 3.8 and it FAILED --
+    # not because the code was wrong but because the ASSERTION was. torch.tensor(3.8) is
+    # float32, i.e. 3.799999952316284, and comparing it to the float64 Python literal 3.8
+    # with == is never true. The contract that actually matters is byte-identity with
+    # train_utils._coil_bond_length's own fallback (`torch.tensor(3.8, device=dev)`), which
+    # is what this now asserts, with torch.equal, against the same expression.
+    # NOTE the source's `fitted` fallback is a bare literal 3.8 while U4's `fixed` arm uses
+    # _COIL_B_FIXED = 5.82 * 0.1 in MODEL units. That inconsistency is real and is
+    # train_utils' to own, not U6's: coil_bond_length must track whatever the node-feature
+    # coil does, so it reproduces the literal rather than quietly converting it.
+    check("N==1 falls back to the coil's own 3.8 constant, byte-identically",
+          torch.equal(CT.coil_bond_length(torch.zeros(1, 3)), torch.tensor(3.8)))
 
     print("\n[8] CACHE key separates the cases the edge set actually depends on")
     k_off = CT.edge_cache_key(B, N, off, n_f)
@@ -213,6 +224,102 @@ def main():
     row_odd = torch.div(out_odd[0], N, rounding_mode='floor')
     check("asymmetric split honoured (n_folded=3 of B=%d)" % B,
           int((row_odd >= 3).sum()) == (B - 3) * 2 * (N - 1))
+
+    print("\n[10] INTEGRATION  the REAL PEM.get_edge_index, not a paraphrase of it")
+    # A module that passes in isolation proves nothing about the wiring. These checks import
+    # the actual model and drive the actual code path, with CFG mutated the way train.py
+    # mutates it.
+    import os as _os, sys as _sys
+    _root = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+    if _root not in _sys.path:
+        _sys.path.insert(0, _root)
+    from model.model_cfg import CFG as _CFG
+    from model.hydro_net import PEM as _PEM
+
+    _saved = (getattr(_CFG, 'coil_edges', False), getattr(_CFG, 'flory_unfolded', False))
+    try:
+        # constructed exactly as gate_g4_cpu constructs it, and fed REAL graphs so the
+        # feature width is whatever the tree actually produces, not a hardcoded 1092.
+        from train_utils import get_graph as _get_graph
+        m = _PEM(layers=_CFG.num_layers, gaussian_coef=_CFG.gaussian_coef,
+                 dropout_rate=_CFG.dropout_rate, light_attention=True, readout=False)
+        m.eval()
+        _xyz = torch.randn(N, 4, 3) * 7.0
+        _oh = torch.eye(20)[torch.randint(0, 20, (N,))]
+        _emb = torch.randn(N, int(_CFG.emb_input_dim))
+        _msk = torch.ones(N)
+        xin = _get_graph(_xyz, _oh, _emb, _msk).unsqueeze(0).repeat(B, 1, 1)
+
+        # -- OFF path: byte-identical edge sets, and the flag is genuinely absent by default
+        _CFG.coil_edges, _CFG.flory_unfolded = False, False
+        m._edge_cache_key, m._edge_cache = None, None
+        g_off, a_off = m.get_edge_index(xin, n_folded=n_f)
+        m._edge_cache_key, m._edge_cache = None, None
+        g_base, a_base = m.get_edge_index(xin)          # exactly today's call, no n_folded
+        check("PEM GAT edges byte-identical with coil off (torch.equal)",
+              torch.equal(a_off, a_base))
+        check("PEM GCN edges byte-identical with coil off (torch.equal)",
+              torch.equal(g_off, g_base))
+        check("PEM GAT edge count is the fully-connected baseline",
+              a_base.shape[1] == B * N * (N - 1))
+
+        # -- ON path: the unfolded rows are chain-local, the folded rows are not
+        _CFG.coil_edges, _CFG.flory_unfolded = True, True
+        m._edge_cache_key, m._edge_cache = None, None
+        g_on, a_on = m.get_edge_index(xin, n_folded=n_f)
+        r = torch.div(a_on[0], N, rounding_mode='floor')
+        check("PEM unfolded GAT edges == 2(N-1) per row  [%d]" % int((r >= n_f).sum()),
+              int((r >= n_f).sum()) == (B - n_f) * 2 * (N - 1))
+        check("PEM folded GAT edges still fully connected",
+              int((r < n_f).sum()) == n_f * N * (N - 1))
+        check("PEM GCN edges UNCHANGED by --coil_edges (U5 is GAT-only)",
+              torch.equal(g_on, g_base))
+
+        # -- the cache bug this patch exists to prevent
+        m._edge_cache_key, m._edge_cache = None, None
+        _CFG.coil_edges = False
+        _, a1 = m.get_edge_index(xin, n_folded=n_f)     # populates the cache, coil off
+        _CFG.coil_edges = True
+        _, a2 = m.get_edge_index(xin, n_folded=n_f)     # same (B,N): must NOT hit that entry
+        check("cache does NOT serve the folded topology to a coil batch",
+              a2.shape[1] != a1.shape[1])
+        # and the folded-only path must never be split even with the coil on
+        m._edge_cache_key, m._edge_cache = None, None
+        _, a_feat = m.get_edge_index(xin)               # n_folded=None, f_type='features'
+        check("folded-only path (n_folded=None) untouched with coil ON",
+              torch.equal(a_feat, a_base))
+
+        # -- forward() end-to-end, both halves, off vs on
+        _CFG.coil_edges, _CFG.flory_unfolded = False, False
+        m._edge_cache_key, m._edge_cache = None, None
+        with torch.no_grad():
+            e_plain = m(xin)
+            m._edge_cache_key, m._edge_cache = None, None
+            e_nf = m(xin, n_folded=n_f)
+        check("PEM.forward byte-identical with/without n_folded when coil off",
+              torch.equal(e_plain, e_nf))
+        _CFG.coil_edges, _CFG.flory_unfolded = True, True
+        m._edge_cache_key, m._edge_cache = None, None
+        with torch.no_grad():
+            e_on = m(xin, n_folded=n_f)
+        check("PEM.forward folded half unchanged by the coil",
+              torch.equal(e_on[:n_f], e_plain[:n_f]))
+        check("PEM.forward unfolded half CHANGED by the coil",
+              not torch.equal(e_on[n_f:], e_plain[n_f:]))
+        check("PEM.forward output finite with the coil on",
+              bool(torch.isfinite(e_on).all()))
+
+        # -- RAISE through the real model, not just the helper
+        _CFG.coil_edges, _CFG.flory_unfolded = True, False
+        m._edge_cache_key, m._edge_cache = None, None
+        raised4 = False
+        try:
+            m.get_edge_index(xin, n_folded=n_f)
+        except ValueError as e:
+            raised4 = "flory_unfolded" in str(e)
+        check("PEM raises on --coil_edges without --flory_unfolded", raised4)
+    finally:
+        _CFG.coil_edges, _CFG.flory_unfolded = _saved
 
     print("")
     if _FAILURES:

@@ -121,6 +121,76 @@ NSTEREO['G'] = 0          # glycine is achiral
 NSTEREO['I'] = 2          # Ca and Cb
 NSTEREO['T'] = 2          # Ca and Cb
 
+# ----------------------------------------------------------------------------------
+# W10: THE ALPHABET IS OPEN PAST TWENTY.
+#
+# Ofir's claim is that a model trained on canonical residues predicts NON-canonical
+# effects, because the descriptor space is continuous -- any molecule with a SMILES
+# string lands on the SAME axes. That claim is untestable while the table has exactly
+# twenty rows, so here are the first five rows past it. They are ordinary PDB chemical
+# component codes, the same labels a structure file uses.
+#
+# All five are NEUTRAL free forms, to match the canonical twenty exactly: the z-score in
+# the builder is taken across rows, so one zwitterionic row among twenty neutral ones
+# would show up as a genuine descriptor difference that is really a protonation-state
+# artefact. The phospho residues are therefore written as the free acid P(=O)(O)O, not
+# the physiological dianion.
+#
+# Every one of them goes through the same two gates as the canonical twenty: the
+# rdkit-free formula/stereocentre/ring/paren selftest, and the rdkit formula+stereo gate.
+# ----------------------------------------------------------------------------------
+NONCANON_SMILES = {
+    # phosphoserine -- serine with the side-chain OH phosphorylated. 1 stereocentre (Ca).
+    'SEP': 'C([C@@H](C(=O)O)N)OP(=O)(O)O',
+    # phosphothreonine -- threonine phosphorylated. 2 stereocentres (Ca, Cb), like T.
+    'TPO': 'C[C@H]([C@@H](C(=O)O)N)OP(=O)(O)O',
+    # phosphotyrosine -- tyrosine phenol O phosphorylated. 1 stereocentre (Ca).
+    'PTR': 'c1cc(ccc1C[C@@H](C(=O)O)N)OP(=O)(O)O',
+    # selenomethionine -- methionine with S -> Se. 1 stereocentre (Ca).
+    # This is THE canonical non-canonical residue: it is in a large share of the PDB as a
+    # phasing aid, so it is the one an open alphabet meets first in real structures.
+    'MSE': 'C[Se]CC[C@@H](C(=O)O)N',
+    # 4-hydroxyproline (trans-4-hydroxy-L-proline) -- proline with 4-OH.
+    # 2 stereocentres (Ca and C4).
+    'HYP': 'C1[C@H](CN[C@@H]1C(=O)O)O',
+}
+
+# Heavy-atom composition of each NEUTRAL free non-canonical residue. Se is tracked
+# separately from S: selenomethionine is NOT methionine with a heavier S, and a checker
+# that folded Se into S would pass MSE while silently accepting a methionine SMILES.
+NONCANON_FORMULA = {
+    'SEP': dict(C=3,  N=1, O=6, S=0, SE=0, P=1),   # C3H8NO6P   phosphoserine
+    'TPO': dict(C=4,  N=1, O=6, S=0, SE=0, P=1),   # C4H10NO6P  phosphothreonine
+    'PTR': dict(C=9,  N=1, O=6, S=0, SE=0, P=1),   # C9H12NO6P  phosphotyrosine
+    'MSE': dict(C=5,  N=1, O=2, S=0, SE=1, P=0),   # C5H11NO2Se selenomethionine
+    'HYP': dict(C=5,  N=1, O=3, S=0, SE=0, P=0),   # C5H9NO3    4-hydroxyproline
+}
+NONCANON_NSTEREO = {'SEP': 1, 'TPO': 2, 'PTR': 1, 'MSE': 1, 'HYP': 2}
+
+# The full open alphabet, canonical twenty FIRST and in AA_MAP order. That ordering is
+# load-bearing: aa_descriptors.py guarantees row i == one-hot index i for i < 20, so the
+# canonical tensor path stays byte-identical no matter how many rows follow.
+ORDER_OPEN = list(ORDER) + ['SEP', 'TPO', 'PTR', 'MSE', 'HYP']
+
+SMILES_OPEN = dict(SMILES)
+SMILES_OPEN.update(NONCANON_SMILES)
+
+# FORMULA entries for the canonical twenty carry no SE/P keys; normalise both tables to
+# the same key set so one checker handles all rows.
+_ELEMENTS = ('C', 'N', 'O', 'S', 'SE', 'P')
+
+
+def _norm_formula(d):
+    return dict((e, int(d.get(e, 0))) for e in _ELEMENTS)
+
+
+FORMULA_OPEN = dict((a, _norm_formula(FORMULA[a])) for a in ORDER)
+FORMULA_OPEN.update(dict((a, _norm_formula(NONCANON_FORMULA[a])) for a in NONCANON_FORMULA))
+
+NSTEREO_OPEN = dict(NSTEREO)
+NSTEREO_OPEN.update(NONCANON_NSTEREO)
+
+
 # Ofir's thresholds, and the scaling of the second one.
 OFIR_N_RESIDUES = 58
 OFIR_MIN_UNIQUE = 40
@@ -128,12 +198,20 @@ OFIR_MIN_UNIQUE = 40
 # ----------------------------------------------------------------------------------
 # SMILES check that needs NO rdkit -- runs in --selftest, anywhere.
 # ----------------------------------------------------------------------------------
-_TOK = re.compile(r'\[[^\]]*\]|Cl|Br|[BCNOPSFIbcnops]')
+# W10: Se and P must be tokenised. 'Se' has to be tried BEFORE the single-letter
+# alternatives or 'S' would match first and the 'e' would be dropped, which would
+# score selenomethionine as methionine and pass.
+_TOK = re.compile(r'\[[^\]]*\]|Cl|Br|Se|[BCNOPSFIbcnops]')
 
 
 def formula_from_smiles_text(smi):
-    """Heavy-atom composition parsed straight from the SMILES text."""
-    c = dict(C=0, N=0, O=0, S=0)
+    """Heavy-atom composition parsed straight from the SMILES text.
+
+    W10: counts Se and P as well as C/N/O/S, because the non-canonical rows need them.
+    Se is a SEPARATE key from S -- selenomethionine differs from methionine in exactly
+    that one atom, so a checker that merged them would validate the wrong molecule.
+    """
+    c = dict((e, 0) for e in ('C', 'N', 'O', 'S', 'SE', 'P'))
     for t in _TOK.findall(smi):
         if t.startswith('['):
             m = re.search(r'[A-Z][a-z]?|[a-z]', t[1:-1])
@@ -146,17 +224,30 @@ def formula_from_smiles_text(smi):
     return c
 
 
+def _fmt_formula(d):
+    return ''.join('%s%d' % (e, d.get(e, 0)) for e in ('C', 'N', 'O', 'S', 'SE', 'P'))
+
+
 def stereocentres_from_smiles_text(smi):
     """Count tetrahedral markers: collapse @@ to @ first, then count @."""
     return len(re.findall(r'@', smi.replace('@@', '@')))
 
 
-def selftest_smiles(verbose=True):
-    """Formula / stereocentre / ring-closure / paren check, no chemistry toolkit."""
+def selftest_smiles(verbose=True, residues=None, smiles=None, formula=None, nstereo=None):
+    """Formula / stereocentre / ring-closure / paren check, no chemistry toolkit.
+
+    W10: parameterised over a residue list so the SAME check runs over the canonical
+    twenty and over the non-canonical rows. Defaults reproduce the pre-W10 behaviour
+    exactly, so an unchanged call site is an unchanged test.
+    """
+    residues = list(ORDER) if residues is None else list(residues)
+    smiles = SMILES_OPEN if smiles is None else smiles
+    formula = FORMULA_OPEN if formula is None else formula
+    nstereo = NSTEREO_OPEN if nstereo is None else nstereo
     fails = []
-    for aa in ORDER:
-        smi = SMILES[aa]
-        got, exp = formula_from_smiles_text(smi), FORMULA[aa]
+    for aa in residues:
+        smi = smiles[aa]
+        got, exp = formula_from_smiles_text(smi), _norm_formula(formula[aa])
         ns = stereocentres_from_smiles_text(smi)
         stripped = re.sub(r'\[[^\]]*\]', '', smi)
         digits = {}
@@ -175,11 +266,9 @@ def selftest_smiles(verbose=True):
         ok_par = ok_par and depth == 0
         why = []
         if got != exp:
-            why.append('formula C%dN%dO%dS%d != C%dN%dO%dS%d'
-                       % (got['C'], got['N'], got['O'], got['S'],
-                          exp['C'], exp['N'], exp['O'], exp['S']))
-        if ns != NSTEREO[aa]:
-            why.append('stereocentres %d != %d' % (ns, NSTEREO[aa]))
+            why.append('formula %s != %s' % (_fmt_formula(got), _fmt_formula(exp)))
+        if ns != nstereo[aa]:
+            why.append('stereocentres %d != %d' % (ns, nstereo[aa]))
         if not ok_ring:
             why.append('unclosed ring')
         if not ok_par:
@@ -187,7 +276,7 @@ def selftest_smiles(verbose=True):
         if why:
             fails.append((aa, '; '.join(why)))
         if verbose:
-            print('  %s  %-42s %s' % (aa, smi, 'ok' if not why else 'FAIL: ' + '; '.join(why)))
+            print('  %-3s %-46s %s' % (aa, smi, 'ok' if not why else 'FAIL: ' + '; '.join(why)))
     return fails
 
 
@@ -195,32 +284,36 @@ def selftest_smiles(verbose=True):
 # The same check again, but through rdkit, on the molecule Mordred will actually see.
 # The text check above can be fooled by exotic syntax; this one cannot.
 # ----------------------------------------------------------------------------------
-def check_mols_rdkit(mols):
+def check_mols_rdkit(mols, residues=None, formula=None, nstereo=None):
+    """W10: parameterised the same way as selftest_smiles. Defaults are the canonical 20."""
     from rdkit import Chem
     from rdkit.Chem import rdMolDescriptors
+    residues = list(ORDER) if residues is None else list(residues)
+    formula = FORMULA_OPEN if formula is None else formula
+    nstereo = NSTEREO_OPEN if nstereo is None else nstereo
     fails = []
-    for aa, m in zip(ORDER, mols):
+    for aa, m in zip(residues, mols):
         if m is None:
             fails.append((aa, 'SMILES failed to parse'))
             continue
         f = rdMolDescriptors.CalcMolFormula(m)          # e.g. 'C6H9N3O2'
-        exp = FORMULA[aa]
-        parsed = dict(C=0, N=0, O=0, S=0)
+        exp = _norm_formula(formula[aa])
+        parsed = dict((e, 0) for e in ('C', 'N', 'O', 'S', 'SE', 'P'))
         for el, n in re.findall(r'([A-Z][a-z]?)(\d*)', f.replace('+', '').replace('-', '')):
+            el = el.upper()
             if el in parsed:
                 parsed[el] = int(n) if n else 1
         why = []
         if parsed != exp:
-            why.append('rdkit formula %s -> C%dN%dO%dS%d, expected C%dN%dO%dS%d'
-                       % (f, parsed['C'], parsed['N'], parsed['O'], parsed['S'],
-                          exp['C'], exp['N'], exp['O'], exp['S']))
+            why.append('rdkit formula %s -> %s, expected %s'
+                       % (f, _fmt_formula(parsed), _fmt_formula(exp)))
         try:
             centres = Chem.FindMolChiralCenters(m, includeUnassigned=True,
                                                 useLegacyImplementation=False)
         except TypeError:
             centres = Chem.FindMolChiralCenters(m, includeUnassigned=True)
-        if len(centres) != NSTEREO[aa]:
-            why.append('rdkit stereocentres %d != %d' % (len(centres), NSTEREO[aa]))
+        if len(centres) != nstereo[aa]:
+            why.append('rdkit stereocentres %d != %d' % (len(centres), nstereo[aa]))
         unassigned = [c for c in centres if c[1] in ('?', None)]
         if unassigned:
             why.append('unassigned stereocentre(s) %s -- chirality lost' % (unassigned,))
@@ -266,27 +359,38 @@ def main():
                          'script does NOT generate; Ofir used ignore_3D=True')
     ap.add_argument('--selftest', action='store_true',
                     help='run the no-dependency SMILES check and exit')
+    ap.add_argument('--include_noncanonical', action='store_true',
+                    help='W10: build the OPEN alphabet -- the canonical 20 followed by '
+                         'SEP, TPO, PTR, MSE, HYP. The canonical rows keep rows 0..19 in '
+                         'AA_MAP order, so the canonical tensor path is unaffected. Note '
+                         'the z-score is then taken over 25 rows, which changes the '
+                         'canonical NUMBERS: use a separate --out, never overwrite the '
+                         'committed 20-row matrix with this.')
     ap.add_argument('--nproc', type=int, default=1,
                     help='mordred worker processes; 1 is deterministic and 20 molecules is trivial')
     A = ap.parse_args()
 
     # ---- selftest path: no rdkit, no mordred, no pandas ---------------------------
     if A.selftest:
-        print('SMILES self-test (no rdkit required) -- %d residues' % len(ORDER))
-        fails = selftest_smiles()
+        res = ORDER_OPEN if A.include_noncanonical else ORDER
+        print('SMILES self-test (no rdkit required) -- %d residues%s'
+              % (len(res), ' (OPEN alphabet)' if A.include_noncanonical else ''))
+        fails = selftest_smiles(residues=res)
         print('')
         if fails:
             for aa, why in fails:
                 print('FAIL %s: %s' % (aa, why))
-            print('SELFTEST FAILED (%d of %d residues)' % (len(fails), len(ORDER)))
+            print('SELFTEST FAILED (%d of %d residues)' % (len(fails), len(res)))
             return 1
         print('SELFTEST PASSED: %d/%d SMILES match their known heavy-atom formula, '
               'stereocentre count, ring closure and parenthesis balance.'
-              % (len(ORDER), len(ORDER)))
+              % (len(res), len(res)))
         return 0
 
     # ---- threshold -----------------------------------------------------------------
-    n_res = len(ORDER)
+    # W10: everything below runs over RESIDUES, which is ORDER or ORDER_OPEN.
+    RESIDUES = ORDER_OPEN if A.include_noncanonical else ORDER
+    n_res = len(RESIDUES)
     if A.min_unique is not None:
         min_unique = A.min_unique
         thr_note = 'set explicitly via --min_unique'
@@ -329,13 +433,13 @@ def main():
     mordred_v = getattr(mordred, '__version__', 'unknown')
 
     # ---- build molecules and GATE them ---------------------------------------------
-    mols = [Chem.MolFromSmiles(SMILES[a]) for a in ORDER]
-    bad = [a for a, m in zip(ORDER, mols) if m is None]
+    mols = [Chem.MolFromSmiles(SMILES_OPEN[a]) for a in RESIDUES]
+    bad = [a for a, m in zip(RESIDUES, mols) if m is None]
     if bad:
         sys.stderr.write('SMILES failed to parse: %s\n' % ', '.join(bad))
         return 3
     if A.strict_smiles:
-        fails = check_mols_rdkit(mols)
+        fails = check_mols_rdkit(mols, residues=RESIDUES)
         if fails:
             sys.stderr.write('\nSMILES GATE FAILED -- refusing to write a descriptor matrix.\n')
             for aa, why in fails:
@@ -344,7 +448,7 @@ def main():
                              'Fix the SMILES; do not pass --no_strict_smiles to get past it.\n')
             return 3
         print('SMILES gate: %d/%d residues match formula, stereocentre count and assignment.'
-              % (len(ORDER), len(ORDER)))
+              % (len(RESIDUES), len(RESIDUES)))
 
     # ---- Mordred -------------------------------------------------------------------
     calc = Calculator(descriptors, ignore_3D=A.ignore_3d)
@@ -352,7 +456,7 @@ def main():
     print('Mordred: %d descriptors registered (ignore_3D=%s); computing over %d residues...'
           % (n_registered, A.ignore_3d, len(mols)))
     df = calc.pandas(mols, nproc=A.nproc, quiet=False)
-    df.index = ORDER
+    df.index = RESIDUES
     n_raw = df.shape[1]
 
     # Mordred returns Error/Missing OBJECTS, not NaN, for descriptors it could not compute.
@@ -379,7 +483,7 @@ def main():
     # ---- provenance ----------------------------------------------------------------
     stamp = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     smiles_hash = hashlib.sha256(
-        ''.join('%s=%s;' % (a, SMILES[a]) for a in ORDER).encode('utf-8')).hexdigest()[:16]
+        ''.join('%s=%s;' % (a, SMILES_OPEN[a]) for a in RESIDUES).encode('utf-8')).hexdigest()[:16]
     prov = [
         'DeepEF amino-acid physicochemical descriptor matrix -- REAL Mordred pipeline',
         'generated_utc=%s' % stamp,
@@ -398,10 +502,13 @@ def main():
         '(pyridine-type ring, one ring N). L-histidine is C6H9N3O2 (imidazol-4-yl, two ring N, '
         'one an NH). Corrected to c1c(nc[nH]1)C[C@@H](C(=O)O)N, PubChem CID 6274.',
         'smiles_gate=rdkit molecular formula + stereocentre count + stereo assignment; %s'
-        % ('ENFORCED, 20/20 pass' if A.strict_smiles else 'SKIPPED via --no_strict_smiles'),
+        % (('ENFORCED, %d/%d pass' % (len(RESIDUES), len(RESIDUES))) if A.strict_smiles
+           else 'SKIPPED via --no_strict_smiles'),
         'mordred_config=Calculator(descriptors, ignore_3D=%s), nproc=%d'
         % (A.ignore_3d, A.nproc),
-        'residue_order=train_utils.AA_MAP alphabetical ACDEFGHIKLMNPQRSTVWY '
+        'residue_order=' + ''.join(ORDER) + ' (train_utils.AA_MAP alphabetical) '
+        + ('then NON-CANONICAL ' + ','.join(RESIDUES[len(ORDER):]) + ' '
+           if len(RESIDUES) > len(ORDER) else '') + 
         '(row i == one-hot index i)',
         'n_residues=%d' % n_res,
         'raw_descriptors=%d (registered by Mordred: %d)' % (n_raw, n_registered),
@@ -439,12 +546,21 @@ def main():
         evr = var / total if total > 0 else np.zeros_like(var)
         cum = float(evr[:k].sum())
         Z = U[:, :k] * S[:k]
-        # Rescale each component to unit variance so all k columns enter the network on the
-        # same footing; otherwise PC1 dominates the block by construction.
-        zsd = Z.std(axis=0, ddof=0)
-        zsd[zsd == 0] = 1.0
-        pca_df = pd.DataFrame(Z / zsd, index=ORDER,
+        # DO NOT WHITEN. Dividing each PC by its own std forces every component to unit
+        # variance, which erases the eigenvalue spectrum -- and that spectrum IS the
+        # chemistry: PC1 carrying ~10x the variance of PC8 is a real statement about the
+        # residue alphabet, not an artifact to be normalised away. Whitening would make an
+        # essentially-noise trailing component shout as loudly as the dominant size/polarity
+        # axis. The projection is kept on its natural scale; one global factor below puts
+        # the block in the same numeric range as the z-scored arm without touching the
+        # RELATIVE variance between components.
+        gscale = float(Z.std(ddof=0))          # ONE scalar over the whole block
+        if gscale == 0.0:
+            gscale = 1.0
+        Zs = Z / gscale
+        pca_df = pd.DataFrame(Zs, index=ORDER,
                               columns=['PC%d' % (i + 1) for i in range(k)])
+        comp_sd = Zs.std(axis=0, ddof=0)
         per = ', '.join('PC%d=%.4f' % (i + 1, evr[i]) for i in range(k))
         cumlist = ', '.join('PC1..%d=%.4f' % (i + 1, float(evr[:i + 1].sum()))
                             for i in range(k))
@@ -457,8 +573,16 @@ def main():
             'pca_variance_explained_cumulative=%.6f' % cum,
             'pca_variance_explained_per_component=%s' % per,
             'pca_variance_explained_cumulative_curve=%s' % cumlist,
-            'pca_components_rescaled=each PC divided by its own std, so all %d columns enter '
-            'the model with unit variance' % k,
+            'pca_scaling=NATURAL COMPONENT SCALE PRESERVED. The projection U[:,:k]*S[:k] is '
+            'divided by ONE global scalar (the std over the whole block, %.6f) and NOT by '
+            'each component OWN std. Per-component whitening was deliberately NOT applied: '
+            'it would set every PC to unit variance and destroy the eigenvalue spectrum, '
+            'which is the chemical content of the decomposition (a dominant size/polarity '
+            'axis and a long tail of near-noise directions).' % gscale,
+            'pca_component_std_after_scaling=%s' % ', '.join(
+                'PC%d=%.6f' % (i + 1, comp_sd[i]) for i in range(k)),
+            'pca_component_std_ratio_PC1_over_PCk=%.4f'
+            % (comp_sd[0] / comp_sd[k - 1] if comp_sd[k - 1] > 0 else float('inf')),
         ]
         pca_path = A.pca_out or (re.sub(r'\.csv$', '', A.out) + '_pca%d.csv' % k)
         _write_csv(pca_path, pca_df, prov + pca_extra)

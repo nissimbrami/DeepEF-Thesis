@@ -82,24 +82,14 @@ _p.add_argument('--coil_offsets_path', type=str, default='', help="U3 offset arm
 _p.add_argument('--unfolded_emb', type=str, default='full', choices=['full', 'zero', 'mean'], help="U2 / Lever D: what the ProtT5 embedding contributes to the UNFOLDED reference state only. full=current behaviour (bit-identical default). zero=the unfolded state is fold-blind. mean=per-column mean broadcast back, keeping global scale but removing per-residue identity. Chosen as factor D by the W0 channel ablation: zeroing this block drops var(E_u) across proteins to 0.331 of baseline and corr(E_u,wt_err) from 0.420 to 0.119, whereas the Flory coil raises var(E_u) to 1.175.")
 _p.add_argument('--burial_features', action='store_true', help="W5: add a 3-dim solvation block (burial, Kyte-Doolittle hydropathy, burial*hydropathy) between Fb and emb. Burial is ZERO in the unfolded state -- the delta-ASA between states IS the hydrophobic driving force, and computing it from the same coordinates in both states makes the column cancel exactly in E_u-E_f. Normalised by a constant, never by N. Default off = bit-identical.")
 _p.add_argument('--burial_mode', type=str, default='count', choices=['count', 'hse'], help="W5 arm: 'count' = Cbeta neighbours within 10A; 'hse' = half-sphere exposure, the standard neighbour-count burial measure, which is direction-aware and needs only CA and CB -- exactly what this backbone-only dataset has. Only read when --burial_features is set.")
-_p.add_argument('--aa_descriptors', type=str, default='none', choices=['none', 'mordred726', 'mordred_pca16', 'mordred_pca16_only'], help="W6: per-residue physicochemical descriptor block (one_hot @ table, K columns from the committed CSV) between the solvation block and emb, at 48+solv_dim. One-hot asserts all twenty residues are mutually equidistant; descriptors give the alphabet a metric and stop it being closed. mordred726/mordred_pca16 APPEND to one-hot (identity and metric structure are complementary); mordred_pca16_only REPLACES it by ZEROING the trailing 20 columns, never deleting them, because hydro_net slices right-anchored. Default none = byte-identical. NAMES: each mode loads the file its name states and the loader ASSERTS the CSV's provenance header and column count against it -- the old names 'pca16'/'curated12'/'pca16_only' are RETIRED and raise, because 'curated12' had come to load a 726-column Mordred matrix. mordred_pca16 (K=16, width 1092->1108) is the sane default; mordred726 widens the feature vector 1092->1818.")
+_p.add_argument('--aa_descriptors', type=str, default='none', choices=['none', 'pca16', 'curated12', 'pca16_only'], help="W6: per-residue physicochemical descriptor block (one_hot @ table, K columns from the committed CSV) between the solvation block and emb, at 48+solv_dim. One-hot asserts all twenty residues are mutually equidistant; descriptors give the alphabet a metric and stop it being closed. pca16/curated12 APPEND to one-hot (identity and metric structure are complementary); pca16_only REPLACES it by ZEROING the trailing 20 columns, never deleting them, because hydro_net slices right-anchored. Default none = byte-identical.")
 _p.add_argument('--aa_descriptor_csv', type=str, default='', help="W6: override the descriptor CSV path. Empty = the per-mode default. The CSV is a COMMITTED artifact; training never calls rdkit.")
 _p.add_argument('--gcn_span', type=int, default=1, help="W7: extend the GCN chain edge set from (i,i+1) to |i-j| <= span. With three layers the baseline reach is three residues, so an alpha-helix (i->i+4) and a beta-sheet (i->i+2) are unrepresentable. 1 = baseline, bit-identical.")
 _p.add_argument('--coil_edges', action='store_true', help="U5: rebuild the UNFOLDED half's GAT edge set as the bidirectional chain (i,i+1)+(i+1,i) instead of reusing the folded fully-connected / CA-cutoff topology. The unfolded node features are already replaced by the coil, but the edges are not, so the coil is only half applied and any coil result measured without this is confounded. Requires --flory_unfolded (RAISES otherwise, never a silent no-op). The GCN set is untouched -- it is already chain-local, so there is no folded contact topology there to remove. Default off = byte-identical.")
 _p.add_argument('--gcn_bidir', action='store_true', help="U10: make the chain edges bidirectional. The baseline span-1 edges are directed forward only, so extending the span AND adding reverse edges would change two things at once. Set this at --gcn_span 1 for an honest control arm. Default off = baseline.")
 _p.add_argument('--edge_features', action='store_true', help="W7: pairwise EDGE ATTRIBUTES on the GAT graph -- src one-hot(20) + dst one-hot(20) + 16 CONCATENATED RBF distance channels = 56 dims, passed to GATv2Conv as edge_dim. The bank is concatenated, never summed: a summed bank returns one number that is flat past ~5A (a 5A contact and a 15A non-contact both read 4.649), leaving the model blind to distance. Default off = byte-identical.")
-_p.add_argument('--ligand_nodes', action='store_true', help="W11: represent BOUND LIGANDS -- ATP, NAD, a cofactor, a substrate, a lipid, a structural ion -- as hetero-nodes, adding a 10-dim contact block (bound flag, 6-class one-hot, contact count, proximity, ligand size) between the last new block and emb. Generalises W9, which covered only metal ions. The block is ZERO in the unfolded state: an unfolded chain has no binding pocket, and the folded-minus-unfolded difference IS the binding term. ACTS ON dG / b_p via folded-state stabilisation -- it CANCELS in ddG when the ligand is present in both WT and mutant, so it must NEVER be scored on ddG alone. Requires --ligand_annotations; expected to be INERT on MegaScale (small in-vitro domains, ligand-free) and is a GENERALITY lever, not an accuracy lever. Default off = byte-identical.")
-_p.add_argument('--ligand_annotations', type=str, default='', help="W11: path to ligand_sites.csv (schema in results/LIGAND_SPEC.md). Required when --ligand_nodes is set: a MISSING file raises rather than training a silently all-zero block that would be written up as a null result. An EMPTY (header-only) file is a legitimate delivery meaning 'this dataset is ligand-free' and makes the lever a byte-identical no-op.")
-_p.add_argument('--ligand_cutoff', type=float, default=4.5, help="W11: contact cutoff in ANGSTROM (default 4.5, the standard heavy-atom protein-ligand contact distance). Rows beyond it are dropped at parse time, so a file generated at 6.0 A can be re-read at a tighter cutoff without regeneration. The annotation file is in Angstrom; ligand_features.to_model_units does the single conversion to the 0.1x-scaled coordinates get_graph actually sees.")
-_p.add_argument('--holdout_residues', type=str, default='',
-                help="LORO (leave-residue-out): comma-separated residue letters removed ENTIRELY from the TRAINING set -- both mutations INTO them and mutations FROM them -- while leaving them in TEST. This is the only runnable proxy for the continuity claim on MegaScale, which contains ZERO non-canonical residues (scripts/count_noncanonical.py: 451514 codes, 20 letters). One-hot cannot represent a residue whose column never fired in training; descriptors can, because the residue is still a point among trained neighbours. The WT row (mut_type=='wt') is NEVER removed -- it is the per-protein reference row 0 that b_p and a_p are defined against. Empty = off = byte-identical to baseline.")
 _a, _ = _p.parse_known_args()
 READOUT = _a.readout
-# LORO_HOLDOUT_RESIDUES -- parsed once at import; the dataset reads this module-level set.
-HOLDOUT_RESIDUES = set(r.strip().upper() for r in _a.holdout_residues.split(',') if r.strip())
-if HOLDOUT_RESIDUES:
-    print('[LORO] holding out of TRAINING (both directions): %s'
-          % ','.join(sorted(HOLDOUT_RESIDUES)))
 WT_ANCHOR_WEIGHT = _a.wt_anchor_weight
 SLOPE_WEIGHT = _a.slope_weight
 VAL_FRAC = _a.val_frac
@@ -133,48 +123,7 @@ CFG.coil_edges = _a.coil_edges
 # W6: PEM reads aa_descriptors in __init__ to size fc1_gcn/fc1_gat, so this must be set
 # before the model is constructed -- it is, this block runs at import.
 CFG.aa_descriptors = _a.aa_descriptors
-# W11: PEM reads ligand_nodes in __init__ to size fc1_gcn/fc1_gat, so this must be set
-# before the model is constructed -- it is, this block runs at import. train_utils reads
-# it off CFG at call time, exactly like the W5/W9 levers.
-CFG.ligand_nodes = _a.ligand_nodes
-CFG.ligand_annotations = _a.ligand_annotations or None
-CFG.ligand_cutoff = _a.ligand_cutoff
-# W11 wiring handle: set to the ligand_features module when the lever is on, so the
-# training loop can push the per-batch protein context.  None when the lever is off,
-# which keeps the OFF path byte-identical (no import, no call).
-_LIG = None
-if _a.ligand_nodes:
-    import sys as _w11_sys, os as _w11_os
-    _w11_sys.path.insert(0, _w11_os.path.join(
-        _w11_os.path.dirname(_w11_os.path.dirname(_w11_os.path.abspath(__file__))),
-        'scripts'))
-    import ligand_features as _LIG
-    if not CFG.ligand_annotations:
-        raise ValueError(
-            '--ligand_nodes requires --ligand_annotations <ligand_sites.csv>. '
-            'Setting the flag with no file would silently train an all-zero 10-dim '
-            'block and look like a null result. An EMPTY header-only file is a valid '
-            'answer meaning the dataset is ligand-free; see results/LIGAND_SPEC.md.')
-    # Raises on a missing or malformed file. Deliberate: see LIGAND_SPEC.md section 8.
-    _LIG.load_annotations(CFG.ligand_annotations, cutoff_angstrom=CFG.ligand_cutoff)
-    print('[W11] %r' % (_LIG.get_annotations(),))
-    print('[W11] SCORING: this lever acts on dG / b_p via folded-state stabilisation. '
-          'It cancels in ddG when the ligand is in both WT and mutant. '
-          'Never score it on ddG alone.')
 CFG.aa_descriptor_csv = _a.aa_descriptor_csv or None
-# W6/provenance: resolve and VERIFY the descriptor matrix now, at import, so a bad
-# matrix kills the job in the first second rather than after hours of GPU time -- and so
-# the run config below can record exactly which bytes were used. descriptor_provenance()
-# routes through load_checked(), the same verified path the model itself uses, so this
-# cannot report one matrix while training on another.
-from aa_descriptors import descriptor_provenance as _descriptor_provenance
-_AA_DESC_PROVENANCE = _descriptor_provenance(CFG.aa_descriptors, CFG)
-if _AA_DESC_PROVENANCE['aa_desc_mode'] != 'none':
-    print('[W6] descriptor matrix: mode=%s K=%d md5=%s'
-          % (_AA_DESC_PROVENANCE['aa_desc_mode'], _AA_DESC_PROVENANCE['aa_desc_k'],
-             _AA_DESC_PROVENANCE['aa_desc_md5']))
-    print('[W6]   csv  = %s' % _AA_DESC_PROVENANCE['aa_desc_csv'])
-    print('[W6]   prov = %s' % _AA_DESC_PROVENANCE['aa_desc_provenance'])
 if _a.flory_unfolded and not (0.0 < _a.flory_nu <= 1.0):
     raise ValueError('--flory_nu must be in (0, 1]; got %s' % _a.flory_nu)
 # U5: die in the first second, not six hours in. coil_topology raises again on the first
@@ -206,18 +155,6 @@ UNFREEZE_FROM = _a.unfreeze_from
 UNFREEZE_LR = _a.unfreeze_lr
 UNFREEZE_EPOCHS = _a.unfreeze_epochs
 LOSS_MODE = _a.loss_mode
-# Agent-E SLOPE guard: the slope term is defined on the spread of ddG WITHIN a protein
-# (slope_pred_ddg = output - wt_dg). Under --loss_mode dg NOTHING in the data loss is a
-# ddG, the model is never trained on a within-protein contrast, and the term would be an
-# unscored side-objective silently riding on an unrelated loss. Undefined => RAISE, do
-# not run. This is the project's signature failure mode (code runs, reports a number, the
-# feature was never really exercised) and it is cheaper to die in the first second.
-if SLOPE_WEIGHT > 0 and LOSS_MODE == 'dg':
-    raise ValueError(
-        '--slope_weight %g requires --loss_mode ddg|joint|ddg_head; got --loss_mode dg. '
-        'The slope term penalises |std(pred_ddG) - std(true_ddG)| within a protein, which '
-        'is undefined under a pure dG loss. Use --loss_mode ddg (or joint) for the slope arm.'
-        % SLOPE_WEIGHT)
 DDG_WEIGHT = _a.ddg_weight
 PILOT_EPOCHS = _a.epochs
 if NO_FREEZE:
@@ -272,14 +209,6 @@ config = {
     'gcn_bidir': _a.gcn_bidir,
     'coil_edges': _a.coil_edges,
     'aa_descriptors': _a.aa_descriptors,
-    # WHICH MATRIX did this run actually read? The mode name alone is NOT an answer:
-    # data/aa_descriptors.csv was silently replaced by a 726-column Mordred matrix while
-    # still being loaded under the name 'curated12', so two runs with identical logged
-    # config used different numbers. These four fields make a result traceable to exact
-    # bytes -- md5 of the CSV plus the generator/shape/arm lines from its own header.
-    # Populated by aa_descriptors.descriptor_provenance(), which loads through the same
-    # verified path the model does, so it cannot report a matrix the run did not use.
-    **_AA_DESC_PROVENANCE,
     'designed_weight': DESIGNED_WEIGHT,
     'pooled_corr_weight': POOLED_CORR_WEIGHT,
     'val_frac': VAL_FRAC,
@@ -332,36 +261,6 @@ def pearson_loss(pred, true):
     true = true - true.mean()
     denom = (pred.norm() * true.norm()).clamp(min=1e-8)
     return 1.0 - (pred * true).sum() / denom
-
-import re  # LORO_HOLDOUT_RESIDUES: mutation-code parsing for the training-set holdout
-
-_LORO_CODE_RE = re.compile(r'^([A-Z])(\d+)([A-Z])$')
-_LORO_STATE = {'removed': 0, 'kept': 0, 'proteins': 0}
-
-
-def _loro_tally(protein, n_before, n_after):
-    _LORO_STATE['removed'] += (n_before - n_after)
-    _LORO_STATE['kept'] += n_after
-    _LORO_STATE['proteins'] += 1
-    if _LORO_STATE['proteins'] <= 5 or n_before == n_after:
-        print('[LORO] %-14s rows %6d -> %6d  (removed %5d)'
-              % (protein, n_before, n_after, n_before - n_after))
-
-
-def loro_report():
-    """Global holdout tally. RAISES if the holdout removed nothing: a flag that
-    claims to remove a residue and removes zero rows would train an arm silently
-    identical to baseline and be written up as a null result."""
-    if not HOLDOUT_RESIDUES:
-        return
-    print('[LORO] TOTAL over %d train proteins: removed %d rows, kept %d'
-          % (_LORO_STATE['proteins'], _LORO_STATE['removed'], _LORO_STATE['kept']))
-    if _LORO_STATE['proteins'] and _LORO_STATE['removed'] == 0:
-        raise RuntimeError(
-            '--holdout_residues %s removed ZERO rows across %d proteins. The flag is '
-            'a no-op and this run would be silently identical to baseline.'
-            % (','.join(sorted(HOLDOUT_RESIDUES)), _LORO_STATE['proteins']))
-
 
 class AllProteinValidationDataset(Dataset):
 
@@ -459,30 +358,6 @@ class AllProteinValidationDataset(Dataset):
         if self.one_mut:
             indexes -= set(mutations[mutations['mut_type'].str.contains(':')].index)
        
-        # ---- LORO_HOLDOUT_RESIDUES : TRAINING-SET-ONLY residue holdout ----------------
-        # Applied here and NOWHERE else. load_test_protein_data has a near-identical
-        # block that is deliberately NOT patched: the held-out rows must survive in
-        # test, or there is nothing to score.
-        if HOLDOUT_RESIDUES:
-            _n_before = len(indexes)
-            _mt = mutations.loc[list(indexes), 'mut_type'].astype(str)
-            # Parse WT/mutant off the code. 'wt' rows never match and are therefore
-            # never dropped -- they are the per-protein reference row that b_p/a_p
-            # are defined against.
-            _drop = set()
-            for _i, _code in _mt.items():
-                _m = _LORO_CODE_RE.match(_code.strip())
-                if _m is None:
-                    continue                      # 'wt', multi-mutants, ins/del: keep
-                if _m.group(1) in HOLDOUT_RESIDUES or _m.group(3) in HOLDOUT_RESIDUES:
-                    _drop.add(_i)
-            indexes = [_i for _i in indexes if _i not in _drop]
-            _n_after = len(indexes)
-            # A holdout that silently removes nothing is this project's signature
-            # failure mode, so it is COUNTED, printed and tallied -- never assumed.
-            _loro_tally(self.protein_dirs[idx], _n_before, _n_after)
-        # ------------------------------------------------------------------
-
         indexes = list(indexes)
         mutations = mutations.loc[indexes]
         delta_g_tensor = delta_g_tensor[indexes]
@@ -746,35 +621,8 @@ class Trainer():
         a, b = np.polyfit(p, t, 1)
         return float(a), float(b)
 
-    def _set_ligand_context(self, batch):
-        """W11: push the per-batch protein name into ligand_features.
-
-        get_graph has no protein argument and is called from six sites, so the name
-        travels as process-global state -- the same mechanism W9/W8 use.  This is the
-        ONLY place the name is known at graph-build time.  Without this call
-        _CURRENT_PROTEIN stays None for the whole run, ligand_features() raises (see
-        the guard there), and --ligand_nodes can no longer silently train on an
-        all-zero block.  No-op when the lever is off.
-
-        Correct for the current single-process loop, where graphs are built in the
-        training loop AFTER the batch is fetched, not in DataLoader workers.  If graph
-        building ever moves into workers this must become an explicit argument.
-        """
-        if _LIG is None:
-            return
-        name = batch.get('name') if hasattr(batch, 'get') else None
-        if isinstance(name, (list, tuple)):
-            name = name[0] if len(name) else None
-        if name is None:
-            raise RuntimeError(
-                "W11: --ligand_nodes is on but the batch carries no 'name', so the "
-                "ligand block cannot be looked up and would be all zeros. The dataset "
-                "must emit the protein name alongside coords/one_hot/prott5.")
-        _LIG.set_current_protein(str(name))
-
     def get_deltaG(self, batch, i, n=None):
         n = self.mini_batch_size if n is None else n
-        self._set_ligand_context(batch)          # W11: before ANY graph is built
         # move all to the same device
         one_hot_minibatch = batch['one_hot'][0, i: i + n].to(self.device)
         prott5_embedding_minibatch = batch['prott5'][0, i: i + n].to(self.device)
@@ -806,7 +654,6 @@ class Trainer():
         FOLDED wild-type (row 0) and folded mutant structures (shared backbone). No unfolded
         state, no energy. Returns ddG per variant [n]."""
         n = self.mini_batch_size if n is None else n
-        self._set_ligand_context(batch)          # W11: before ANY graph is built
         one_hot_mb = batch['one_hot'][0, i: i + n].to(self.device)
         prott5_mb = batch['prott5'][0, i: i + n].to(self.device)
         batch['coords'] = batch['coords'].to(self.device)
@@ -823,7 +670,6 @@ class Trainer():
 
     def get_wt_deltaG(self, batch):
         """Predicted dG of the wild-type (row 0), recomputed in-graph for the ddG loss."""
-        self._set_ligand_context(batch)          # W11: before ANY graph is built
         one_hot_wt = batch['one_hot'][0, 0:1].to(self.device)
         prott5_wt = batch['prott5'][0, 0:1].to(self.device)
         batch['coords'] = batch['coords'].to(self.device)

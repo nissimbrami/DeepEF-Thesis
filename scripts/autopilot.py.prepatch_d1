@@ -33,14 +33,6 @@ SIGMA_PP = 0.0037
 EFFECT_MIN = 0.0083          # 2 * SIGMA_POOLED / sqrt(3)
 REF_POOLED, REF_PP, REF_STD_B = 0.591, 0.731, 0.223
 CEILING = 0.711
-# AUTOPILOT.md D1: "A cell that raises pooled while collapsing slope below 0.3 median is
-# not selected, even if its pooled is highest -- that is the anchor's known failure mode
-# and selecting it would defeat the purpose." The driver used to select on pooled alone,
-# so it could and would pick exactly that cell. a_p is a within-protein slope: it does not
-# cancel in ddG, so it is legitimately measurable here, and it is a separate calibration
-# channel (corr(a_p, per-protein PCC) = +0.571; mean_rel_SASA vs a_p r = +0.714, 10/10).
-SLOPE_MED_MIN = 0.3
-MIN_EVAL_CSV_BYTES = 1000    # a finished training run is not a result
 POLL_SECONDS = 600
 MAX_CONCURRENT = 8
 
@@ -205,69 +197,11 @@ def collect_results():
         cell = parse_tag(tag)
         if not cell:
             continue
-        # A FINISHED TRAINING RUN IS NOT A RESULT. Three separate 7h+ runs reached
-        # COMPLETED with no CSV. A stub/empty/header-only CSV must never be scored:
-        # it would enter D1 as a real cell. Assert non-empty BEFORE scoring.
-        path = os.path.join(d, f)
-        try:
-            size = os.path.getsize(path)
-        except OSError:
-            size = 0
-        if size < MIN_EVAL_CSV_BYTES:
-            log('SKIP %s: eval CSV is %d bytes (< %d) -- not a result, not scored'
-                % (tag, size, MIN_EVAL_CSV_BYTES))
-            seen.discard(tag)
-            continue
-        stats = calib_diag(path)
+        stats = calib_diag(os.path.join(d, f))
         if stats and 'pooled' in stats:
             cell.update(stats)
             rows.append(cell)
-        else:
-            log('SKIP %s: calib_diag returned no pooled ddG PCC -- not scored' % tag)
-            seen.discard(tag)
     return rows
-
-
-def select_best(rows, log_fn=log):
-    """D1 selection under the documented slope guard.
-
-    Returns (best, rejected) where `rejected` lists (row, slope_med) for every cell
-    excluded for slope collapse. A cell is ELIGIBLE only if its median a_p is known and
-    >= SLOPE_MED_MIN. Ranking among eligible cells is by pooled, as documented.
-
-    Rejection is LOUD: the whole point of the guard is that a pooled-winning cell got
-    thrown out, and that must appear in the log, not be silently skipped.
-
-    A cell with no slope_med is NOT eligible -- unknown slope is not a passing slope.
-    If every cell collapses, this returns (None, rejected) and the caller halts rather
-    than quietly selecting a collapsed cell.
-    """
-    eligible, rejected = [], []
-    for r in rows:
-        sm = r.get('slope_med')
-        if sm is None or sm != sm:            # missing or NaN
-            rejected.append((r, sm))
-            continue
-        if sm < SLOPE_MED_MIN:
-            rejected.append((r, sm))
-            continue
-        eligible.append(r)
-    for r, sm in sorted(rejected, key=lambda t: -t[0].get('pooled', 0)):
-        shown = 'missing' if (sm is None or sm != sm) else '%.3f' % sm
-        log_fn('D1 REJECT %s: pooled=%.4f but slope_med=%s < %.2f -- slope collapse; '
-               'not selected (AUTOPILOT.md D1)'
-               % (r.get('tag', '?'), r.get('pooled', float('nan')), shown, SLOPE_MED_MIN))
-    if not eligible:
-        return None, rejected
-    best = max(eligible, key=lambda r: r['pooled'])
-    if rejected:
-        top = max(rejected, key=lambda t: t[0].get('pooled', 0))[0]
-        if top.get('pooled', 0) > best['pooled']:
-            log_fn('D1 GUARD BINDING: %s had the highest pooled (%.4f) but was rejected '
-                   'for slope collapse; selecting %s (pooled %.4f, slope_med %.3f) instead'
-                   % (top.get('tag', '?'), top.get('pooled', float('nan')),
-                      best['tag'], best['pooled'], best['slope_med']))
-    return best, rejected
 
 
 def main_effects(rows):
@@ -385,18 +319,7 @@ def one_pass(st, go):
     log('D1 effects: ' + ', '.join('%s=%+.4f%s' % (k, v, '*' if abs(v) > EFFECT_MIN else '')
                                    for k, v in sorted(eff.items())))
     mains = {k: v for k, v in real.items() if len(k) == 1}
-    best, rejected = select_best(rows)
-    if best is None:
-        halt(st, 'H2',
-             'every one of the %d scored cells has median slope a_p < %.2f, so D1 has no '
-             'eligible cell: selecting on pooled alone would pick a slope-collapsed cell, '
-             'which AUTOPILOT.md D1 forbids' % (len(rows), SLOPE_MED_MIN),
-             'D1 slope guard over all scored cells',
-             ['the anchor weight is too high across the whole factorial',
-              'calib_diag slope parsing broke and every slope_med is missing',
-              'the eval scored a split with too little within-protein range'])
-    log('D1 selection: %d/%d cells eligible (slope_med >= %.2f), %d rejected'
-        % (len(rows) - len(rejected), len(rows), SLOPE_MED_MIN, len(rejected)))
+    best = max(rows, key=lambda r: r['pooled'])
 
     if mains:
         choice, why = best['tag'], 'real main effect(s): %s' % ', '.join(sorted(mains))
@@ -407,13 +330,7 @@ def one_pass(st, go):
         why = ('F1: no effect exceeds EFFECT_MIN=%.4f. Calibration levers do not move '
                'pooled beyond noise -- a genuine negative result and a thesis finding.'
                % EFFECT_MIN)
-    decide(st, 'D1', choice,
-           why + ' | best pooled %.4f slope_med %.3f (%s) | slope guard >= %.2f rejected %d cell(s): %s'
-           % (best['pooled'], best['slope_med'], best['tag'], SLOPE_MED_MIN, len(rejected),
-              ', '.join('%s(pooled %.4f, slope %s)'
-                        % (r.get('tag', '?'), r.get('pooled', float('nan')),
-                           'missing' if (sm is None or sm != sm) else '%.3f' % sm)
-                        for r, sm in rejected) or 'none'))
+    decide(st, 'D1', choice, why + ' | best pooled %.4f (%s)' % (best['pooled'], best['tag']))
     st['state'] = 'S5_BUILD_INFO'
     save_state(st)
     return st

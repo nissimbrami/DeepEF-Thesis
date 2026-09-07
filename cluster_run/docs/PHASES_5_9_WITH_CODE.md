@@ -272,6 +272,44 @@ Same pattern as Phase 5: a block between `Fb` and `emb`, `solv_start` becomes
 `48 + solv_dim`, and both `fc1` widths grow. Flag
 `--aa_descriptors {none,pca16,curated12,pca16_only}`.
 
+> **CORRECTION (descriptor-matrix naming trap, applied this session).** The arm names in
+> the text above are RETIRED. `data/aa_descriptors.csv` was overwritten with the 20x726
+> Mordred matrix while `aa_descriptors.py` still mapped the mode `curated12` to it, so
+> anything reported as "curated12" after that rebuild was a **726-column Mordred run, not
+> a 12-descriptor curated run** -- two runs with identical logged config used different
+> matrices. `pca16` and `pca16_only` both pointed at `data/aa_descriptors_pca16.csv`,
+> a name that did not say which pipeline built it.
+>
+> The modes are renamed so a name states its matrix, and each points at a file whose
+> name matches:
+>
+> | mode | file | K | effect on the feature vector |
+> |---|---|---|---|
+> | `none` | -- | 0 | 1092 (baseline, byte-identical) |
+> | `mordred726` | `data/aa_descriptors_mordred.csv` | 726 | 1092 -> 1818 |
+> | `mordred_pca16` | `data/aa_descriptors_mordred_pca16.csv` | 16 | 1092 -> 1108 |
+> | `mordred_pca16_only` | `data/aa_descriptors_mordred_pca16.csv` | 16 | replaces one-hot |
+>
+> `mordred_pca16` is the sane default. `curated12` as previously wired widened the vector
+> to 1818, which is almost certainly not what the plan intended by "12 descriptors".
+>
+> The old names are **not aliases** -- `curated12`, `pca16` and `pca16_only` now RAISE,
+> from argparse and again from the loader, so no old invocation is silently
+> reinterpreted. The loader additionally asserts the CSV's own `#` provenance header and
+> its column count against what the mode expects, and `train.py`'s run config records
+> `aa_desc_csv`, `aa_desc_md5`, `aa_desc_k` and `aa_desc_provenance` so a result traces
+> to exact bytes. Gate: `scripts/gate_desc_provenance.py`.
+>
+> Chemical sanity of the committed matrix was verified before training
+> (`scripts/chem_sanity.py`, 20/20 checks): F -> Y,H,W; L -> V,I; D -> N,E; N -> D,Q;
+> K -> ...,R. The plan's own required checks (L->{I,V,M}, D->{E,N}, F->{Y,W}) all hold.
+> The histidine SMILES in the PHASE 6 table was WRONG (a pyridine-type ring, C7H10N2O2);
+> the committed matrix used the corrected imidazole (C6H9N3O2) -- confirmed by
+> de-z-scoring the surviving `MW` column against 19 known amino-acid masses (max residual
+> 0.07 Da), which places H at **155.168 Da** vs 155.157 correct / 154.169 for the typo.
+
+
+
 ## 6.4 Verification — before training, and this one is decisive
 
 The descriptor space must be chemically sensible or nothing downstream can work:

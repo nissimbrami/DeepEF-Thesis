@@ -52,6 +52,47 @@ CEILING = 0.711
 REF_POOLED, REF_PP, REF_STD_B = 0.591, 0.731, 0.223
 
 # The thirteen lever flags that already exist and work (per the item brief).
+# The VALID --aa_descriptors probe is READ FROM THE LIVE MODULE, never hard-coded. It
+# used to be the literal 'pca16'; that mode was renamed when the descriptor-matrix naming
+# trap was closed, at which point a hard-coded probe would start failing for a reason
+# that has nothing to do with what this suite tests. Taking the first non-'none' live
+# mode means the probe follows any future rename automatically.
+def _first_live_descriptor_mode():
+    """First non-'none' mode in aa_descriptors.MODES, read WITHOUT importing the module.
+
+    A plain `import aa_descriptors` drags in torch. This suite otherwise needs no torch --
+    it shells out to train.py -- so that import turns a torch-less shell into a crash
+    before any check runs. Parsing the literal with ast gets the same answer with no
+    import and no side effects, and still tracks a rename automatically.
+    """
+    import ast as _ast
+    _here = os.path.dirname(os.path.abspath(__file__))
+    for _cand in (os.path.join(os.getcwd(), 'aa_descriptors.py'),
+                  os.path.join(os.path.dirname(_here), 'aa_descriptors.py'),
+                  os.path.join(_here, 'aa_descriptors.py')):
+        if not os.path.isfile(_cand):
+            continue
+        with open(_cand) as _fh:
+            _tree = _ast.parse(_fh.read())
+        for _node in _tree.body:
+            if not isinstance(_node, _ast.Assign):
+                continue
+            for _t in _node.targets:
+                if isinstance(_t, _ast.Name) and _t.id == 'MODES':
+                    _modes = _ast.literal_eval(_node.value)
+                    for _m in _modes:
+                        if _m != 'none':
+                            return _m
+                    raise RuntimeError(
+                        'verify_e2e: aa_descriptors.MODES has no mode other than '
+                        "'none', so there is no valid --aa_descriptors probe: %r"
+                        % (_modes,))
+        raise RuntimeError('verify_e2e: no MODES assignment found in %s' % _cand)
+    raise RuntimeError('verify_e2e: could not locate aa_descriptors.py to read MODES')
+
+
+_LIVE_DESC_MODE = _first_live_descriptor_mode()
+
 # value = a VALID value to prove the flag parses, and an INVALID value that must be
 # rejected with a non-zero exit. None as valid_value means a store_true flag.
 LEVER_FLAGS = [
@@ -70,7 +111,7 @@ LEVER_FLAGS = [
     # are `type=str, choices=[...]` with a default that is the byte-identical path, so
     # the invalid probe is a value outside `choices` and argparse must say "invalid
     # choice". An earlier draft stopped at ten flags and silently under-tested these.
-    ('--aa_descriptors',     'pca16',   'banana',       'choice'),
+    ('--aa_descriptors',     _LIVE_DESC_MODE, 'banana',  'choice'),
     ('--coil_channels',      'ca_only', 'banana',       'choice'),
     ('--coil_b',             'fixed',   'banana',       'choice'),
 ]

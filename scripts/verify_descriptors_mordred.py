@@ -102,12 +102,35 @@ def main():
     print('\n[1] shape and residue order')
     print('    %d residues x %d descriptors' % (D.shape[0], D.shape[1]))
     got = list(D.index)
-    if got != ORDER:
-        blocking.append('residue order is %s, must be %s (row i == one-hot index i)'
-                        % (''.join(got), ''.join(ORDER)))
-        print('    FAIL order: got %s' % ''.join(got))
+    # W10: open alphabet. The invariant is NOT "exactly the twenty" -- that was the same
+    # hard closure this project removed from aa_descriptors.py. It is: the canonical
+    # twenty occupy rows 0..19 in AA_MAP order (so row i == one-hot index i and the
+    # canonical tensor path is byte-identical), and anything after row 19 is an extra.
+    head, extras = got[:len(ORDER)], got[len(ORDER):]
+    if head != ORDER:
+        blocking.append('rows 0..%d are %s, must be %s (row i == one-hot index i)'
+                        % (len(ORDER) - 1, ''.join(head), ''.join(ORDER)))
+        print('    FAIL order: first %d rows are %s' % (len(ORDER), ''.join(head)))
     else:
-        print('    ok: ACDEFGHIKLMNPQRSTVWY, matching train_utils.AA_MAP')
+        print('    ok: rows 0-19 are ACDEFGHIKLMNPQRSTVWY, matching train_utils.AA_MAP')
+    if extras:
+        dup = [e for e in extras if e in ORDER]
+        seen, rep = set(), []
+        for e in extras:
+            if e in seen:
+                rep.append(e)
+            seen.add(e)
+        if dup:
+            blocking.append('extra rows %s shadow canonical residues' % ','.join(dup))
+            print('    FAIL extras: %s duplicate canonical labels' % ','.join(dup))
+        elif rep:
+            blocking.append('extra rows repeat labels %s' % ','.join(rep))
+            print('    FAIL extras: repeated labels %s' % ','.join(rep))
+        else:
+            print('    ok: %d NON-CANONICAL row(s) past the twenty: %s'
+                  % (len(extras), ','.join(extras)))
+            print('        (the alphabet is OPEN -- these are reachable by label via')
+            print('         aa_descriptors.residue_descriptors_by_label)')
     if D.shape[1] < 2:
         blocking.append('only %d descriptor column(s) -- nothing to measure' % D.shape[1])
 

@@ -55,7 +55,12 @@ FREEZE_LAYERS = args.freeze_layers
 CRITERION = "L1"
 MODEL_PATH = './Megascale-fineTuning/models'
 MINI_BATCH_SIZE = 64
-DEVICE = 'cuda'# if torch.cuda.is_available() else 'cpu'
+# Restored the CPU fallback that was commented out. Scoring is a forward pass over 28
+# proteins and does not need a GPU; hard-coding 'cuda' meant every eval had to queue
+# for a card behind the trainings, which is why 12 finished cells had 0 CSVs. Worse,
+# run_calib_eval.sh still printed 'DONE ... -> abl_<tag>.csv' after the CUDA error, so
+# the failure looked like success.
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 TRAINED_MODEL_PATH = args.trained_model_path
 BASE_MODEL_NAME = TRAINED_MODEL_PATH.split('/')[-2]
 MODEL_NAME = args.model_name
@@ -184,10 +189,10 @@ class AllProteinValidationDataset(Dataset):
         mutations = pd.read_csv(mutations_path)
         mutations = mutations[~mutations['mut_type'].str.contains('ins|del')].reset_index(drop=True)
         # Load and preprocess the data for each protein
-        coords_tensor = torch.load(os.path.join(protein_dir, COORDS),weights_only=True)
-        delta_g_tensor = torch.load(os.path.join(protein_dir, DELTA_G),weights_only=True)
-        mask_tensor = torch.load(os.path.join(protein_dir, MASKS),weights_only=True)
-        one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT),weights_only=True)
+        coords_tensor = torch.load(os.path.join(protein_dir, COORDS),weights_only=True, map_location=DEVICE)
+        delta_g_tensor = torch.load(os.path.join(protein_dir, DELTA_G),weights_only=True, map_location=DEVICE)
+        mask_tensor = torch.load(os.path.join(protein_dir, MASKS),weights_only=True, map_location=DEVICE)
+        one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT),weights_only=True, map_location=DEVICE)
         embedding_tensor = self.load_embedding_tensor(os.path.join(protein_dir, PROTT5_EMBEDDINGS))
         
         # Add ddg column
@@ -239,10 +244,10 @@ class AllProteinValidationDataset(Dataset):
         mutations = pd.read_csv(mutations_path)
         mutations = mutations[~mutations['mut_type'].str.contains('ins|del')].reset_index(drop=True)
         # Load and preprocess the data for each protein
-        coords_tensor = torch.load(os.path.join(protein_dir, COORDS),weights_only=True)
-        delta_g_tensor = torch.load(os.path.join(protein_dir, DELTA_G),weights_only=True)
-        mask_tensor = torch.load(os.path.join(protein_dir, MASKS),weights_only=True)
-        one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT),weights_only=True)
+        coords_tensor = torch.load(os.path.join(protein_dir, COORDS),weights_only=True, map_location=DEVICE)
+        delta_g_tensor = torch.load(os.path.join(protein_dir, DELTA_G),weights_only=True, map_location=DEVICE)
+        mask_tensor = torch.load(os.path.join(protein_dir, MASKS),weights_only=True, map_location=DEVICE)
+        one_hot_tensor = torch.load(os.path.join(protein_dir, ONE_HOT),weights_only=True, map_location=DEVICE)
         embedding_tensor = self.load_embedding_tensor(os.path.join(protein_dir, PROTT5_EMBEDDINGS))
         
         # Check if deltaG thershold is set and apply it to the mutations dataframe
@@ -288,7 +293,7 @@ class AllProteinValidationDataset(Dataset):
                                      key=lambda x: int(os.path.splitext(x)[0].split('_')[-1]))
         for filename in all_embedding_files:
             if filename.endswith('.pt'):
-                embedding_tensor = torch.load(filename,weights_only=True).to('cpu') # load the tensor to cpu memory
+                embedding_tensor = torch.load(filename,weights_only=True, map_location=DEVICE).to('cpu') # load the tensor to cpu memory
                 embeddings.append(embedding_tensor)
         return torch.vstack(embeddings)
 

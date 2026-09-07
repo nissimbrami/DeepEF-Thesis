@@ -12,6 +12,36 @@ from model.model_cfg import CFG
 from aa_descriptors import (aa_descriptor_mode, desc_or_none, descriptor_dim,
                             keeps_one_hot)
 
+
+# ---------------------------------------------------------------------------
+# W11 -- generic bound-ligand / cofactor / ion hetero-nodes (--ligand_nodes).
+# Guarded import: ligand_features.py lives in scripts/, which is not on the path for
+# every entry point, and W11 is an optional sibling lever. If it is absent the helper
+# below returns None and every graph is byte-identical to the pre-W11 tree.
+# ---------------------------------------------------------------------------
+try:
+    import sys as _sys, os as _os
+    _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'scripts'))
+    from ligand_features import ligand_or_none as _ligand_or_none
+except Exception:                                            # noqa: BLE001
+    _ligand_or_none = None
+
+
+def _lig_or_none(x, mask, folded):
+    """W11: the [N,10] ligand contact block, or None when the lever is off.
+
+    None -- not a zero block -- is what keeps the OFF path byte-identical: the caller
+    then builds the original torch.cat with no extra tensor at all.
+
+    The block is ZERO in the unfolded state (folded=False), enforced inside
+    ligand_features. An unfolded chain has no binding pocket, and a column computed
+    identically in both passes would cancel exactly in dG = E_u - E_f. That is defect
+    U7; scripts/gate_ligand.py gate C exists to catch its return.
+    """
+    if _ligand_or_none is None:
+        return None
+    return _ligand_or_none(x, mask, folded, CFG)
+
 # amino acid one hot map
 AA_MAP = {
     'A': 0,
@@ -73,10 +103,19 @@ def load_checkpoint(path,model,optimizer=None,device=CFG.device):
     model_dict = torch.load(path,map_location=device,weights_only=False)
     print(f"Loaded model from {path}")
     target = model.module if hasattr(model, "module") else model
-    target.load_state_dict(model_dict['model_state_dict'])
-    if optimizer is not None:
-        optimizer.load_state_dict(model_dict['optimizer_state_dict'])
-    return model,optimizer,model_dict['epoch'],model_dict['loss'],model_dict['valid_loss']
+    # Two checkpoint FORMATS exist in this tree and both must load. train.py's per-epoch
+    # save writes a BARE state_dict (torch.save(self.model.state_dict(), ...)), while the
+    # older pretrained checkpoints are a wrapper dict carrying model/optimizer/epoch/loss.
+    # Assuming the wrapper raised KeyError 'model_state_dict' on every per-epoch file,
+    # which is why 12 finished factorial cells could not be scored.
+    if isinstance(model_dict, dict) and 'model_state_dict' in model_dict:
+        target.load_state_dict(model_dict['model_state_dict'])
+        if optimizer is not None and 'optimizer_state_dict' in model_dict:
+            optimizer.load_state_dict(model_dict['optimizer_state_dict'])
+        return (model, optimizer, model_dict.get('epoch', -1),
+                model_dict.get('loss', float('nan')), model_dict.get('valid_loss', float('nan')))
+    target.load_state_dict(model_dict)
+    return model, optimizer, -1, float('nan'), float('nan')
     
 def validation_plots(Exd,Exn,seq_len,type,epoch):
     """
@@ -320,7 +359,8 @@ def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     _S = _solv_or_none(x, one_hot, mask, folded=True)
     _Dsc = _desc_or_none(one_hot)                     # W6: [N,K] or None
     _oh = _onehot_block(one_hot)                      # W6: zeroed under pca16_only
-    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + [emb, _oh]
+    _L = _lig_or_none(x, mask, folded=True)   # W11: [N,10] or None
+    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + ([] if _L is None else [_L]) + [emb, _oh]
     Fh = torch.cat(_blocks, dim=1)  # N,16+32[+3][+K]+emb_size+20
     
     return Fh
@@ -586,7 +626,8 @@ def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     # chemistry is supposed not to differ, and does not.
     _Dsc = _desc_or_none(one_hot)
     _oh = _onehot_block(one_hot)
-    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + [emb, _oh]
+    _L = _lig_or_none(x, mask, folded=False)   # W11: [N,10] or None
+    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + ([] if _L is None else [_L]) + [emb, _oh]
     Fh = torch.cat(_blocks, dim=1)
 
     return Fh
@@ -644,7 +685,8 @@ def _flory_unfolded_graph(x, one_hot, emb, mask, gaussian_coef):
     _S = _solv_or_none(x, one_hot, mask, folded=False)   # W5: burial is ZERO unfolded
     _Dsc = _desc_or_none(one_hot)                        # W6: state-independent
     _oh = _onehot_block(one_hot)
-    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + [emb, _oh]
+    _L = _lig_or_none(x, mask, folded=False)   # W11: [N,10] or None
+    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + ([] if _L is None else [_L]) + [emb, _oh]
     Fh = torch.cat(_blocks, dim=1)
 
     return Fh

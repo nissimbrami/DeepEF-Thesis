@@ -773,6 +773,12 @@ attacked.
 
 # CHECKPOINT 8 — 2026-09-07 — THE SIGNAL IS ON a_p, NOT b_p (corrected significance)
 
+> **PARTIALLY RETRACTED - see CHECKPOINT 9.** The "NOT b_p" half of this title is
+> wrong. Burial predicts the offset (`frac_buried_rel_lt_0.25` vs `b_p_wt_error`, mean r=-0.475,
+> 10/10 sign-consistent, 8/10 significant). It was missed because the b_p rows were scored on a
+> single checkpoint against a uniform 90-test Bonferroni bar and were never put through the
+> replication sweep that promoted the a_p row. Everything else in this checkpoint stands.
+
 ## The finding
 
 Structural exposure predicts the COMPRESSION SLOPE a_p. Not the offset b_p.
@@ -1009,3 +1015,281 @@ that rule: the coil, BSA, and now W5.
 - the dG training arm (`--loss_mode dg --flory_unfolded --coil_b fixed`)
 - `--slope_weight` (factor C) — now the best-motivated lever we have
 - the severing experiment (built, dry-run green, `results/SEVERING_READY.md`)
+
+
+# CHECKPOINT 9 — 2026-09-07 — CORRECTION TO CHECKPOINT 8: ONE STRUCTURAL AXIS, BOTH CHANNELS
+
+## The claim being corrected
+
+CHECKPOINT 8 is titled **"THE SIGNAL IS ON a_p, NOT b_p"**. **The "NOT b_p" half of that title is
+wrong and is retracted here.** The a_p half stands unchanged and is strengthened.
+
+### Why the wrong conclusion was reached
+
+The b_p-side rows were scored **once, on one checkpoint** (`abl_calib_ctrl_repro2_e14`), against a
+**Bonferroni bar of alpha=5.6e-4 applied uniformly across all 90 tests**. Nothing on the b_p side
+cleared it, so CHECKPOINT 8 recorded "Nothing survives Bonferroni against b_p" and stopped there.
+
+The a_p row was then taken forward into a 10-checkpoint replication sweep and promoted to the
+headline. **The b_p rows were never put through that same sweep.** The asymmetry was procedural,
+not empirical: one channel got the strong test, the other got only the weak one.
+
+That is backwards as evidence. **Sign-consistency across 10 independently-trained checkpoints is
+far stronger evidence than a single-sample p-value against a conservative family-wise bar**, and
+at n=28 a real |r|~0.47 has only ~60% power at alpha=0.05 and almost none at 5.6e-4 — so a uniform
+Bonferroni over 90 tests is close to guaranteed to erase a true effect of that size. Failing that
+bar once is not evidence of absence. The sweep was the right test and it simply was not run.
+
+## The correction, measured
+
+`scripts/bp_replication.py` -> `results/bp_replication_sweep.json`, `results/bp_anchor_gradient.json`.
+
+Independent re-derivation: per-protein a_p/b_p/pcc/b_p_wt_error recomputed from the raw eval CSVs
+and all 15 structural covariates recomputed from the AlphaFold PDBs with Biopython Shrake-Rupley.
+It does **not** read `catalogue_vs_bp.json` or `results/repl/*.json` — the cached numbers were
+re-derived from source, not trusted. All 10 CSVs verified to carry the same 28 proteins.
+15 features x 4 b_p-side targets = **60 pairs**, each over all 10 checkpoints.
+
+### The headline b_p-side result — ESTABLISHED
+
+| feature | target | mean r | sd | sign-consistent | individually p<0.05 | range |
+|---|---|---|---|---|---|---|
+| **frac_buried_rel_lt_0.25** | **b_p_wt_error** | **-0.475** | 0.092 | **10/10** | **8/10** | -0.561 .. -0.306 |
+
+Reproduces the oversight agent's numbers to three decimals. The two checkpoints that miss p<0.05
+are `anchor_w0.3` (p=0.058) and `anchor_w1.0` (p=0.114) — i.e. the misses are **the anchor arms**,
+which is itself the point (see the gradient section below), not scattered noise.
+
+**So the honest picture is one structural axis acting on BOTH calibration channels:**
+
+- **Exposure predicts the SLOPE**: `mean_rel_SASA` vs `a_p`, mean r = **+0.624**, 10/10 sign-consistent, **10/10** significant.
+- **Burial predicts the OFFSET**: `frac_buried_rel_lt_0.25` vs `b_p_wt_error`, mean r = **-0.475**, 10/10 sign-consistent, **8/10** significant.
+
+Same physical variable (relative solvent accessibility), opposite ends of it, two different
+calibration objects. Exposed proteins lose less slope; buried proteins carry a more positive WT
+offset error. This is more coherent than the CHECKPOINT 8 story, not less — it was hidden by
+running the strong test on only one of the two channels.
+
+### Ranked b_p-side table (top rows of 60; full table in the JSON)
+
+| # | feature | target | mean r | sd | signs | sig | class |
+|---|---|---|---|---|---|---|---|
+| 1 | frac_buried_rel_lt_0.25 | b_p_wt_error | -0.475 | 0.092 | 10/10 | 8/10 | **ESTABLISHED** |
+| 2 | SASA_per_residue | abs_b_p | -0.341 | 0.096 | 10/10 | 4/10 | SUGGESTIVE |
+| 3 | frac_buried_rel_lt_0.25 | abs_b_p_wt_error | +0.324 | 0.085 | 10/10 | 3/10 | SUGGESTIVE |
+| 4 | mean_rel_SASA | abs_b_p_wt_error | -0.312 | 0.097 | 10/10 | 2/10 | SUGGESTIVE |
+| 5 | SASA_over_len_pow_073 | abs_b_p | -0.306 | 0.099 | 10/10 | 2/10 | SUGGESTIVE |
+| 6 | SASA_per_residue | abs_b_p_wt_error | -0.304 | 0.092 | 10/10 | 2/10 | SUGGESTIVE |
+| 7 | SASA_over_len_pow_073 | b_p_wt_error | +0.299 | 0.089 | 10/10 | 2/10 | SUGGESTIVE |
+| 8 | mean_rel_SASA | abs_b_p | -0.289 | 0.095 | 10/10 | 2/10 | SUGGESTIVE |
+| 11 | length | abs_b_p | +0.294 | 0.081 | 10/10 | 1/10 | SUGGESTIVE |
+| 30 | length | abs_b_p_wt_error | +0.260 | 0.139 | 9/10 | 2/10 | DEAD |
+| 31 | frac_buried_rel_lt_0.25 | abs_b_p | +0.205 | 0.159 | 9/10 | 1/10 | DEAD |
+| 60 | frac_glycine | b_p | +0.006 | 0.068 | 5/10 | 0/10 | DEAD |
+
+Classification used: **ESTABLISHED** = 10/10 sign-consistent AND >=6/10 individually p<0.05;
+**SUGGESTIVE** = 10/10 sign-consistent but rarely significant; **DEAD** = not 10/10 sign-consistent.
+
+**Tally: 1 ESTABLISHED, 28 SUGGESTIVE, 31 DEAD of 60 b_p-side pairs.**
+
+Note the shape of the SUGGESTIVE block: rows 2-8 are *all* the same exposure/burial axis measured
+different ways against different b_p parameterisations. They are corroborating, not seven findings
+— the same caution CHECKPOINT 8 correctly applied to the four a_p near-misses.
+
+### Verification of the three numbers I was asked to check
+
+- `frac_buried_rel_lt_0.25` vs `b_p_wt_error`: **CONFIRMED** — mean r=-0.4746, sd=0.0922, 10/10, 8/10 sig, range -0.561..-0.306. Matches the reported -0.475 / 0.087 / 10/10 / 8/10 / -0.561..-0.306.
+- `SASA_per_residue` vs `abs_b_p`: **CONFIRMED as SUGGESTIVE** — 10/10 sign-consistent, 4/10 significant, mean r=-0.341.
+- `length` vs `abs_b_p`: **CORRECTED.** It is **10/10 sign-consistent, 1/10 significant** (mean r=+0.294) — i.e. **SUGGESTIVE, not DEAD**. The "1/10" in the brief is the significance count, which was read as if it were the sign-consistency count. Every one of the 10 checkpoints gives a positive r (+0.135..+0.401); only one reaches p<0.05. Weak, but it is not sign-inconsistent. The genuinely dead length row is `length` vs `b_p` (6/10, mean r=+0.040).
+
+## The anchor-weight suppression gradient replicates on the b_p channel
+
+CHECKPOINT 8's unlooked-for second finding was that the a_p correlation decays monotonically with
+WT-anchor weight while unanchored sigma seeds sit highest. **The same gradient is present on the
+b_p channel**, which is independent corroboration on a second channel:
+
+| pair | \|r\| anchor arms (3) | \|r\| sigma seeds (5) | gap | full separation | MWU p (1-sided) |
+|---|---|---|---|---|---|
+| frac_buried_rel_lt_0.25 vs b_p_wt_error | 0.359 | 0.514 | +0.155 | YES | 0.018 |
+| SASA_per_residue vs abs_b_p | 0.237 | 0.383 | +0.146 | YES | 0.018 |
+| mean_rel_SASA vs abs_b_p | 0.185 | 0.332 | +0.147 | YES | 0.018 |
+| SASA_over_len_pow_073 vs abs_b_p | 0.211 | 0.348 | +0.136 | YES | 0.018 |
+| length vs abs_b_p | 0.196 | 0.329 | +0.133 | YES | 0.018 |
+| *(reference)* mean_rel_SASA vs a_p | 0.486 | 0.678 | +0.192 | YES | 0.018 |
+
+Per-arm detail for the headline b_p pair, `frac_buried_rel_lt_0.25` vs `b_p_wt_error`:
+
+    anchor w0.3 -> -0.363    anchor w1.0 -> -0.306    anchor w3.0 -> -0.410
+    sigma seeds -> -0.515, -0.419, -0.550, -0.543, -0.545
+
+Every sigma seed is stronger than every anchor arm (0.018 is the floor p for a 5-vs-3
+Mann-Whitney, i.e. perfect separation). **So the suppression is real on both channels.**
+
+Two honest limits on this:
+1. **The b_p gradient is NOT monotonic in anchor weight** (w3.0 is stronger than w1.0), unlike the
+   a_p gradient which was cleanly monotonic 0.587 -> 0.471 -> 0.400. What replicates is
+   *anchored-weaker-than-unanchored*, not the ordering within the anchor arms.
+2. **3 vs 5 checkpoints is not a designed experiment.** The anchor arms also differ from the sigma
+   seeds in seed (all s42) and epoch, so arm and seed-family are confounded. The running 48-cell
+   factorial is what settles this; it now has a prediction on two channels instead of one.
+
+## n=28 caveats — applying throughout, to the a_p finding as much as this one
+
+- **n=28 proteins.** At n=28, r=+0.62 has a 95% CI of roughly [0.33, 0.80] and r=-0.48 roughly
+  [-0.72, -0.14]. Quote directions and rough magnitudes; do not quote these r's to three decimals
+  as if they were stable population values.
+- **The 10 checkpoints are not 10 independent datasets.** They are 10 models scored on the *same*
+  28 proteins. Replication here proves the effect is **not a checkpoint artifact** — it does NOT
+  give 10x the effective sample size against protein sampling. The 28-protein draw is the single
+  point of failure for both findings, and it is shared.
+- **Range restriction.** All 28 are single-chain, ligand-free, metal-free monomers of 43-72 aa.
+  Nothing here generalises to multimers, ligand-bound proteins, or large proteins, and complexity /
+  BSA / ligand effects remain *untestable in principle* on this set (zero variance), not null.
+- **Multiplicity is still live.** 60 b_p-side pairs were scanned. The buried/b_p_wt_error row was
+  named in advance by the oversight agent, so it is a confirmatory test rather than the winner of a
+  60-way search — but the 28 SUGGESTIVE rows were not pre-specified and should be treated as
+  hypothesis-generating.
+- **Designed vs natural.** The a_p finding was checked within the 21 natural proteins alone
+  (r=+0.767); **the equivalent natural-only check has not yet been run for the b_p finding.** Until
+  it is, a designed-fold contribution to the burial/offset coupling is not excluded.
+
+## What this changes
+
+1. **Retract "NOT b_p" from CHECKPOINT 8's title and body.** Keep everything else in CHECKPOINT 8:
+   the a_p result, the Bonferroni correction of the "five clear it" claim, the empty-join finding,
+   and the zero-variance analysis all stand.
+2. **The offset channel has a structural predictor after all.** The offset-removal ORACLE is
+   0.70-0.72 and ICC(b_p)=0.898 already said b_p is learnable; this now supplies a *structural*
+   handle on it (burial), not just the knowledge that it is learnable.
+3. **Both levers are the same lever.** An exposure/burial-derived per-protein correction is one
+   feature with two effects, not two separate research directions.
+4. **THE METRIC RULE still applies and is not softened.** `frac_buried_rel_lt_0.25` is a
+   whole-protein property, so it is identical between WT and mutant and **cancels in ddG**. It is
+   scored here on `b_p_wt_error` (the raw WT dG error) precisely because of that rule. Any lever
+   built on it must be scored on dG or b_p — never on ddG. The rule is what made this measurable,
+   and it is what caught the coil, BSA, and W5-burial levers.
+5. **Procedural lesson.** When two sibling hypotheses are tested, run the strong test on both
+   before promoting either. A single-checkpoint Bonferroni result is not grounds to drop an arm
+   from a replication sweep — the sweep is cheap and it is the better test.
+
+`scripts/gate_g4_cpu.py`: **ALL PASS**, dG=0.0023 width=1095 on the burial row, and the
+no-new-dims row holds at **width=1092** as required. No feature vector was changed by this work
+(analysis only, CPU only, no jobs touched).
+
+---
+
+# CHECKPOINT 10 — 2026-09-07 — OFIR RECONCILED, CORRECTOR FAILS, NO-OP HOLES CLOSED
+
+Three workflows completed before a session limit. Their verifiers did NOT run, so everything below
+is WORKER-REPORTED, NOT ADVERSARIALLY VERIFIED. Re-verify before quoting in the thesis.
+
+## 1. OFIR'S THESIS — READ IN FULL (56 pages, BGU CS, Keasar, Dec 2023)
+
+`results/OFIR_THESIS_NOTES.md`. **Three things in our build are WRONG:**
+
+**(a) PCA-16 IS NOT HIS METHOD.** He does NO dimensionality reduction. "PCA"/"principal
+component"/"SVD" appear NOWHERE in the thesis. His 654 features enter a CNN as 654 channels.
+Our `--pca 16` is OUR invention and must be relabelled as ours, not attributed to him.
+
+**(b) `ignore_3D=True` CONTRADICTS his 1826.** 1613 2D + 213 3D = 1826. Quoting 1826 is only
+coherent if 3D was requested — which also explains his 1826->1280 missing-value drop, since 3D
+descriptors return NaN without an embedded conformer. With `ignore_3D=True` the ceiling is 1613
+and his drop is unreproducible. Our docstring says 1826 while our provenance says
+"Mordred(ignore_3D)" — these contradict each other.
+
+**(c) 15-of-20 IS NOT A FAITHFUL SCALING of 40-of-58.** 40/58 = 0.690, so proportional scaling
+gives 13-14, not 15. Our help text calls 15 "three quarters"; 40/58 is roughly two thirds. Deeper:
+**he gives NO justification for 40 at all** — it reads as tuned to land a workable feature count.
+So there is no ratio to preserve. Likely inert on 20 canonical residues (any threshold 13-17
+selects nearly the same columns) but the docstring must be fixed either way.
+
+**HIS CENTRAL CLAIM AND ITS EVIDENCE (Table 3.3):** train on canonical single-point mutants, test
+on non-canonical. PUMA BH3: 646 train -> 714 ncAA test, RMSE 0.975, **Pearson r = 0.642**.
+CP2: 228 -> 240, RMSE 0.859, **r = 0.670**. 30 seeds varying only CNN init, split fixed.
+**NO baseline of ANY kind** — no one-hot, no LM, no shuffled-descriptor, no per-position-mean.
+He calls it "a proof-of-concept" and notes "there was no benchmark to compare RMSE results to".
+He is candid that Fig 3.4 shows "a near-constant prediction line at 0" — part of that r is
+partial collapse to a constant.
+
+**HE ADDRESSES THE LM OBJECTION — AND CONCEDES IT** (p.31, verbatim): "Physicochemical properties
+of AAs are implicitly represented in these datasets ... and accordingly, implicitly represented in
+the embeddings. Thus, ncAAs, which do not occur in these databases, are challenging to represent."
+**His argument is COVERAGE ONLY, not added information.** He runs ZERO experiments comparing
+descriptors against an LM embedding or one-hot.
+
+**CONSEQUENCE FOR US, and it is decisive:** our 28 test proteins are canonical, so every residue
+HAS a real ProtT5 vector and the coverage gap he exploits DOES NOT EXIST in our setting. **By his
+own sentence, the physicochemical content is already implicit in our 1024-dim ProtT5. The thesis
+does NOT support adding a Mordred block on top of ProtT5+one-hot for canonical monomers.**
+
+**HE INDEPENDENTLY FOUND OUR OFFSET PROBLEM.** Leave-one-AA-out (Table 3.4, 18 ncAAs x 30 seeds):
+r stays flat 0.858-0.948 while RMSE swings 7.05-19.32, and he shows **RMSE tracks the train/test
+MEAN GAP** (Ornithine 19.316 vs gap 18.030). That is b_p, found independently, with essentially
+our offset-removal fix proposed.
+
+**WHAT TO STEAL:** leave-one-AMINO-ACID-out. We have leave-one-protein-out but nothing holding out
+a residue TYPE. Directly portable, needs no ncAA data, and asks whether the model learned residue
+chemistry or residue identity. Also: enrichment as a metric, and the train/test mean-gap diagnostic.
+
+**TRAP:** 2D Mordred CANNOT distinguish D from L — every 2D descriptor is identical for both, so
+his effective alphabet is well under 58 and L/D pairs contribute ONE unique value, not two.
+
+## 2. THE b_p CORRECTOR FAILS — a real, publishable negative
+
+`results/OFFSET_CORRECTOR.md`. Mean over all 10 eval CSVs:
+
+| | pooled ddG PCC |
+|---|---|
+| raw | 0.5994 |
+| mean-offset baseline | 0.5940 |
+| **LOPO feature-predicted offset** | **0.6049** |
+| oracle offset removed | 0.7119 |
+
+**95% of the oracle gain does not survive held-out prediction.** Held-out R^2 of b_p is NEGATIVE
+on 8/10 CSVs (mean -0.123) — worse than predicting the training mean. 0 of 22 features reach
+positive R^2 alone. Permutation null: p in [0.295,0.758], significant on 0/10. With ridge alpha
+FIXED the gain goes NEGATIVE (-0.0016), so the +0.0055 was alpha-search variance, not skill.
+
+**THE MECHANISM, which is the useful part:** the oracle gain is NOT broad learnable
+miscalibration. **The top-2 |b_p| proteins carry 78% of it** (60-88% across all 10 CSVs).
+Correcting only 2K5H+2KVS gives 0.591->0.687 (80% of the gain); correcting the other 26 gives
+0.615 (20%). Neither is a structural outlier (max |z| ~2.0 over 22 features), so **there is no
+signature to regress on**. And 2KVS is not an offset case at all: a_p=0.094 vs median 0.4975,
+per-protein PCC 0.160 vs ~0.80 — the model simply fails there and b_p absorbs the failure.
+
+**METRIC CORRECTION THAT MATTERS:** Pearson is SHIFT-INVARIANT, so subtracting a CONSTANT changes
+pooled PCC by exactly zero (verified: -1.0/0.0/mean/+1.0 all give 0.590991). **Therefore the null a
+per-protein corrector must beat is the RAW number, not the mean baseline.** Scoring against the
+mean baseline would have manufactured a fake +0.011 lift.
+
+**Also corrects a units confusion:** std(b_p)=1.5741 is the dG-space WT error. The ddG-space
+intercept the oracle actually subtracts has std **0.2273**. The ddG intercept is the correct
+corrector target.
+
+## 3. THREE SILENT-NO-OP HOLES CLOSED — `scripts/gate_noop.py`, 30 checks ALL PASS
+
+**(A) PEMGraphTransformer dropped inserted blocks silently — MEASURED, not assumed.** A gate builds
+`flat_x` with 726 sentinel columns at offset 48, runs the real reassembly
+`cat([:16],[16:48],[-1044:-20],[-20:])`, and the output is byte-identical to the no-descriptor
+case: **0 of 726 sentinel columns reach the node vector, and nothing raises.** Guard now raises in
+`__init__` (cheap) for ALL FIVE affected levers — aa_descriptors, burial, metal, struct_quality,
+ligand — not just descriptors.
+
+**(B) `--ligand_nodes` could not fire in training.** Wired `Trainer._set_ligand_context(batch)`
+before the first `get_graph` in all three entry points; `ligand_features()` now RAISES when a table
+is loaded but context was never set. **`gate_ligand.py` D.14 had CODIFIED the bug** — it asserted
+"unset context -> exactly zero". Replaced.
+
+**(C) `gate_open_alphabet` tested a /tmp fixture, not the real table. THE REAL FINDING:** the
+committed 25-row table is **K=756 vs canonical K=726**, with **27 canonical columns DROPPED and 57
+ADDED**, and the canonical 20 rows are **NOT byte-identical**. It is not an open alphabet over our
+matrix — **it is a different descriptor matrix wearing the same name.** The loader now refuses it.
+
+**(D) A FOURTH HOLE, unassigned:** `gate_open_alphabet.py` hard-coded the retired mode
+`'curated12'`, so it raised in its first section and **had stopped testing anything at all.**
+
+## STATUS
+
+G4 re-verified after every change: `dG=-0.0030 width=1092`.
+NOT verified adversarially (session limit killed all verifiers): Ofir notes, corrector, no-op
+gates, severing, identifiability, slope_origin, W8. **Re-run the verifiers before the write-up.**

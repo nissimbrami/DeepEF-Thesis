@@ -3,7 +3,18 @@ import os, glob, json
 import numpy as np, pandas as pd
 from scipy import stats
 
-EV = sorted(glob.glob('eval_results/*.csv'))
+EV = ['eval_results/abl_anchor_w0.3_s42_e14.csv',
+      'eval_results/abl_anchor_w1.0_s42_e14.csv',
+      'eval_results/abl_anchor_w3.0_s42_e13.csv',
+      'eval_results/abl_calib_ctrl_repro2_e14.csv',
+      'eval_results/abl_p3_slope3.0_s42_e8.csv',
+      'eval_results/abl_sigma_seed1_e13.csv',
+      'eval_results/abl_sigma_seed2_e10.csv',
+      'eval_results/abl_sigma_seed3_e13.csv',
+      'eval_results/abl_sigma_seed42_e9.csv',
+      'eval_results/abl_sigma_seed4_e14.csv']  # PINNED: the 10 canonical checkpoints.
+# An 11th (abl_p3_a0_d0_s0_D1_uemb_seed42_e9.csv) appeared 2026-09-07 17:04 mid-analysis
+# from another job; excluded so every number in this report is over the same 10.
 SF = pd.read_csv('results/structfeat/struct_features_28.csv')
 
 DESIGNED = {'HEEH_KT_rd6_0746','HEEH_KT_rd6_0793','HHH_rd1_0142','HHH_rd1_0244',

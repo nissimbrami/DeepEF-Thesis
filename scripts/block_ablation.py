@@ -38,6 +38,7 @@ ap.add_argument('--tm_path', default='./data/ThermoMPNN/mega_test.csv')
 ap.add_argument('--mb', type=int, default=32)
 ap.add_argument('--shard', type=int, default=0)
 ap.add_argument('--nshard', type=int, default=1)
+ap.add_argument('--maxmut', type=int, default=0, help='0=all; else keep WT + a deterministic even-spaced subsample of this many mutants')
 A = ap.parse_args()
 dev = torch.device(A.device)
 NANO_TO_ANGSTROM = 0.1
@@ -122,6 +123,15 @@ with torch.no_grad():
         if len(idx) < 5:
             print('  skip %s: only %d rows' % (name, len(idx)))
             continue
+        # Deterministic even-spaced subsample. The WT row (index 0 of the protein's
+        # mutation table, ddG==0 by construction) is ALWAYS kept: b_p is defined as the
+        # WT error and evaluate.py anchors pred_ddG on the first row.
+        if A.maxmut and len(idx) > A.maxmut + 1:
+            head = idx[0]
+            rest = idx[1:]
+            step = len(rest) / float(A.maxmut)
+            keep = [rest[int(k * step)] for k in range(A.maxmut)]
+            idx = [head] + keep
         mutsel = mut.loc[idx]
         dgs = dg.reshape(-1)[idx]
         ohs = oh[idx]
@@ -140,16 +150,25 @@ with torch.no_grad():
             ug = torch.stack([get_unfolded_graph(coords, oj[k].squeeze(), ej[k].squeeze(), mask)
                               for k in range(oj.size(0))])
             assert fg.shape[-1] == WIDTH, 'width %d != %d' % (fg.shape[-1], WIDTH)
+            # Every condition is a pair (folded variant, unfolded variant) drawn from a
+            # SMALL set of distinct graphs. Scoring each distinct graph ONCE and reusing
+            # the energies costs 8 forwards instead of 28, and is numerically identical:
+            # the readout is a pure function of its input graph.
+            variants = {}
             for tag, blk, place in CONDS:
-                f2 = zero_(fg, blk) if place in ('f', 'b') else fg
-                u2 = zero_(ug, blk) if place in ('u', 'b') else ug
-                E = model(torch.cat([f2, u2], dim=0)).reshape(-1)
-                h = E.size(0) // 2
-                Ef, Eu = E[:h], E[h:]
-                acc[tag].append((Eu - Ef).cpu().numpy())
+                variants[('f', blk if place in ('f', 'b') else None)] = None
+                variants[('u', blk if place in ('u', 'b') else None)] = None
+            energy = {}
+            for (side, blk) in variants:
+                g = zero_(fg if side == 'f' else ug, blk)
+                energy[(side, blk)] = model(g).reshape(-1).cpu().numpy()
+            for tag, blk, place in CONDS:
+                Ef = energy[('f', blk if place in ('f', 'b') else None)]
+                Eu = energy[('u', blk if place in ('u', 'b') else None)]
+                acc[tag].append(Eu - Ef)
                 if tag == 'base':
-                    Ef_base.append(Ef.cpu().numpy())
-                    Eu_base.append(Eu.cpu().numpy())
+                    Ef_base.append(Ef)
+                    Eu_base.append(Eu)
             del fg, ug
             gc.collect()
 

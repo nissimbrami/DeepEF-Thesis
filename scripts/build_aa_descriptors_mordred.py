@@ -5,7 +5,13 @@
 Ofir Ezrielev's method, run as he ran it, not the 14-column hand fallback:
 
     chiral SMILES (L-amino acid, neutral free form)
-      -> Mordred Calculator(descriptors, ignore_3D=True)      ~1826 raw descriptors
+      -> Mordred Calculator(descriptors, ignore_3D=True)      ~1613 raw descriptors
+         NOTE (verified against the thesis): Ofir reports 1826, which is 1613 2D + 213 3D.
+         That total is only coherent if 3D descriptors WERE requested. With ignore_3D=True
+         the ceiling is 1613 and his 1826->1280 missing-value drop is unreproducible -- 3D
+         descriptors return NaN without an embedded conformer, which is what his drop was.
+         We keep ignore_3D=True deliberately (no conformer generation), so our counts differ
+         from his BY DESIGN. Do not quote 1826 as if this script produced it.
       -> filter 1: drop every column with ANY missing value   -> ~1280
       -> filter 2: keep columns with enough unique values     -> ~654
       -> normalise (z-score across the residues)
@@ -22,7 +28,10 @@ THE ONE DELIBERATE DEVIATION, stated here, in the CSV header, and in REPORT.md
 Ofir kept descriptors with >= 40 unique values across his 58 residues (canonical plus
 non-canonical). With 20 residues the maximum possible unique count is 20, so >= 40 is
 unsatisfiable. The threshold scales to 15/20 = 0.750 -- a descriptor must distinguish at
-least three quarters of the alphabet. Both the original and the scaled threshold are
+roughly two thirds of the alphabet -- 40/58 = 0.690, which scales to 13.8, so a faithful
+proportional threshold would be 13 or 14, NOT 15. We keep 15 as OUR choice. Note also that
+the thesis gives NO justification for 40 at all, so there is no ratio to preserve; and 2D
+Mordred cannot distinguish D from L, so his effective alphabet is well under 58. Both the original and the scaled threshold are
 recorded in the CSV header. --min_unique overrides it; --unique_frac derives it from a
 fraction if you would rather scale Ofir's 40/58 = 0.690 exactly.
 
@@ -356,7 +365,9 @@ def main():
                          'gate that caught the wrong histidine in the plan')
     ap.add_argument('--use_3d', dest='ignore_3d', action='store_false', default=True,
                     help='compute 3D descriptors too -- requires embedded conformers, which this '
-                         'script does NOT generate; Ofir used ignore_3D=True')
+                         'script does NOT generate. NOTE: the thesis reports 1826 = 1613 2D '
+                         '+ 213 3D, so Ofir most likely did NOT use ignore_3D=True; that is '
+                         'our deviation, not his setting.')
     ap.add_argument('--selftest', action='store_true',
                     help='run the no-dependency SMILES check and exit')
     ap.add_argument('--include_noncanonical', action='store_true',
@@ -568,7 +579,11 @@ def main():
             'arm=pca%d' % k,
             'pca_requested=%d, delivered=%d (rank cap = min(n_residues-1, n_cols) = %d)'
             % (A.pca, k, rank_cap),
-            'pca_input=the %d z-scored descriptors above, so this is PCA on the correlation '
+            "pca_note=PCA IS OUR ADDITION, NOT THE THESIS METHOD. Ofir does no "
+                     "dimensionality reduction of any kind: PCA, principal component and "
+                     "SVD appear nowhere in the thesis, and his 654 features enter the CNN "
+                     "as 654 channels. Do not attribute this projection to him. "
+                     'pca_input=the %d z-scored descriptors above, so this is PCA on the correlation '
             'structure, not on raw units' % n_keep,
             'pca_variance_explained_cumulative=%.6f' % cum,
             'pca_variance_explained_per_component=%s' % per,

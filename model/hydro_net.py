@@ -367,11 +367,17 @@ def _sibling_block_dims(cfg):
     """
     total = 0
     if getattr(cfg, 'metal_features', False):
-        try:
-            from metal_features import METAL_DIM
-            total += METAL_DIM
-        except Exception:                                    # noqa: BLE001
-            total += 9
+        # W9 IS RETIRED. train_utils.get_graph concatenates NO metal block, so adding
+        # METAL_DIM here would widen fc1 and shift the W11 ligand block 9 columns into
+        # the LLM embedding -- a silent wrong-column read, not a crash. Refuse instead
+        # of quietly returning 9. See scripts/metal_features.py._w9_retired.
+        raise RuntimeError(
+            "W9 --metal_features is RETIRED (superseded by W11 --ligand_nodes). "
+            "hydro_net._sibling_block_dims() refuses to reserve METAL_DIM=9 columns "
+            "for a block that train_utils.get_graph never assembles: doing so would "
+            "shift the W11 ligand slice 9 columns into the LLM embedding WITHOUT "
+            "crashing. There is no --metal_features flag in train.py; do not add one. "
+            "Use --ligand_nodes with --ligand_annotations instead.")
     if getattr(cfg, 'struct_quality', False):
         try:
             from struct_quality import STRUCT_QUALITY_DIM

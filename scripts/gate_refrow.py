@@ -24,6 +24,29 @@ import csv, collections, glob, sys
 HARD_PCTILE = 25.0   # below this, the reference row is almost certainly wrong
 WARN_PCTILE = 50.0   # below the median is worth reporting
 
+
+MUT_DIRS = ('data_fixed/mutation_datasets', 'data/Processed_K50_dG_datasets/mutation_datasets')
+
+def _n_backgrounds(protein):
+    """How many distinct wild-type backgrounds does this protein's mutation file contain?
+
+    2K5H's file concatenates 2K5H.pdb, 2K5H.pdb_G11S and 2K5H.pdb_G23A; each is 'wt' of its own
+    background, so mut_type alone cannot distinguish them. More than one background means row 0
+    may not be the true WT. Prefers data_fixed/ so a corrected file is seen first.
+    """
+    import os
+    for d in MUT_DIRS:
+        f = os.path.join(d, protein + '.csv')
+        if not os.path.exists(f):
+            continue
+        names = set()
+        with open(f) as fh:
+            for r in csv.DictReader(fh):
+                if str(r.get('mut_type', '')).strip().lower() == 'wt':
+                    names.add(r['name'].split('_wt')[0].strip())
+        return len(names) if names else 1
+    return 1
+
 def check(path):
     g = collections.defaultdict(list)
     with open(path) as f:
@@ -38,12 +61,25 @@ def check(path):
             hard.append((p, 'has %d rows with ddG==0 (expected exactly 1)' % len(zeros)))
         elif zeros[0] != 0:
             hard.append((p, 'the ddG==0 row is index %d, not 0' % zeros[0]))
-        if pct < HARD_PCTILE:
-            hard.append((p, 'row0 dG=%.3f is at the %.1f-th percentile of its own protein '
-                            '(max %.3f) - the reference row looks like a MUTANT, not the WT'
-                         % (dg[0], pct, max(dg))))
-        elif pct < WARN_PCTILE:
-            warn.append((p, 'row0 dG=%.3f at %.1f-th percentile (below median)' % (dg[0], pct)))
+        # The percentile alone is suggestive, not decisive: a DESIGNED protein with many
+        # stabilising mutations legitimately has a low-percentile WT. r18_3_TrROS_Hall sits at
+        # the 38th percentile and is CORRECT -- its mutation file has a single background and
+        # row 0 really is r18_3_TrROS_Hall.pdb.
+        # What made 2K5H a bug is that its file CONCATENATES THREE BACKGROUNDS
+        # (2K5H.pdb, 2K5H.pdb_G11S, 2K5H.pdb_G23A) and the mutant one sorts first. So the
+        # decisive test is multiplicity of backgrounds, and the percentile only escalates it.
+        nbg = _n_backgrounds(p)
+        if nbg > 1 and pct < WARN_PCTILE:
+            hard.append((p, 'row0 dG=%.3f at the %.1f-th percentile AND the mutation file has %d '
+                            'distinct backgrounds - row 0 is probably a MUTANT background, not '
+                            'the true WT (this is the 2K5H defect)' % (dg[0], pct, nbg)))
+        elif nbg > 1:
+            warn.append((p, '%d distinct backgrounds in the mutation file; row0 percentile %.1f '
+                            'looks fine, but confirm row 0 is the true WT' % (nbg, pct)))
+        elif pct < HARD_PCTILE:
+            warn.append((p, 'row0 dG=%.3f at the %.1f-th percentile (max %.3f) but only ONE '
+                            'background - low percentile alone is legitimate for a designed '
+                            'protein with many stabilising mutations' % (dg[0], pct, max(dg))))
     return hard, warn
 
 def main():

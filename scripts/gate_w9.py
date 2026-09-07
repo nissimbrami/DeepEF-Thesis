@@ -1,4 +1,8 @@
-"""W9 gates -- must all pass before --metal_features is used in any run.
+"""W9 gates -- RETIRED lever (superseded by W11 --ligand_nodes).
+
+These check metal_features.py IN ISOLATION only. Passing does NOT mean
+--metal_features can be enabled: there is no assembly path for it and no
+flag in train.py. See scripts/metal_features.py docstring.
 
 Usage
 -----
@@ -350,27 +354,113 @@ def gate_g4(csv_path, tensor_dir):
         print('    SKIP G4.3: no annotated residue resolved to a stored tensor.')
 
 
+# ---------------------------------------------------------------------------
+# G5 -- REAL-TREE cross-check. The gap this suite had for its whole life: G1-G3
+# never imported hydro_net or train_utils, so they verified metal_start() against
+# a torch.randn fixture built from metal_start() -- a tautology. These checks
+# assert against the ACTUAL assembly path and the ACTUAL model.
+# ---------------------------------------------------------------------------
+
+def gate_g5():
+    print('\n--- G5: cross-check against the real train_utils / hydro_net ---')
+    import io as _io
+
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    tu = _io.open(os.path.join(_root, 'train_utils.py'), encoding='utf-8').read()
+    check('G5.1 train_utils.py assembles NO metal block (retired lever)',
+          'metal' not in tu.lower(),
+          'found %d occurrences of "metal"' % tu.lower().count('metal'))
+
+    hn = _io.open(os.path.join(_root, 'model', 'hydro_net.py'),
+                  encoding='utf-8').read()
+    check('G5.2 PEM defines no self.metal_start (nothing reads a metal block)',
+          'self.metal_start' not in hn)
+
+    # G5.3 -- the retirement is ENFORCED, not merely documented. Every entry point
+    # must raise when the lever is requested; a docstring alone is not a guard.
+    class _On(object):
+        metal_features = True
+        burial_features = False
+        struct_quality = False
+        ligand_nodes = False
+        aa_descriptors = 'none'
+        aa_desc_dim = None
+        emb_input_dim = 1024
+
+    on = _On()
+    x = torch.randn(8, 3)
+    m = torch.ones(8)
+    for nm, fn in (('metal_dim', lambda: metal_dim(on)),
+                   ('metal_start', lambda: metal_start(on)),
+                   ('metal_or_none', lambda: metal_or_none(x, m, True, on))):
+        raised = False
+        try:
+            fn()
+        except RuntimeError:
+            raised = True
+        except Exception:                                    # noqa: BLE001
+            pass
+        check('G5.3 %s() RAISES when metal_features is set' % nm, raised,
+              '' if raised else
+              'retirement is documentation-only -- the lever is still enableable')
+
+    # G5.4 -- the OFF path must remain byte-identical, or retiring W9 broke W5/W11.
+    class _Off(_On):
+        metal_features = False
+
+    off = _Off()
+    try:
+        ok = (metal_dim(off) == 0 and metal_start(off) == 48
+              and metal_or_none(x, m, True, off) is None)
+    except Exception:                                        # noqa: BLE001
+        ok = False
+    check('G5.4 OFF path unchanged: dim 0, start 48, block None', ok)
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--csv', default=None, help='path to metal_sites.csv (enables G4)')
-    ap.add_argument('--tensors', default=None, help='tensor_root_dir (enables G4.1-G4.3)')
+    ap.add_argument('--csv', default=None,
+                    help='(retired) path to metal_sites.csv -- no such file exists')
+    ap.add_argument('--tensors', default=None, help='(retired) tensor_root_dir')
     a = ap.parse_args()
 
-    gate_g1()
-    gate_g2()
-    gate_g3()
-    if a.csv:
-        gate_g4(a.csv, a.tensors)
-    else:
-        print('\n--- G4 SKIPPED: no --csv. The annotation file does not exist yet; '
-              'see ANNOTATION_SPEC.md. G1-G3 are complete without it. ---')
+    print('W9 --metal_features is RETIRED, superseded by W11 --ligand_nodes.')
+    print('')
+    for _ln in (
+        'G1-G4 are RETIRED WITH THE LEVER and are no longer run. They exercised the',
+        'ON path (metal_or_none with metal_features=True), which now raises by design',
+        'because the retirement is ENFORCED in metal_features.py, not just documented.',
+        '',
+        'They were also never trustworthy. G3 "slot arithmetic" built a synthetic',
+        'torch.cat from metal_start() and then asserted the block was recoverable at',
+        'metal_start() -- it checked the arithmetic against itself. gate_w9.py never',
+        'imported hydro_net or train_utils at all, so the suite printed',
+        '"W9 GATES PASSED. --metal_features is safe to enable" for a lever that had',
+        'no --metal_features flag in train.py, no splice site in train_utils.get_graph,',
+        'and no self.metal_start in PEM to read it back.',
+        '',
+        'G5 replaces them: it asserts against the REAL tree that no metal block is',
+        'assembled, that nothing reads one, that the retirement raises at every entry',
+        'point, and that the OFF path is byte-identical.',
+        ''):
+        print(_ln)
 
-    print('\n' + '=' * 62)
+    gate_g5()
+
+    if a.csv or a.tensors:
+        print('')
+        print('NOTE: --csv/--tensors ignored. metal_sites.csv and ANNOTATION_SPEC.md')
+        print('      never existed in this repo; W9 had no annotation pipeline.')
+
+    print('')
+    print('=' * 62)
     if _FAILURES:
-        print('W9 GATES FAILED (%d): %s' % (len(_FAILURES), _FAILURES))
+        print('W9 RETIREMENT GATES FAILED (%d): %s' % (len(_FAILURES), _FAILURES))
         return 1
-    print('W9 GATES PASSED. --metal_features is safe to enable '
-          '(and is inert without an annotation file).')
+    print('W9 RETIREMENT VERIFIED. The lever is inert and cannot be enabled.')
+    print('Use --ligand_nodes (W11) with --ligand_annotations instead; a metal is a')
+    print('ligand of class METAL. Score it on dG / b_p, NEVER on ddG -- a metal site')
+    print('is identical in WT and mutant and cancels exactly.')
     return 0
 
 

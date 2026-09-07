@@ -15,7 +15,6 @@ Usage:
     python scripts/autopilot.py --once --go     # a single pass, for cron
 """
 import argparse
-import io
 import json
 import os
 import re
@@ -174,110 +173,6 @@ def calib_diag(csv):
         if m:
             g[key] = float(m.group(1))
     return g if 'pooled' in g else None
-
-
-# ------------------------------------------------- D2 zero-variance guard
-# A lever whose driving feature has ZERO VARIANCE on the eval set cannot be measured
-# here. Scoring it anyway produces a null that looks like a real negative result --
-# a MANUFACTURED NEGATIVE. The 28 MegaScale test proteins are single-chain,
-# ligand-free and metal-free monomers (n_het_residues == 0 and n_metal_residues == 0
-# for all 28, verified), so --ligand_nodes (W11) is not merely inert on this set, it
-# is UNTESTABLE: its block is identically zero for every protein in both the folded
-# and the unfolded state, so the cell is byte-identical to baseline by construction.
-#
-# This is the same principle the MIN_EVAL_CSV_BYTES check enforces one screen down:
-# refuse entry, do not score a zero. A cell that cannot vary its input cannot inform
-# a main effect, and averaging it in dilutes every other cell on that axis.
-#
-# The rule is stated on the DRIVING FEATURE, not on the flag name, so a future lever
-# gets the same protection without editing this list.
-UNTESTABLE_MD = os.path.join(ROOT, 'results', 'UNTESTABLE.md')
-
-# lever -> (driving-feature columns, human description). A lever is testable on this
-# eval set only if at least one driving column is present AND varies across proteins.
-LEVER_DRIVERS = {
-    'ligand_nodes': (('n_het_residues', 'n_metal_residues'),
-                     'W11 bound-ligand / cofactor / ion hetero-nodes'),
-    'metal_features': (('n_metal_residues',),
-                       'W9 metal ions (RETIRED -- superseded by W11 --ligand_nodes)'),
-}
-
-
-def feature_variance(rows, columns):
-    """Max spread of any named driving column over the eval set.
-
-    Returns (variance, column_used, n_seen). variance is None when NO named column is
-    present at all -- absent is not the same as constant, and the two must not be
-    collapsed: a missing column means we cannot even ask the question.
-    """
-    best = None
-    for col in columns:
-        vals = [r[col] for r in rows if isinstance(r, dict) and r.get(col) is not None]
-        if not vals:
-            continue
-        try:
-            fv = [float(v) for v in vals]
-        except (TypeError, ValueError):
-            continue
-        spread = max(fv) - min(fv)
-        if best is None or spread > best[0]:
-            best = (spread, col, len(fv))
-    return best if best is not None else (None, None, 0)
-
-
-def lever_testable(lever, rows):
-    """(ok, reason). ok=False means: log 'untestable-here', REFUSE entry to the factorial.
-
-    Never returns a score. A refused lever is not a zero and not a negative result --
-    it is a measurement this eval set cannot make.
-    """
-    drivers, desc = LEVER_DRIVERS.get(lever, ((), lever))
-    if not drivers:
-        return True, 'no driving feature registered for %r; not guarded' % lever
-    if not rows:
-        return False, ('untestable-here: no eval rows to measure the variance of %s on'
-                       % (', '.join(drivers)))
-    var, col, n = feature_variance(rows, drivers)
-    if var is None:
-        return False, ('untestable-here: none of the driving columns %s is present in the '
-                       'eval set, so the variance of %s cannot be established. Absent is '
-                       'NOT constant -- refusing to score rather than assume.'
-                       % (', '.join(drivers), desc))
-    if var == 0:
-        return False, ('untestable-here: driving feature %r is CONSTANT across all %d eval '
-                       'proteins (spread 0). %s cannot vary its input on this set, so any '
-                       'result would be a manufactured negative, not evidence.'
-                       % (col, n, desc))
-    return True, 'testable: %r varies across %d eval proteins (spread %g)' % (col, n, var)
-
-
-def admit_lever(st, lever, rows, log_fn=log):
-    """D2 gate. True = the lever may enter the factorial; False = recorded untestable."""
-    ok, reason = lever_testable(lever, rows)
-    log_fn('D2 %s: %s' % (lever, reason))
-    if ok:
-        return True
-    entry = {'lever': lever, 'verdict': 'untestable-here', 'reason': reason,
-             'ts': time.strftime('%Y-%m-%dT%H:%MZ')}
-    rec = st.setdefault('untestable', [])
-    if not any(e.get('lever') == lever for e in rec):
-        rec.append(entry)
-        save_state(st)
-        try:
-            d = os.path.dirname(UNTESTABLE_MD)
-            if d and not os.path.isdir(d):
-                os.makedirs(d)
-            new = not os.path.exists(UNTESTABLE_MD)
-            with io.open(UNTESTABLE_MD, 'a', encoding='utf-8') as f:
-                if new:
-                    f.write(u'# Levers refused entry to the factorial\n\n'
-                            u'Not negative results. Each lever below has a driving feature '
-                            u'with zero variance on this eval set, so it cannot be measured '
-                            u'here at all. Scoring one would manufacture a negative.\n\n')
-                f.write(u'- **%s** (%s) -- %s\n' % (lever, entry['ts'], reason))
-        except (OSError, IOError) as e:
-            log_fn('D2 note: could not write %s (%s)' % (UNTESTABLE_MD, e))
-    return False
 
 
 # ---------------------------------------------------------------- factorial parsing

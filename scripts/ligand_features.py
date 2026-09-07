@@ -176,7 +176,16 @@ _REQUIRED_COLUMNS = ('protein', 'ligand_id', 'ligand_class', 'resi', 'distance')
 def to_model_units(angstrom):
     """Convert an Angstrom distance to the coordinate units get_graph actually sees.
 
-    ONE place does this conversion. See the DEFAULT_CUTOFF_ANGSTROM note.
+    *** NOT USED BY THE FEATURE PATH. VERIFIED 2026-09-07. ***
+    grep shows the only callers are gate_ligand.py's D.19 self-test. This is correct
+    and is NOT the U4 trap: W11 never measures a distance from the coordinate tensor.
+    Both sides of every comparison are ANGSTROM and come from the CSV --
+    `distance` (Angstrom) against `cutoff_angstrom` (Angstrom) in from_csv and in
+    block()'s proximity term -- so the 0.1x coordinate scaling never enters the
+    arithmetic and there is nothing to convert. Kept as the conversion point for a
+    future variable-N graph that would emit real ligand->residue edges in model
+    units from `contacts()`. Do not "wire it in" to the current path: multiplying
+    one side only would break a comparison that is presently self-consistent.
     """
     return float(angstrom) * NANO_TO_ANGSTROM
 
@@ -538,6 +547,11 @@ def ligand_or_none(x, mask, folded, cfg):
     """
     if not getattr(cfg, 'ligand_nodes', False):
         return None
+    # `mask` is accepted for signature parity with _solv_or_none and is deliberately
+    # NOT applied: a masked residue keeps whatever ligand annotation it carries. That
+    # is safe here because get_graph zeroes masked rows of D/Fb only, and the block is
+    # driven entirely by the annotation table, which is written against the stored
+    # tensor. Stated so it is not mistaken for an oversight.
     n_res = x.shape[0]
     return ligand_features(n_res, folded=folded, device=x.device, dtype=x.dtype)
 
@@ -611,5 +625,35 @@ def ligand_start(cfg):
     train_utils.get_graph and with hydro_net's self.lig_start, or the model reads the
     wrong columns WITHOUT crashing.
     """
-    return (48 + solv_dim_of(cfg) + desc_dim_of(cfg) + metal_dim_of(cfg)
-            + struct_quality_dim_of(cfg))
+    m = metal_dim_of(cfg)
+    q = struct_quality_dim_of(cfg)
+    if m or q:
+        # VERIFIED 2026-09-07 against this tree: train_utils.get_graph builds
+        #     _blocks = [D, Fb] (+ _S) (+ _Dsc) (+ _L) + [emb, _oh]
+        # and contains NO reference to metal_features or struct_quality at all
+        # (grep -n -i "metal\|struct_qual" train_utils.py -> no matches). So W9's and
+        # W8's widths are NOT present in the concatenation, and adding them here moves
+        # the ligand block off its real start at 48+solv+desc. Measured: with
+        # metal_features=True the graph width is unchanged at 1102, the block still
+        # lives at column 48, but this function returned 57 -- hydro_net would then
+        # slice ten columns of the ProtT5 embedding as "the ligand block" and the real
+        # block would be read as embedding. No crash, wrong columns: the project's
+        # signature failure.
+        #
+        # These flags do not exist in Megascale-fineTuning/train.py today, so the
+        # arithmetic is unreachable rather than wrong-in-flight. Refusing loudly here
+        # keeps it that way: whoever wires W9/W8 into get_graph must come back and
+        # update BOTH this function and hydro_net._sibling_block_dims, and must make
+        # gate_ligand gate E assert against real get_graph output instead of the
+        # torch.randn fixture that let this through.
+        raise RuntimeError(
+            "W11: ligand_start() was asked for an offset with metal_features=%r / "
+            "struct_quality=%r, but train_utils.get_graph does not concatenate a W9 "
+            "or W8 block, so those widths are not in the feature vector. Returning "
+            "48+solv+desc+%d would point the ligand slice at the ProtT5 embedding and "
+            "the model would read the wrong columns WITHOUT crashing.\n"
+            "Fix the block list in train_utils.get_graph (and hydro_net's "
+            "_sibling_block_dims) before enabling those levers alongside "
+            "--ligand_nodes." % (getattr(cfg, 'metal_features', False),
+                                 getattr(cfg, 'struct_quality', False), m + q))
+    return 48 + solv_dim_of(cfg) + desc_dim_of(cfg)

@@ -451,12 +451,36 @@ def gate_e():
     # Every combination of the sibling levers. The ligand block must land at
     # 48+solv+desc+metal+sq in ALL of them. A wrong offset does NOT crash -- it
     # silently feeds the wrong columns into fc1 -- which is exactly why this is gated.
+    #
+    # FIXED 2026-09-07. This loop used to run metal/sq over (False, True) and then
+    # build `parts` with torch.randn stand-ins for the W9 and W8 blocks. That layout
+    # IS A FICTION: train_utils.get_graph builds
+    #     _blocks = [D, Fb] (+ _S) (+ _Dsc) (+ _L) + [emb, _oh]
+    # and mentions neither metal_features nor struct_quality anywhere in the file.
+    # So the gate constructed a feature vector the training path cannot emit, and
+    # PASSED on it -- while the real graph width stayed 1102 with metal_features=True
+    # and the block stayed at column 48, against a ligand_start() of 57. That is the
+    # project's signature failure (runs, completes, reports a number, wrong columns).
+    # ligand_start() now REFUSES those combinations, so the gate asserts the refusal
+    # instead of asserting the fiction. Re-enable the combos here only when the W9/W8
+    # blocks are genuinely concatenated in get_graph.
     combos = []
     for burial in (False, True):
         for desc_k in (0, 16):
-            for metal in (False, True):
-                for sq in (False, True):
-                    combos.append((burial, desc_k, metal, sq))
+            combos.append((burial, desc_k, False, False))
+
+    for _m, _q in ((True, False), (False, True), (True, True)):
+        _cfg = _Cfg(ligand_nodes=True, burial_features=False,
+                    metal_features=_m, struct_quality=_q, emb_input_dim=E,
+                    aa_descriptors='none', aa_desc_dim=None)
+        try:
+            ligand_start(_cfg)
+            check('E ligand_start REFUSES unreachable W9/W8 layout '
+                  '(metal=%d,sq=%d)' % (_m, _q), False,
+                  'returned an offset instead of raising')
+        except RuntimeError:
+            check('E ligand_start REFUSES unreachable W9/W8 layout '
+                  '(metal=%d,sq=%d)' % (_m, _q), True)
 
     for burial, desc_k, metal, sq in combos:
         cfg = _Cfg(ligand_nodes=True, burial_features=burial,

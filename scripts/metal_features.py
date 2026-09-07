@@ -1,50 +1,42 @@
-"""W9 -- metal coordination features.
+"""RETIRED -- W9 metal features. SUPERSEDED BY W11 (--ligand_nodes).
 
-Standalone module. Import from train_utils.py; nothing here imports train_utils, so
-there is no cycle.
+DO NOT WIRE THIS UP. There is no --metal_features flag in Megascale-fineTuning/train.py
+and there must not be one. This module is kept only because gate_w9.py documents the
+block arithmetic that W11 reuses; nothing in the training path imports it.
 
-WHAT THIS IS
-------------
-A dative bond from a side chain to a metal ion is a real physical term in the folding
-free energy, and this model has no representation for it at all. This is NOT the same
-thing as interface buried surface area, which was dropped on measurement (corr -0.001
-over 100,246 structures). Buried surface between chains and a coordinate covalent bond
-to a Zn(II) are different physics; the BSA result says nothing about this one.
+WHY IT WAS RETIRED (not merely unused -- actively unsafe to enable)
+------------------------------------------------------------------
+1. NO ASSEMBLY PATH EXISTS. train_utils.get_graph builds its node features as
+       _blocks = [D, Fb] + [_S(W5)] + [_Dsc(W6)] + [_L(W11)] + [emb, _oh]
+   There is no metal block in that list, and `grep -c metal train_utils.py` == 0.
+   Setting CFG.metal_features would therefore concatenate ZERO metal columns.
 
-WHAT THIS IS NOT
-----------------
-This is a GENERALITY lever, not a benchmark lever. MegaScale is small soluble domains
-of 30-80 residues and most of them have no metal site. Expected per-protein PCC change
-on this benchmark is ~0.00. Do not sell it as accuracy. See REPORT.md section 1.
+2. BUT THE MODEL WOULD BELIEVE OTHERWISE, AND WOULD NOT CRASH. hydro_net's
+   _sibling_block_dims() adds METAL_DIM == 9 to the fc1 input width as soon as
+   cfg.metal_features is true, and ligand_features.ligand_start() shifts W11 by the
+   same 9. Measured with burial=True, ligand=True, metal=True:
 
-THE BLOCK, 9 dims
------------------
-    [0]    first-shell flag           1.0 if this residue coordinates any ion
-    [1:8]  metal identity one-hot     ZN, CA, MG, FE, MN, CU, OTHER
-    [8]    coordination number / 6    clipped to [0,1]
+       ligand_features.ligand_start(cfg) -> 60      (what the model reads)
+       actual position of the W11 block  -> 51      (what train_utils writes)
 
-It sits between the last existing new block and emb(1024), i.e. at index
-48 + solv_dim + desc_dim (48 = D(16) + Fb(32); W5 solvation then W6 descriptors come
-first). LEFT-anchored widths grow and the RIGHT-anchored indices (one_hot_index=-20,
-llm_index=-(emb_input_dim+20)) do not move. That is the slot discipline W5 established.
+   A nine-column offset error that raises nothing. The model would read the tail of
+   the ligand block plus part of the LLM embedding as if they were ligand features and
+   report a plausible number. That is precisely this project's SIGNATURE FAILURE:
+   code runs, completes, reports a number, feature never read.
 
-ZERO IN THE UNFOLDED STATE
---------------------------
-Non-negotiable, and it is the whole point. dG = E_unfolded - E_folded, so any column
-computed identically in both passes cancels EXACTLY and the feature cannot express
-anything. Defect U7 in this codebase was exactly that bug for burial. An unfolded chain
-has no coordination geometry -- the ion is not held -- so the block is legitimately zero
-there, and the folded-minus-unfolded difference IS the coordination term.
+3. W11 GENERALISES IT ANYWAY. A metal ion is one ligand class -- --ligand_nodes covers
+   ions inside its 6-class one-hot, is fully wired end to end, and has its own gates.
+   Two overlapping block insertions competing for the same slot range is exactly how
+   the offset bug above becomes reachable.
 
-DATA DEPENDENCY, AND WHY THE PLUMBING LOOKS ODD
------------------------------------------------
-get_graph(x, one_hot, emb, mask) receives no protein identity. The dataset dict carries
-'name', but the training loop never passes it down. Rather than change the signature of
-a function called from six places (train.py x6, train_utils.get_all_graphs x5), this
-module holds a module-level "current protein" that the training loop sets once per batch
--- the same call-time-CFG-read pattern the Flory and burial levers already use. If the
-current protein is unset, or is not in the annotation table, the block is all zeros,
-which is exactly the correct answer for a metal-free protein.
+4. IT IS ALSO UNTESTABLE ON THIS EVAL SET. All 28 MegaScale test proteins are
+   ligand-free and metal-free (n_metal_residues == 0 for all 28), so the driving
+   feature has zero variance. scripts/autopilot.py's D2 guard refuses such a lever
+   entry to the factorial and logs it 'untestable-here' rather than scoring a zero.
+
+If bound-ligand or metal effects are ever needed, use W11 --ligand_nodes with a proper
+ligand_sites.csv (results/LIGAND_SPEC.md) on a dataset that actually contains them.
+Retired 2026-09-07.
 """
 
 import os
@@ -252,7 +244,12 @@ _CURRENT_PROTEIN = None      # str or None
 
 
 def load_annotations(path):
-    """Load the table once, at startup. Call from train.py after parsing args."""
+    """RETIRED. Raises: there is no --metal_features flag to load a table for."""
+    raise RuntimeError(
+        "W9 --metal_features is RETIRED (superseded by W11 --ligand_nodes). "
+        "load_annotations() has no caller and no flag: there is no --metal_features "
+        "argument in Megascale-fineTuning/train.py. Use --ligand_nodes with "
+        "--ligand_annotations <ligand_sites.csv> instead.")
     global _ANNOTATIONS
     _ANNOTATIONS = MetalAnnotations.from_csv(path)
     return _ANNOTATIONS
@@ -325,6 +322,7 @@ def metal_or_none(x, mask, folded, cfg):
     """
     if not getattr(cfg, 'metal_features', False):
         return None
+    _w9_retired(cfg)          # RETIRED: raises. No assembly path exists.
     n_res = x.shape[0]
     return metal_features(n_res, folded=folded, device=x.device, dtype=x.dtype)
 
@@ -334,6 +332,7 @@ def metal_or_none(x, mask, folded, cfg):
 # ---------------------------------------------------------------------------
 
 def metal_dim(cfg):
+    _w9_retired(cfg)          # RETIRED: raises when the lever is requested.
     return METAL_DIM if getattr(cfg, 'metal_features', False) else 0
 
 
@@ -374,4 +373,20 @@ def metal_start(cfg):
     with the _blocks order in train_utils.get_graph and with hydro_net's
     self.metal_start, or the model reads the wrong columns WITHOUT crashing.
     """
+    _w9_retired(cfg)          # RETIRED: raises when the lever is requested.
     return 48 + solv_dim_of(cfg) + desc_dim_of(cfg)
+
+
+# ---------------------------------------------------------------------------
+# RETIREMENT TRIPWIRE. W9 has no assembly path in train_utils.get_graph, so a truthy
+# cfg.metal_features widens fc1 and shifts W11 by 9 columns WITHOUT raising. Anything
+# that turns this lever on is a bug; fail loudly at the first read instead of training
+# a silently mis-indexed model.
+def _w9_retired(cfg):
+    if getattr(cfg, 'metal_features', False):
+        raise RuntimeError(
+            "W9 --metal_features is RETIRED (superseded by W11 --ligand_nodes) and has "
+            "NO feature-assembly path: train_utils.get_graph never concatenates a metal "
+            "block, but enabling it adds METAL_DIM=9 to the fc1 width and shifts the W11 "
+            "ligand block by 9 columns -- a silent wrong-column read, not a crash. "
+            "Use --ligand_nodes with a ligand_sites.csv instead. See the module docstring.")

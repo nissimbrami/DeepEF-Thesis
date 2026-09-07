@@ -30,6 +30,10 @@ ap.add_argument('--device', default='cpu')
 ap.add_argument('--tensor_root', default='./data/Processed_K50_dG_datasets/training_data')
 ap.add_argument('--tm_path', default='./data/ThermoMPNN/mega_test.csv')
 ap.add_argument('--part', default='all')
+ap.add_argument('--coord_scale', type=float, default=1.0,
+                help='multiply loaded coords by this BEFORE any graph call. 1.0 = raw Angstrom '
+                     '(what w0_dg.py did). 0.1 = what train.normalize_batch actually feeds the '
+                     'model during training.')
 A = ap.parse_args()
 dev = torch.device(A.device)
 
@@ -53,7 +57,7 @@ with torch.no_grad():
     for name in proteins:
         d = os.path.join(A.tensor_root, name)
         try:
-            coords = tload(os.path.join(d, 'coords_tensor.pt')).to(dev).squeeze()
+            coords = tload(os.path.join(d, 'coords_tensor.pt')).to(dev).squeeze() * A.coord_scale
             dg = tload(os.path.join(d, 'deltaG.pt'))
             mask = tload(os.path.join(d, 'mask_tensor.pt')).to(dev).squeeze()
             oh = tload(os.path.join(d, 'one_hot_encodings.pt'))
@@ -77,7 +81,7 @@ if len(DATA) < 20:
     sys.exit(1)
 print('fitted b (model units): mean %.4f sd %.4f -> Angstrom mean %.3f'
       % (np.mean([d['b_fit'] for d in DATA]), np.std([d['b_fit'] for d in DATA]),
-         np.mean([d['b_fit'] for d in DATA]) / TU._COIL_COORD_SCALE))
+         np.mean([d['b_fit'] for d in DATA]) / A.coord_scale))
 
 TRUE = np.array([d['true'] for d in DATA])
 
@@ -104,7 +108,7 @@ def reset():
     CFG.coil_channels = 'broadcast'
     CFG.unfolded_emb = 'full'
     CFG.flory_nu = 0.5
-    TU._COIL_B_FIXED = TU._COIL_B_FIXED_ANGSTROM * TU._COIL_COORD_SCALE
+    TU._COIL_B_FIXED = TU._COIL_B_FIXED_ANGSTROM * A.coord_scale
 
 
 def mk_base():
@@ -130,7 +134,7 @@ def mk_fixed(nu, b_ang, chan='broadcast'):
         CFG.flory_nu = nu
         CFG.coil_b = 'fixed'
         CFG.coil_channels = chan
-        TU._COIL_B_FIXED = b_ang * TU._COIL_COORD_SCALE
+        TU._COIL_B_FIXED = b_ang * A.coord_scale
     return f
 
 
@@ -176,7 +180,8 @@ json.dump(dict(checkpoint=A.ckpt, n=len(DATA),
                true=[d['true'] for d in DATA],
                b_fit_model_units=[d['b_fit'] for d in DATA],
                lengths=[d['L'] for d in DATA],
-               coord_scale=TU._COIL_COORD_SCALE,
+               coord_scale=A.coord_scale,
+               coil_coord_scale_const=TU._COIL_COORD_SCALE,
                gaussian_coef=CFG.gaussian_coef,
                results=RES), open(A.out, 'w'), indent=1)
 print('WROTE %s  (%d cells, %.1fs)' % (A.out, len(RES), time.time() - t0))

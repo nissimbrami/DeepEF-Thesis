@@ -845,6 +845,7 @@ class Trainer():
         val_dg = torch.tensor([],device=self.device)
         val_dg_pred = torch.tensor([],device=self.device)
         ddg_exp_all, ddg_pred_all, perprot_pcc = [], [], []   # benchmark ddG metric
+        perprot_ap, perprot_sratio = [], []   # a_p and std(pred)/std(true), per protein
         with torch.no_grad():
             for i, batch in enumerate(tqdm(self.val_ds,desc=f'Validation Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
@@ -891,7 +892,12 @@ class Trainer():
         wandb_log({f'{prefix}_loss': val_loss, 'epoch': epoch, f'{prefix}_pc_corr': pc_corr,
                    f'{prefix}_ddg_pcc': ddg_pcc, f'{prefix}_ddg_pcc_pp': ddg_pcc_pp,
                    f'{prefix}_ddg_rmse': ddg_rmse}, run)
-        print(f'  ddG PCC={ddg_pcc:.3f}  ddG PCC-PP={ddg_pcc_pp:.3f}  ddG RMSE={ddg_rmse:.3f}')
+        ap_med = float(sorted(perprot_ap)[len(perprot_ap)//2]) if perprot_ap else float('nan')
+        sr_med = float(sorted(perprot_sratio)[len(perprot_sratio)//2]) if perprot_sratio else float('nan')
+        wandb_log({f'{prefix}_ap_median': ap_med, f'{prefix}_sratio_median': sr_med,
+                   'epoch': epoch}, run)
+        print(f'  ddG PCC={ddg_pcc:.3f}  ddG PCC-PP={ddg_pcc_pp:.3f}  ddG RMSE={ddg_rmse:.3f}'
+              f'  a_p median={ap_med:.4f}  std_ratio median={sr_med:.4f}')
         if LOSS_MODE == 'ddg_head':
             pc_corr = torch.tensor(ddg_pcc)   # scheduler + epoch-selection on ddG (no dG predicted)
         return pc_corr, val_loss

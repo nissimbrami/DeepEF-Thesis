@@ -16,6 +16,8 @@ op = os.path.join(R, 'offset_corrector_outliers.json')
 outl = json.load(open(op)) if os.path.exists(op) else None
 fap = os.path.join(R, 'offset_corrector_fixedalpha.json')
 fixa = json.load(open(fap)) if os.path.exists(fap) else None
+odp = os.path.join(R, 'offset_corrector_outlier_diag.json')
+odiag = json.load(open(odp)) if os.path.exists(odp) else None
 if os.path.exists(pp):
     perm = json.load(open(pp))
 if os.path.exists(sp):
@@ -153,6 +155,37 @@ if outl:
       'held-out R^2 reports. **The oracle gain is the outliers.**')
     A('')
 
+A('### The outliers are not structural outliers -- and one is not an offset at all')
+A('')
+if odiag:
+    A('Checked directly: neither dominant protein is an outlier in feature space. The '
+      'largest absolute z-score across all %d features is only %+.2f for `2K5H` (`%s`) and '
+      '%+.2f for `2KVS` (`%s`). Both sit inside the structural distribution, so there is no '
+      'structural signature for a regression to latch onto. That is the mechanism behind '
+      'the negative R^2, not a modelling mistake.'
+      % (main['protocol']['n_features'],
+         odiag['2K5H']['top_z'][0][1], odiag['2K5H']['top_z'][0][0],
+         odiag['2KVS']['top_z'][0][1], odiag['2KVS']['top_z'][0][0]))
+A('')
+if odiag:
+    A('More importantly, `2KVS` is not really a "calibration offset" case at all: its slope '
+      'is a_p = %.3f against a median of %.4f, and its per-protein PCC is %.3f against a '
+      'median of %.2f. The model essentially fails on that protein outright; the large '
+      'fitted b_p is absorbing that failure. Subtracting an offset is the wrong repair for '
+      'it, and no offset predictor -- however good -- would be the right fix. (`2K5H` is '
+      'the opposite case: a_p = %.3f and PCC = %.3f, a genuinely well-ranked protein '
+      'carrying a real offset.)'
+      % (odiag['2KVS']['a_p'], odiag['medians']['a_p'], odiag['2KVS']['pcc'],
+         odiag['medians']['pcc'], odiag['2K5H']['a_p'], odiag['2K5H']['pcc']))
+A('')
+if odiag:
+    _v = odiag['n_vs_abs_bp']
+    A('|b_p| is also mildly related to the number of mutations measured per protein '
+      '(r = %.3f, p = %.3f, n = %d), so part of the spread is estimation noise in b_p '
+      'itself rather than a physical property waiting to be predicted.'
+      % (_v['pearson_r'], _v['p'], _v['n']))
+A('')
+
 A('### The small positive gain is an artefact of the alpha search, not skill')
 A('')
 A('The main table selects the ridge penalty by an inner leave-one-out on each training '
@@ -181,7 +214,9 @@ if perm:
     A('Shuffling the b_p labels against the feature rows destroys any true feature->b_p '
       'mapping while preserving the b_p distribution and the entire LOPO machinery. '
       'Real model and null both use a fixed alpha=30 so the comparison is exactly matched. '
-      '200 permutations per CSV.')
+      '%d permutations per CSV. (The LOPO ridge here is a closed-form solve verified '
+      'identical to the sklearn path to 2.5e-16.)'
+      % list(perm.values())[0]['n_perm'])
     A('')
     A('| eval CSV | d(ridge-raw) | null mean d | null 95th pct | p |')
     A('|---|---|---|---|---|')

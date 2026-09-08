@@ -1,4 +1,12 @@
 # CONTEXT.md — resume file for the DeepEF cluster run
+> **CANONICAL BASIS (P8).** Every headline number in this document is computed on:
+> **27 test proteins (2K5H excluded) | ddG metric | the 9 original-population eval CSVs |
+> the val-selected epoch only.** That basis is `pooled 0.5772 / oracle 0.7156 / gain +0.1384`.
+> Membership, exclusions and provenance: `results/05_infrastructure/HEADLINE_BASIS.md`.
+> Enforced by `scripts/gate_headline.py`. **Never average across runs that differ in factor D**
+> (`--unfolded_emb zero`) — D0 and D1 are different models; report them separately, always.
+
+
 Written 2026-09-05 by the cluster agent. READ THIS FIRST after any context loss,
 together with cluster_run/docs/RUNBOOK.md and cluster_run/docs/STATE.md.
 
@@ -2213,16 +2221,22 @@ directory instead:
 
 `scripts/fix_2k5h.py` does this reproducibly (`--check` / `--apply`).
 
-## THE CORRECTED HEADLINE — 22 eval CSVs
+## THE HEADLINE — canonical basis (P8)
 
 Because the fix shifts 2K5H's ddG by a CONSTANT, its effect applies exactly to existing predictions.
 
-| | pooled | oracle | gain |
+| basis | pooled | oracle | gain |
 |---|---|---|---|
-| with the bug | 0.5018 | **0.7391** | **+0.2373** |
-| **corrected** | 0.4899 | **0.6443** | **+0.1544** |
+| **CANONICAL — 9 original-population CSVs, 27 proteins** | **0.5772** | **0.7156** | **+0.1384** |
+| *retired* † — 22 mixed CSVs incl. D1 arms | *0.4899* | *0.6443* | *+0.1544* |
+| *retired* † — 22 mixed CSVs, with the 2K5H bug | *0.5018* | *0.7391* | *+0.2373* |
 
-**The bug inflated the offset-removal gain by 35%** (+0.2373 -> +0.1544) and the oracle by 0.095.
+**† quoted as published; NOT re-derivable** — the 22-CSV population was never recorded and does not
+reproduce today (nearest reconstruction: 0.4252). See `results/05_infrastructure/HEADLINE_BASIS.md`.
+
+**Only the canonical row is quotable.** The 2K5H bug inflated the offset-removal gain by 35%
+(retired figures: +0.2373 -> +0.1544) and the oracle by 0.095 — but both of those were also
+averaged over the wrong population, which is the separate and larger defect that P8 fixes.
 
 A constant per-protein label shift IS a per-protein offset by construction, so the oracle was
 partly rediscovering an offset we had introduced.

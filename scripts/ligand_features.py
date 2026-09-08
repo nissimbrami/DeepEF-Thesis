@@ -617,6 +617,17 @@ def struct_quality_dim_of(cfg):
         return 3
 
 
+def _sc_dim_of(cfg):
+    """W12 side-chain block width (4 when on), via the module that owns it."""
+    if not getattr(cfg, 'sidechain_features', False):
+        return 0
+    try:
+        from sidechain_features import sidechain_dim
+        return sidechain_dim(cfg)
+    except Exception:                                        # noqa: BLE001
+        return 4
+
+
 def ligand_start(cfg):
     """Where the ligand block starts.
 
@@ -656,4 +667,7 @@ def ligand_start(cfg):
             "_sibling_block_dims) before enabling those levers alongside "
             "--ligand_nodes." % (getattr(cfg, 'metal_features', False),
                                  getattr(cfg, 'struct_quality', False), m + q))
-    return 48 + solv_dim_of(cfg) + desc_dim_of(cfg)
+    # W12: the side-chain block IS assembled by train_utils.get_graph, between W6
+    # and this block, so its width really is in the feature vector and must be
+    # added here. (Contrast W9/W8 above, which are NOT assembled and so refuse.)
+    return 48 + solv_dim_of(cfg) + desc_dim_of(cfg) + _sc_dim_of(cfg)

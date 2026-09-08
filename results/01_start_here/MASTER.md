@@ -2,6 +2,14 @@
 ### M.Sc. thesis · Nissim Brami · supervised by Prof. Chen Keasar · Ben-Gurion University
 ### Complete state as of 2026-09-08. Written to survive a full context wipe.
 
+> **CANONICAL BASIS (P8).** Every headline number in this document is computed on:
+> **27 test proteins (2K5H excluded) | ddG metric | the 9 original-population eval CSVs |
+> the val-selected epoch only.** That basis is `pooled 0.5772 / oracle 0.7156 / gain +0.1384`.
+> Membership, exclusions and provenance: `results/05_infrastructure/HEADLINE_BASIS.md`.
+> Enforced by `scripts/gate_headline.py`. **Never average across runs that differ in factor D**
+> (`--unfolded_emb zero`) — D0 and D1 are different models; report them separately, always.
+
+
 > **How to read every number here.** Three qualifiers, always: *pooled-or-per-protein* /
 > *dG-or-ddG* / *which split*. A number without its basis is not a measurement — that mistake was
 > made in this project and is corrected in §1.4.
@@ -76,7 +84,10 @@ population is not a measurement — it is an artifact of which runs happened to 
 
     pooled 0.5772   oracle 0.7156   gain +0.1384
 
-Three different populations gave 0.4899, 0.5646 and 0.5772. **Pick one basis and state it.**
+Three different populations gave 0.4899 (22 mixed CSVs, D1 arms included), 0.5646 (20 non-D1
+checkpoints, three lanes) and 0.5772. **The last is canonical; the first two are retired.**
+The basis is now declared and machine-enforced: `results/05_infrastructure/HEADLINE_BASIS.md`
+and `scripts/gate_headline.py`.
 
 ## 1.5 The affine oracle (0.77–0.81) is NOT reproducible
 

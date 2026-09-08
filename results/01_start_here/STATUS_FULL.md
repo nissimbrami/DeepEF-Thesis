@@ -1,6 +1,14 @@
 # DeepEF — WHERE WE STAND
 ### 2026-09-08. Every number measured from the eval CSVs, 27 proteins (2K5H dropped), ddG metric.
 
+> **CANONICAL BASIS (P8).** Every headline number in this document is computed on:
+> **27 test proteins (2K5H excluded) | ddG metric | the 9 original-population eval CSVs |
+> the val-selected epoch only.** That basis is `pooled 0.5772 / oracle 0.7156 / gain +0.1384`.
+> Membership, exclusions and provenance: `results/05_infrastructure/HEADLINE_BASIS.md`.
+> Enforced by `scripts/gate_headline.py`. **Never average across runs that differ in factor D**
+> (`--unfolded_emb zero`) — D0 and D1 are different models; report them separately, always.
+
+
 ---
 
 # PART A — THE SCORE WE REACHED
@@ -22,16 +30,25 @@
 
 **Best a_p = 0.740** (`gld_slope1.0_s42_e13`), against a control of 0.496.
 
-## A.2 The headline, on ONE stated basis
+## A.2 The headline, on the ONE canonical basis
 
-Averaged over the 9 original-population eval CSVs, dropping 2K5H:
+Canonical basis: **27 proteins (2K5H excluded), ddG, the 9 original-population eval CSVs,
+val-selected epoch only.**
 
-    pooled 0.5772   oracle 0.7156   gain +0.1384
+    pooled 0.5772 ± 0.0316   oracle 0.7156 ± 0.0474   gain +0.1384      (n = 9 runs)
 
-**Correction to the record:** the figure I published earlier (0.4899 / 0.6443 / +0.1544) was averaged
-over **22 mixed CSVs** that included D1 arms scoring as low as −0.08. That is not a headline, it is
-an artifact of which runs happened to be scored that day. **A correlation averaged across a mixed
-population is not a measurement.** The number above states its basis; the old one did not.
+The nine: `calib_ctrl_repro2_e14`, `sigma_seed{1,2,3,4,42}`, `anchor_w{0.3,1.0,3.0}_s42`.
+Full membership and the exclusion argument: `results/05_infrastructure/HEADLINE_BASIS.md`;
+recomputed and enforced by `scripts/gate_headline.py`.
+
+**Correction to the record.** This number was already correct — what was missing is *which nine
+CSVs produced it*, which let two other averages stand beside it as apparent equals. Both are now
+retired: 0.4899 / 0.6443 / +0.1544 (22 mixed CSVs, including D1 arms scoring as low as −0.074) and
+0.5646 / 0.6347 / +0.0702 (20 non-D1 checkpoints spanning three lanes). Both are quoted as
+published and **neither can be re-derived** — those populations were never recorded, and the
+nearest reconstruction of the 22 gives 0.4252, not 0.4899. They are retired not because they were
+shown to be wrong but because they can no longer be shown to be anything. **A correlation averaged across a mixed population is not a
+measurement.**
 
 ## A.3 What actually moved the score
 

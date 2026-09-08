@@ -48,3 +48,15 @@ else
   echo "  autopilot DEAD <-- resubmit: sbatch --partition=cpu --qos normal --time 7-00:00:00 --wrap 'bash /home/nissimb/auto/run_autopilot.sh'"
 fi
 tail -1 ~/auto/autopilot.log 2>/dev/null | sed 's/^/  /'
+echo
+echo "=== 5. GATES ==="
+# P0 epoch-selection audit: every run must have exactly ONE scored test epoch, except the
+# trajectory runs allowlisted in results/trajectory_runs.txt with their canonical (val-selected)
+# epoch on record. A FAIL here means a number somewhere may be a best-of-N test pick.
+python scripts/gate_epoch_selection.py || echo "  ^^ P0 GATE FAILED -- see results/05_infrastructure/EPOCH_AUDIT.md"
+# P8 canonical-basis audit: the headline is 27 proteins / ddG / the 9 original-population eval
+# CSVs / val-selected epoch = pooled 0.5772, oracle 0.7156, gain +0.1384. A FAIL here means a
+# document quotes a figure from a retired population. Basis: results/05_infrastructure/HEADLINE_BASIS.md
+python scripts/gate_headline.py >/dev/null 2>&1 \
+  && echo "  P8 headline basis OK (pooled 0.5772 / oracle 0.7156 / gain +0.1384, n=9)" \
+  || echo "  ^^ P8 GATE FAILED -- run: python scripts/gate_headline.py"

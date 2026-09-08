@@ -2,6 +2,14 @@
 ### M.Sc. thesis, Nissim Brami, supervised by Prof. Chen Keasar, BGU
 ### State as of 2026-09-08. Every number computed or re-derived by the main session.
 
+> **CANONICAL BASIS (P8).** Every headline number in this document is computed on:
+> **27 test proteins (2K5H excluded) | ddG metric | the 9 original-population eval CSVs |
+> the val-selected epoch only.** That basis is `pooled 0.5772 / oracle 0.7156 / gain +0.1384`.
+> Membership, exclusions and provenance: `results/05_infrastructure/HEADLINE_BASIS.md`.
+> Enforced by `scripts/gate_headline.py`. **Never average across runs that differ in factor D**
+> (`--unfolded_emb zero`) — D0 and D1 are different models; report them separately, always.
+
+
 **Reading rule — three qualifiers on every number: pooled-or-per-protein / dG-or-ddG / which split.**
 Agent-reported figures that did not reproduce are listed in §14 rather than quietly dropped.
 
@@ -38,17 +46,34 @@ Per protein, the prediction is an affine function of the truth:
 **The model ranks well within a protein and is miscalibrated between proteins.** The gap between
 0.798 and 0.59 is the entire thesis.
 
-## 1.3 The corrected headline
+## 1.3 The headline, on the canonical basis
 
 Removing each protein's own offset (an oracle, see the caveat) lifts pooled ddG PCC:
 
-| | pooled | offset-removal oracle | gain |
+| basis | pooled | offset-removal oracle | gain |
 |---|---|---|---|
-| **corrected, 22 eval CSVs** | **0.4899** | **0.6443** | **+0.1544** |
-| previously reported | 0.5018 | 0.7391 | +0.2373 |
+| **CANONICAL — 9 original-population CSVs, 27 proteins** | **0.5772** | **0.7156** | **+0.1384** |
+| *retired* † — 22 mixed CSVs incl. D1 arms | *0.4899* | *0.6443* | *+0.1544* |
+| *retired* † — 20 non-D1 checkpoints, three lanes | *0.5646* | *0.6347* | *+0.0702* |
+| *retired* † — with the 2K5H reference bug | *0.5018* | *0.7391* | *+0.2373* |
 
-**The oracle is 0.644 — NOT 0.739, and NOT the older 0.70-0.72 figure.** The effect is real and
-substantial; its size was inflated 35% by the 2K5H data bug (§12.1).
+Per-run spread on the canonical basis: pooled 0.5772 ± 0.0316, oracle 0.7156 ± 0.0474 (n=9 runs).
+The canonical row is recomputed from the nine CSVs by `scripts/gate_headline.py`.
+
+**† The retired rows are quoted as originally published and could NOT be re-derived.** The
+populations that produced them were never written down, and do not reproduce from the current
+`eval_results/`: the nearest reconstruction of the "22 mixed CSVs" gives 0.4252, not 0.4899. They
+are retired not because they were shown to be wrong, but because they can no longer be shown to be
+anything — which is the defect P8 exists to prevent. See
+`results/05_infrastructure/HEADLINE_BASIS.md` §4.1.
+
+**Only the first row is quotable.** The two retired averages are not wrong arithmetic — they are
+the wrong *population*. The 22-CSV average included D1 (`--unfolded_emb zero`) arms scoring as low
+as −0.074 pooled; averaging a correlation across a mixed population is not a measurement of
+anything. The 20-checkpoint average spanned three different lanes and levers.
+
+**The oracle is an oracle.** Its size was separately inflated 35% by the 2K5H data bug (§12.1),
+which is why the bugged row is also retired.
 
 **THE ORACLE IS AN ORACLE.** It subtracts a constant fitted on TEST labels. It licenses exactly one
 claim — *the ranking information is present, what is lost is calibration* — and nothing stronger.

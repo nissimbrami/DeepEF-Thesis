@@ -357,6 +357,18 @@ def _ligand_block_dim(cfg):
             'imported. Refusing to run with a silently-zero-width block.')
 
 
+def _sidechain_block_dim(cfg):
+    """W12 side-chain block width: 4 when --sidechain_features, else 0.
+
+    Delegates to scripts/sidechain_features.sidechain_dim so the width has ONE
+    authority -- the same discipline W6's descriptor K follows.
+    """
+    if not getattr(cfg, 'sidechain_features', False):
+        return 0
+    from sidechain_features import sidechain_dim
+    return sidechain_dim(cfg)
+
+
 def _sibling_block_dims(cfg):
     """Width of the OTHER optional blocks that sit between W6 and W11: W9 then W8.
 
@@ -384,6 +396,11 @@ def _sibling_block_dims(cfg):
             total += STRUCT_QUALITY_DIM
         except Exception:                                    # noqa: BLE001
             total += 3
+    # W12 IS wired: train_utils.get_graph concatenates the 4-column side-chain block
+    # between W6 and W11, so unlike the RETIRED W9 its width is genuinely present in
+    # the feature vector and MUST be counted here -- otherwise --ligand_nodes would
+    # slice four columns early and read the wrong data WITHOUT crashing.
+    total += _sidechain_block_dim(cfg)
     return total
 
 
@@ -460,15 +477,22 @@ class PEM(torch.nn.Module):
         # W9 metal and W8 confidence -- see ligand_features.ligand_start, which is the
         # ONE authority for this arithmetic; a mismatch here would silently feed the
         # wrong columns into fc1 and never crash.
+        # W12: the side-chain chemistry block sits immediately after the W6 descriptor
+        # block, at 48 + solv_dim + desc_dim, and BEFORE the W11 ligand block. Its width
+        # is counted by _sibling_block_dims so lig_start moves with it; without that the
+        # ligand slice would start 4 columns early and read them without crashing.
+        self.sc_dim = _sidechain_block_dim(CFG)
+        self.sc_start = self.desc_start + self.desc_dim
+        _cd = self.sc_dim
         self.lig_dim = _ligand_block_dim(CFG)
         self.lig_start = self.desc_start + self.desc_dim + _sibling_block_dims(CFG)
         _ld = self.lig_dim
         # ONLY fc1_* grow. fc2_* project back to FIXED internal widths, so inst_norm1,
         # inst_norm2 and fc_in_dim must NOT change -- widening them was a real bug.
-        self.fc1_gcn = nn.Linear(52 + _sd + _dd + _ld + proj_extra, 64) # 52 = 32(dist) + 20(one-hot) [+ solv] [+ desc] [+ lig] [+ proj_extra]
+        self.fc1_gcn = nn.Linear(52 + _sd + _dd + _cd + _ld + proj_extra, 64) # 52 = 32(dist) + 20(one-hot) [+ solv] [+ desc] [+ sidechain] [+ lig] [+ proj_extra]
         self.fc2_gcn = nn.Linear(64, gcn_dim_in)
         # Fully connected layers - GAT
-        self.fc1_gat = nn.Linear(36 + _sd + _dd + _ld + proj_extra, 64) # 36 = 16(dist) + 20(one-hot) [+ solv] [+ desc] [+ lig] [+ proj_extra]
+        self.fc1_gat = nn.Linear(36 + _sd + _dd + _cd + _ld + proj_extra, 64) # 36 = 16(dist) + 20(one-hot) [+ solv] [+ desc] [+ sidechain] [+ lig] [+ proj_extra]
         self.fc2_gat = nn.Linear(64, gat_dim_in)
         # normalization layers
         self.inst_norm1 = Normalization_layer(36 + proj_extra, affine=True)
@@ -544,6 +568,11 @@ class PEM(torch.nn.Module):
         # W11: the ligand block is LAST among the new blocks, matching the _blocks order
         # in train_utils.get_graph. Appended here, never spliced in earlier, so W5/W6
         # keep reading exactly the columns they read before this lever existed.
+        # W12: after W6 desc and before W11 lig, matching the _blocks order in
+        # train_utils.get_graph. NOTE the GCN branch's distance half is x[:, :32], so
+        # this block reaches both branches ONLY through _extra.
+        if getattr(self, 'sc_dim', 0):
+            _extra.append(x[:, self.sc_start:self.sc_start + self.sc_dim])
         if getattr(self, 'lig_dim', 0):
             _extra.append(x[:, self.lig_start:self.lig_start + self.lig_dim])
         if _extra:
@@ -606,7 +635,7 @@ class PEM(torch.nn.Module):
     def forward_gat(self, x, edge_index_gat, B, N, edge_attr=None):
         """forward function for the graph model"""
         if (getattr(self, 'solv_dim', 0) or getattr(self, 'desc_dim', 0)
-                or getattr(self, 'lig_dim', 0)):
+                or getattr(self, 'sc_dim', 0) or getattr(self, 'lig_dim', 0)):
             # W5 + W6: the input is wider than fc2_gat's fixed output, so the residual
             # must be taken AFTER the projection or h1 + identity is a shape error.
             # W6 extends this same branch rather than adding a second one: the real
@@ -813,6 +842,8 @@ class PEMGraphTransformer(torch.nn.Module):
             _blocked.append('--struct_quality (W8)')
         if getattr(CFG, 'ligand_nodes', False):
             _blocked.append('--ligand_nodes (W11, 10 cols)')
+        if getattr(CFG, 'sidechain_features', False):
+            _blocked.append('--sidechain_features (W12, 4 cols)')
         if _blocked:
             raise ValueError(
                 "model_arch='graph_transformer' CANNOT read inserted feature blocks, but "

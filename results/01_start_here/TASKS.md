@@ -107,3 +107,19 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       k=1 HURTS (-0.044): noise/signal = 0.6801/0.4615 = 1.47, break-even k=2.2, so never use k<3.
       Leakage blocked by disjoint index sets. MUST be reported as FEW-SHOT, not zero-shot.
       -> results/02_findings/W13_MEASURED_OFFSET.md
+
+- [x] CATALOGUE RE-CHECK **— MY EARLIER CLAIM WAS WRONG.** I recorded "ligands/complexes have zero
+      variance" from an agent report without verifying. The 100k catalogue actually holds
+      67,856 complexes vs 31,852 monomers (100% coverage of Is Complex?/Oligomeric State).
+      BUT the decisive fact is different: **0 of our 28 test proteins AND 0 of 247 PDB-like
+      training proteins appear in the catalogue at all.** Catalogue median length 477aa, p5=94;
+      our proteins are 42-72aa, below its 5th percentile. Ligands_x and BSA_Percentage are
+      populated in only 4 and 5 rows of 100,246 - genuinely empty columns.
+      -> results/04_data_integrity/CATALOGUE_RECHECK.md
+- [ ] K21 **PLANNED IN FULL** (not yet built). Attach at train_utils.py:379, FOLDED ONLY, before
+      D.sum(dim=1) at 381. Correction: my earlier "line 607" was wrong - that is inside
+      _coil_expand_channels. Adds a LOSS not columns, so width stays 1092.
+      -> results/03_levers/K21_DISTOGRAM_PLAN.md
+- [ ] ANNOTATE OUR 21 PDB PROTEINS DIRECTLY from the PDB (oligomeric state, HETATM, interface
+      area). Bounded job, 21 structures. This is the only honest route to testing the
+      ligand/complex ideas and it has never been attempted.

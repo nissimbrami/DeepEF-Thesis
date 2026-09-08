@@ -9,15 +9,14 @@
 > (`--unfolded_emb zero`) — D0 and D1 are different models; report them separately, always.
 
 
-- [ ] P0a REQUOTE gld_slope1.0_s42 AT ITS CANONICAL EPOCH e10, NOT e13/e14.
-          The epoch audit found `a_p = 0.740` (MASTER.md:59, STATUS_FULL.md:23/40/97,
-          MASTER.md:685) is the MAXIMUM over six scored TEST epochs -- test-set peeking.
-          The val argmax is e10 (val PCC 0.740; e14 is 0.722, 8th of 15).
-          Also fix MASTER.md:141 / CONTEXT.md:2696, which quote e14 on the 28-protein
-          basis rather than the canonical 27. Full detail + line list:
-          `results/05_infrastructure/EPOCH_AUDIT.md`. Gate: scripts/gate_epoch_selection.py.
-- [ ] P0b Correct OPEN_PROBLEMS.md P0 step 3: it asserts canonical e14 for BOTH trajectory
-          runs. True for gld_dg_coil_s42, WRONG for gld_slope1.0_s42 (e10).
+- [x] P0a **DONE — the headline a_p was PEEKED.** Canonical epoch e10 gives a_p 0.782, not the
+      0.857 quoted from e13 (best of 7 TEST-scored epochs). Correction: 0.496 -> 0.782, not 0.857.
+      NEW: s crosses 1.0 between e4 and e8, so the arm OVERSHOOTS calibration and a_p rising past
+      s=1 is a defect reported as a gain. Read the 3 running seeds on s, not a_p.
+      -> results/02_findings/SLOPE_CANONICAL.md
+- [x] P0b **DONE.** OPEN_PROBLEMS.md P0 step 3 claimed canonical e14 for BOTH trajectory runs.
+      Verified from the val logs: gld_slope1.0_s42 -> e10 (argmax 0.740, tied at e12, first-max
+      wins; e14 is 8th-best at 0.722) and gld_dg_coil_s42 -> e14 (0.769, unique). Text corrected.
 - [ ] P0c Rescore loroW_onehot_s42 and p3_a1_d1_s0_D1_uemb_seed42 at e14 (both were scored
           at e12, not their val argmax; both near-zero arms, error runs against them).
           Detector: scripts/audit_epoch_provenance.py.
@@ -29,8 +28,8 @@
           by much, because ProtT5 already predicts held-out-residue hydropathy at R^2 0.704.
 - [ ] K10 Decide on the D1 half of the factorial: D0 coil scores 0.58-0.62, D1 uemb -0.08 to 0.31,
           no overlap, a_p 0.37-0.72 vs 0.005-0.020. ~190 GPU-h would confirm a visible negative.
-- [ ] K11 26,315 double mutants for our 28 sit in NO split. Held-out generalisation test needing
-          no new labels. Untouched.
+- [x] K11 **CANCELLED — same refuted claim as K22.** See CHECKPOINT 25: the 2,356 2-point
+      rows are all 2K5H single mutations on the _G11S/_G23A backgrounds, not double mutants.
 - [ ] K15 results/FINDINGS.md — the single thesis-facing document, updated with corrected numbers.
 - [ ] K16 CONTEXT.md checkpoint + push after every batch (running continuously).
 
@@ -95,7 +94,16 @@ K6 looked like a 31% improvement and was the model predicting nothing.
 - [ ] K21 T-E2 distogram head, **FOLDED state only**. Attach at `train_utils.py:607`, before
       `D.sum(dim=1)` — the `[N,N,16]` pair tensor still exists there. NOT on the unfolded state
       (its map is an analytic function of |i−j| and predicting it teaches nothing). After K20.
-- [ ] K22 T-E5 **26,315 double mutants in NO split** — the only truly held-out data we have.
-      Score existing checkpoints, no training. Sharpest available test of what b_p is.
+- [x] K22 **CANCELLED — the 26,315 double mutants DO NOT EXIST.** CHECKPOINT 25 already measured
+      it: 2-point rows number 2,356, ALL belonging to 2K5H, and they are single mutations on the
+      _G11S / _G23A backgrounds parsed as two codes — the same concatenation artifact K1 fixed.
+      There is no held-out double-mutant set. Do not re-plan this.
 - [ ] K23 W12 side-chain readout: 5 golden arms queued (3 seeds ddG, 1 dG, 1 ×slope).
       Score on ddG AND dG/std(b_p) — scoring on ddG alone would repeat the W5 mistake.
+
+- [x] W13 **DONE — THE LARGEST RESULT IN THE PROJECT.** Ofir's MEASURED offset, zero GPU.
+      k=3 -> 0.6813 (+0.060), k=5 -> 0.7047, k=10 -> 0.7247, k=20 -> **0.7330** vs oracle 0.7468
+      = 98% of the recoverable gain. Every lever ever tested combined gave +0.075; this gives +0.112.
+      k=1 HURTS (-0.044): noise/signal = 0.6801/0.4615 = 1.47, break-even k=2.2, so never use k<3.
+      Leakage blocked by disjoint index sets. MUST be reported as FEW-SHOT, not zero-shot.
+      -> results/02_findings/W13_MEASURED_OFFSET.md

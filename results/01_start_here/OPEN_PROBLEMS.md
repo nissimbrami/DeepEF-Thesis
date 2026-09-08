@@ -28,7 +28,11 @@ headline, that IS test-set peeking.** Every other run has exactly one scored epo
    appears in an explicit allowlist file `results/trajectory_runs.txt`.
 2. Seed that allowlist with the two trajectory runs above and a one-line reason each.
 3. In the allowlist, record which epoch is the **canonical** one (the val-selected epoch) for each.
-   For both runs that is `e14` (the val log's argmax), and any table must quote that one.
+   The canonical epoch DIFFERS between the two runs and was verified from the val logs:
+   `gld_slope1.0_s42` -> **e10** (val argmax 0.740, tied at e12; run_calib_eval.sh takes the
+   FIRST max. e14 has val PCC 0.722, the 8th-best of 15 -- the earlier claim of e14 was WRONG).
+   `gld_dg_coil_s42` -> **e14** (val argmax 0.769, unique). Any table must quote these.
+   Measured consequence: quoting slope at e13 inflates a_p to 0.857 vs the canonical 0.782.
 4. Add to `scripts/loop_check.sh` so it runs every round.
 5. Re-audit `results/01_start_here/` and grep every quoted score against the canonical epoch.
 

@@ -123,3 +123,11 @@ K6 looked like a 31% improvement and was the model predicting nothing.
 - [ ] ANNOTATE OUR 21 PDB PROTEINS DIRECTLY from the PDB (oligomeric state, HETATM, interface
       area). Bounded job, 21 structures. This is the only honest route to testing the
       ligand/complex ideas and it has never been attempted.
+
+- [x] W13b **DONE — slope and the measured offset do NOT compose.** At k=20 the arms converge to
+      0.7106-0.7337 and the ORDER SCRAMBLES: the best-slope arm (a_p 0.782) finishes LAST, the
+      worst (0.448) ties for first. They overlap rather than add.
+      BUT across all 35 runs the oracle spread does NOT collapse (sd 0.0237 -> 0.0261), and
+      corr(zero-shot, oracle) = +0.548 -- so the model still matters, and zero-shot ranking is a
+      POOR predictor of post-calibration ranking. Select on the oracle, not on zero-shot.
+      Best k=20 so far: 0.7337 (p3_slope1.0_s42_e13). -> results/02_findings/W13B_COMPOSITION.md

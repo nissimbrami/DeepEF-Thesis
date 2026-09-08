@@ -158,3 +158,18 @@ K6 looked like a 31% improvement and was the model predicting nothing.
 - [x] CLARIFIED: only 3 of the 12 delivered scripts are GPU levers (distogram_head,
       unfolded_ensemble, coil_sign_check). The other 9 are CPU analysis tools and have already RUN
       on real data (job 21144901, 4 artifacts verified). They do not belong on a GPU.
+
+- [~] W15 SIDE-CHAIN RECONSTRUCTION **IN PROGRESS.** FASPR downloaded, compiled, smoke-tested
+      (783 atoms in -> 782 out, 0.08 s). 368/368 backbones written. Repack job 21145042 running.
+      TWO BLOCKERS FOUND BY MEASUREMENT:
+      (1) THE CLUSTER HAS NO C++ COMPILER. gcc reports 11.5 and ls shows /usr/bin/g++, but
+          cc1plus is missing on BOTH login and compute nodes, so gcc cannot compile C++ at all.
+          Fixed with conda gxx_linux-64 -> x86_64-conda-linux-gnu-g++.
+      (2) data/MsDs IS GEOMETRICALLY CORRUPT for packing: |CB-CA|/CA-CA = 0.0039 across 40
+          proteins vs the real 1.53/3.80 = 0.403. CB sits ~100x too close to CA, so the CB
+          direction vector a packer uses is numerical noise. Processed_K50 is clean (0.3990-0.4025)
+          and is the tree the model actually trains on. Also: aa_seq.pt is an EMPTY LIST, so the
+          first run wrote all 368 as poly-alanine; sequence now comes from one_hot_encodings.pt.
+      Writer verified on real output: 18 residue types present, |CB-CA| median 1.534 A,
+      scale correctly detected as 1.0 (already Angstrom) on all 368, glycine CB dropped not faked.
+      -> results/03_levers/W15_PROGRESS.md

@@ -1,6 +1,27 @@
 # TASKS — main session only, no background agents. Loop: task -> test -> record -> next.
 
 ## OPEN
+> **CANONICAL BASIS (P8).** Every headline number in this document is computed on:
+> **27 test proteins (2K5H excluded) | ddG metric | the 9 original-population eval CSVs |
+> the val-selected epoch only.** That basis is `pooled 0.5772 / oracle 0.7156 / gain +0.1384`.
+> Membership, exclusions and provenance: `results/05_infrastructure/HEADLINE_BASIS.md`.
+> Enforced by `scripts/gate_headline.py`. **Never average across runs that differ in factor D**
+> (`--unfolded_emb zero`) — D0 and D1 are different models; report them separately, always.
+
+
+- [ ] P0a REQUOTE gld_slope1.0_s42 AT ITS CANONICAL EPOCH e10, NOT e13/e14.
+          The epoch audit found `a_p = 0.740` (MASTER.md:59, STATUS_FULL.md:23/40/97,
+          MASTER.md:685) is the MAXIMUM over six scored TEST epochs -- test-set peeking.
+          The val argmax is e10 (val PCC 0.740; e14 is 0.722, 8th of 15).
+          Also fix MASTER.md:141 / CONTEXT.md:2696, which quote e14 on the 28-protein
+          basis rather than the canonical 27. Full detail + line list:
+          `results/05_infrastructure/EPOCH_AUDIT.md`. Gate: scripts/gate_epoch_selection.py.
+- [ ] P0b Correct OPEN_PROBLEMS.md P0 step 3: it asserts canonical e14 for BOTH trajectory
+          runs. True for gld_dg_coil_s42, WRONG for gld_slope1.0_s42 (e10).
+- [ ] P0c Rescore loroW_onehot_s42 and p3_a1_d1_s0_D1_uemb_seed42 at e14 (both were scored
+          at e12, not their val argmax; both near-zero arms, error runs against them).
+          Detector: scripts/audit_epoch_provenance.py.
+
 - [ ] K8  Read out the 8 golden-lane arms when they finish (now at epoch 7-11 of 14):
           dg_coil, slope, w5_dg, w7edge, u10bidir, w7span4, loroW_onehot, loroW_desc.
           Each answers a lever that had NEVER been run.
@@ -16,8 +37,10 @@
 ## DONE — verified by the main session, not by agent report
 V K1  2K5H reference row fixed. Its file concatenates 3 backgrounds and the mutant _G11S sorts
       first; true WT is at index 2738. Shift +3.0824. Corrected copy in data_fixed/ (Shahar's
-      tree is read-only). CORRECTED HEADLINE over 22 CSVs: pooled 0.4899, oracle 0.6443,
-      gain +0.1544 — the bug had inflated the gain by 35%.
+      tree is read-only). CANONICAL HEADLINE (9 original-population CSVs, 27 proteins):
+      pooled 0.5772, oracle 0.7156, gain +0.1384. The earlier, now-retired figures over 22
+      mixed CSVs (0.4899 / 0.6443 / +0.1544) were the wrong population — see
+      results/05_infrastructure/HEADLINE_BASIS.md.
 V K2  r18_3_TrROS_Hall is CLEAN: single background, row 0 is the true WT; its low percentile is
       legitimate for a designed protein with many stabilising mutations.
 V K3  gate_refrow hardened: counts distinct WT backgrounds per protein, which is the decisive
@@ -54,3 +77,25 @@ V     13 gate suites green throughout; gate_g4_cpu prints dG=-0.0030 width=1092 
 Score a lever on the metric it acts on. It has now caught FIVE: the coil, BSA, W5 burial,
 ligands, and our own model-selection metric. And: always compute the degenerate baseline —
 K6 looked like a 31% improvement and was the model predicting nothing.
+
+## Added 2026-09-08 — after the ν sweep and the b_p decomposition
+
+- [x] K17 ν sweep (0.5→0.65 × b) — **DONE, REJECTED.** All 10 cells worse than no coil on
+      std(b_p): best 1.1036 vs base 0.9972. Correct physics does not rescue the coil.
+      → `results/02_findings/NU_SWEEP.md`
+- [x] K18 b_p global-vs-spread decomposition — **DONE.** b_p is **96.3 % one global constant**;
+      `MAE ≡ |global|` exactly. The thesis target is the residual spread **1.0155**.
+      → `results/02_findings/BP_DECOMPOSITION.md`
+- [x] K19 Is the coil failure a length-normalisation bug? — **DONE, YES.** corr(b_p,N) goes
+      −0.215 → −0.507 monotonically in ν. The coil INDUCES a length artifact. Closed at zero cost.
+- [ ] K20 **T-E1 unfolded ENSEMBLE** — k sampled coil conformations, cached per protein (the coil
+      map never reads one_hot, so it is variant-independent). Sample COORDINATES not distances.
+      Run both `mean_k E_k` and `−log Σ exp(−E_k)`; their difference is the conformational entropy.
+      **Falsifier: if k=8 does not beat std(b_p) 0.9972, the reference-state programme ENDS.**
+- [ ] K21 T-E2 distogram head, **FOLDED state only**. Attach at `train_utils.py:607`, before
+      `D.sum(dim=1)` — the `[N,N,16]` pair tensor still exists there. NOT on the unfolded state
+      (its map is an analytic function of |i−j| and predicting it teaches nothing). After K20.
+- [ ] K22 T-E5 **26,315 double mutants in NO split** — the only truly held-out data we have.
+      Score existing checkpoints, no training. Sharpest available test of what b_p is.
+- [ ] K23 W12 side-chain readout: 5 golden arms queued (3 seeds ddG, 1 dG, 1 ×slope).
+      Score on ddG AND dG/std(b_p) — scoring on ddG alone would repeat the W5 mistake.

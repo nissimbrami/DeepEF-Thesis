@@ -144,3 +144,17 @@ K6 looked like a 31% improvement and was the model predicting nothing.
 - [x] BOTH [VERIFY] MARKERS CLOSED. f_type='features' EXISTS but is FOLDED-ONLY and n_folded must be
       passed explicitly. coil_b_fixed=3.8 is WRONG: ours is 5.82A * 0.1 = 0.582 model units; using
       3.8 would be ~6.5x off and saturate the Gaussian kernel -- the w5_dg.py units bug again.
+
+- [x] K20 **BUILT, UNITS BUG FIXED, VERIFIED, SUBMITTED.** The delivered script defaulted to
+      coil_b_fixed=3.8; ours is _COIL_B_FIXED = 5.82A * 0.1 = 0.582 MODEL UNITS. 3.8 is ~6.5x too
+      large and would saturate the Gaussian kernel -- the w5_dg.py units bug again. Fixed to 0.582.
+      Self-verify after the fix: triangle inequality 0.00% violations (proves COORDINATES are
+      sampled, not distances), Flory scaling worst error 14.8%, cache determinism, ensemble
+      diversity 2.138 A. gate_g4_cpu ALL PASS width 1092. Flags proven parsed:
+      --unfolded_ensemble_k 8 -> CFG=8, reduce -> logsumexp.
+      Queued 21144960 (k=8 mean), 21144961 (k=8 logsumexp), 21144962 (k=3 mean).
+      Their difference IS the conformational entropy.
+      FALSIFIER: if k=8 does not push std(b_p) below 0.9972, the reference-state programme CLOSES.
+- [x] CLARIFIED: only 3 of the 12 delivered scripts are GPU levers (distogram_head,
+      unfolded_ensemble, coil_sign_check). The other 9 are CPU analysis tools and have already RUN
+      on real data (job 21144901, 4 artifacts verified). They do not belong on a GPU.

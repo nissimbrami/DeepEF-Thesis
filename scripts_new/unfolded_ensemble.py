@@ -84,7 +84,7 @@ def unfolded_energy_ensemble(model, x, one_hot, emb, mask, k=8, reduce="logsumex
     nothing and that is itself the answer.
     """
     n = int(mask.sum().item())
-    b = float(b if b is not None else getattr(CFG, "coil_b_fixed", 3.8))   # [VERIFY]
+    b = float(b if b is not None else getattr(CFG, "coil_b_fixed", 0.582))  # FIXED: 5.82A * 0.1 = 0.582 model units (train_utils.py:472-474). 3.8 was wrong in BOTH unit systems.
     nu = float(nu if nu is not None else getattr(CFG, "flory_nu", 0.5))
 
     confs = get_coil_ensemble(n, b, nu, k, x.device)
@@ -116,7 +116,7 @@ def verify(device="cpu"):
     ok = True
 
     # 1. Triangle inequality -- the reason coordinates are sampled rather than distances.
-    n, b, nu = 60, 3.8, 0.588
+    n, b, nu = 60, 0.582, 0.588   # FIXED: model units, not 3.8
     g = torch.Generator(device=device); g.manual_seed(0)
     c = sample_coil_coords(n, b, nu, torch.device(device), g)
     D = torch.cdist(c, c)

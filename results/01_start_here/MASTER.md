@@ -671,3 +671,61 @@ explanations.**
 **And we removed more than we added:** eleven rejections, two data-integrity bugs, five mis-scored
 levers, four silent no-ops, and three scoring bugs that had hidden twelve finished runs. **The
 negative results are the more valuable half of this work.**
+
+---
+
+# 14. DID IT FAIL, OR DID IT NOT RUN? — the triage table
+
+**Read this before trusting any negative result.** A lever that failed *because the science is
+wrong* is settled. A lever that failed *because the execution broke* is still open. They look
+identical in a results table and mean opposite things.
+
+| lever / experiment | design correct? | execution correct? | verdict | re-run? | files |
+|---|---|---|---|---|---|
+| **`--slope_weight 1.0`** | ✅ | ✅ | ✅ **WORKS** — a_p 0.496→0.740, all via s | replicating seeds now | `02_findings/SLOPE_ARM.md`, `SLOPE_OBJECTIVE.md` |
+| **Factor D (D0 vs D1)** | ✅ | ✅ | ✅ **SETTLED 14.4σ** — D1 destroys the model | **no** | `02_findings/FACTORIAL_ANALYSIS.md` |
+| **W5 burial on dG** | ✅ | ✅ | 🟡 best single-flag a_p (0.664), **n=1** | replicating now | `02_findings/W5_ON_DG.md` |
+| **The Flory coil / dG arm** | ❌ **design flaw** | ✅ | ❌ **REJECTED** — the motivating MAE measured *mean bias*, not dispersion; std(b_p) rose | **no** | `02_findings/DG_ARM.md` |
+| **`--dg_length_norm`** | ❌ **degenerate** | ✅ | ❌ arm deletes the prediction | **no** | §6.3 |
+| **LORO descriptors** | ✅ | ❌ **BROKE** — collapsed to a constant, RMSE frozen at 2.541 | ⚠️ **NEVER TESTED** | **YES — running now** | `02_findings/LORO_RESULT.md` |
+| **W7span / U10 / W7edge** | ✅ | ✅ | ❌ all inside the ±0.060 seed band | not a priority | `02_findings/INFO_LEVERS.md` |
+| **b_p feature corrector** | ✅ | ✅ | ❌ 95% of the gain does not survive held-out | **no** | `02_findings/OFFSET_CORRECTOR.md` |
+| **Severing experiment** | ✅ | ⚠️ **OOD guard fired** | ⚠️ **UNINTERPRETABLE** — f_resid invalid; corr(E_u,E_f)=0.543 still informative | needs a *retrained* severed model | `02_findings/SEVERING_RESULT.md` |
+| **Factor A (anchor)** | ❌ **confounded** | ✅ | ⚠️ **NOT ESTIMABLE** — perfectly aliased with seed AND epoch | needs a clean design | `02_findings/FACTORIAL_ANALYSIS.md` |
+| **Ligands (W11)** | ✅ | — | ⚠️ **UNTESTABLE HERE** — zero variance on 28 monomers | needs a ligand-bearing set | `03_levers/LIGAND_SPEC.md` |
+| **W6 descriptors (theory)** | ✅ | ✅ | ❌ **redundant** — ProtT5 predicts held-out hydropathy at R²=0.704 | **no** | §8.1 |
+| **Side-chain "bulk" mechanism** | ❌ **wrong mechanism** | ✅ | ❌ refuted by its own shuffle test (volume R² 0.031 vs hydropathy 0.666) | mechanism is transfer free energy | `02_findings/SIDECHAIN_DESIGN.md` |
+
+## 14.1 The three that are NOT settled
+
+**These are the only negatives that could still turn positive:**
+
+1. **LORO descriptors** — the arm collapsed technically (descriptors centred but never scaled, ~13.8×
+   the one-hot energy). **Re-running now** as `gld_loroWdesc2_s42` with `mordred_pca16_only`, which
+   *replaces* one-hot instead of appending, removing the scale clash.
+2. **The severing experiment** — the OOD guard fired, so `f_resid` must not be used. Needs a
+   *retrained* severed model, not a frozen-checkpoint ablation. **Script ready:**
+   `scripts/severing.py`, spec in `03_levers/SEVERING_READY.md`.
+3. **Factor A** — aliased with seed and epoch, so its apparent effect is not attributable. Needs a
+   design where anchor weight varies with seed and epoch held fixed. **No file yet — this one still
+   needs planning.**
+
+## 14.2 What is ready to run, and where
+
+| work | ready? | where |
+|---|---|---|
+| Seed replication of the slope arm | ✅ **running** (3 seeds) | `scripts/fill_golden.sh` |
+| LORO re-run with the scale fix | ✅ **running** | `scripts/fill_golden.sh` |
+| W5-on-dG replication | ✅ **running** (2 seeds) | `scripts/fill_golden.sh` |
+| slope + W5 / slope + anchor combinations | ✅ **running** | `scripts/fill_golden.sh` |
+| Scoring the 14 unscored D0 cells | ✅ **running** (CPU) | `scripts/run_cpu_evals.sh` |
+| Severing, retrained | 📄 script ready, **not submitted** | `scripts/severing.py` |
+| Side-chain / transfer-free-energy feature | 📄 **design only**, not implemented | `02_findings/SIDECHAIN_DESIGN.md` |
+| Clean factor-A design | ❌ **nothing yet** | — |
+| Re-score 2K5H against the true WT row | ❌ only the constant-shift approximation exists | `data_fixed/`, `scripts/fix_2k5h.py` |
+
+## 14.3 The one-line summary
+
+**Settled and positive:** the slope lever, and requiring D0.
+**Settled and negative:** the coil, length-norm, the corrector, the information levers, W6.
+**NOT settled — do not quote as negatives:** LORO, severing, factor A.

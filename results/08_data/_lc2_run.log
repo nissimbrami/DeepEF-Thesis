@@ -1,0 +1,51 @@
+n=28 proteins; a_p averaged over 10 checkpoints
+ICC-style: mean across-checkpoint SD of a_p = 0.1545 vs between-protein SD = 0.2017
+
+=== 1. MULTIVARIATE OLS  a_p ~ SASA + length (standardised) ===
+  const            beta=+0.0000  t=+0.000  p=1
+  mean_rel_SASA    beta=+0.9123  t=+4.860  p=5.359e-05
+  length           beta=+0.3904  t=+2.080  p=0.04796
+  R2=0.5101    VIF: SASA=1.80 length=1.80
+
+=== 2. SEMIPARTIAL (unique variance) on mean a_p ===
+  SASA unique   sr=+0.6803  sr2=0.4628 (46.3% of variance)
+  length unique sr=+0.2911  sr2=0.0848 (8.5% of variance)
+  raw r(SASA,a)=+0.6522  raw r(len,a)=-0.2174  r(SASA,len)=-0.6662
+
+=== 3. LEAVE-ONE-PROTEIN-OUT on partial(SASA, a | length) ===
+  min=+0.6456 (drop 1W4H)   max=+0.7921 (drop 2BTH)   median=+0.6969
+  all 28 LOPO partials p<0.05? True (max p = 0.0003684)
+
+  same for partial(length, a | SASA):
+  min=+0.2683 max=+0.4602 median=+0.3844 ; p<0.05 in 9/28 LOPO folds
+
+=== 4. DROP the 4 designed 43aa proteins ===
+  n=21 remaining, length range 44-72
+  raw r(SASA,a)=+0.6930 p=0.0004968   raw r(len,a)=-0.6121 p=0.003188
+  partial SASA|len   = +0.4109 p=0.07189
+  partial len |SASA  = +0.0014 p=0.9953
+  r(SASA,len) here   = -0.8839
+
+=== 5. LENGTH-STRATIFIED (within-stratum SASA vs a_p) ===
+  short (<=56aa)   n=15  r(SASA,a)=+0.7202 p=0.00246   r(len,a)=+0.0366 p=0.8969  len 43-56
+  long (>56aa)     n=13  r(SASA,a)=+0.4492 p=0.1235   r(len,a)=-0.1543 p=0.6148  len 57-72
+
+=== 6. OTHER EXPOSURE PROXIES vs a_p (raw / partial on length) ===
+  SASA_per_residue           n=28  raw=+0.4932 (p=0.00765)   |len=+0.5847 (p=0.00136)   r(x,len)=-0.8386
+  frac_buried_rel_lt_0.25    n=28  raw=-0.4187 (p=0.0266)   |len=-0.3686 (p=0.0585)   r(x,len)=+0.5911
+  frac_exposed_rel_gt_0.5    n=28  raw=+0.5751 (p=0.00137)   |len=+0.5538 (p=0.00273)   r(x,len)=-0.5168
+  total_SASA                 n=28  raw=+0.0992 (p=0.616)   |len=+0.5295 (p=0.0045)   r(x,len)=+0.8387
+  mean_rel_SASA_hydrophobic  n=28  raw=+0.6492 (p=0.000186)   |len=+0.6401 (p=0.000324)   r(x,len)=-0.1409
+  mean_hydropathy_KD         n=28  raw=+0.2002 (p=0.307)   |len=+0.3851 (p=0.0473)   r(x,len)=+0.5374
+  frac_hydrophobic           n=28  raw=+0.2332 (p=0.232)   |len=+0.2634 (p=0.184)   r(x,len)=+0.1035
+  plddt_mean                 n=24  raw=-0.4258 (p=0.038)   |len=-0.0235 (p=0.915)   r(x,len)=+0.7120
+  SASA_over_len_pow_073      n=28  raw=+0.5811 (p=0.00119)   |len=+0.5683 (p=0.00198)   r(x,len)=-0.5618
+
+=== 7. b_p CHANNEL: frac_buried vs b_p_wt_error, controlling length ===
+  n=28  raw r(frac_buried, b_p)=-0.4969 p=0.007148
+       raw r(length,      b_p)=-0.1376 p=0.4851
+       partial frac_buried|len = -0.5202 p=0.005414
+       partial len|frac_buried = +0.2231 p=0.2633
+       r(frac_buried, length)  = +0.5911
+
+[wrote] results/length_confound2.json

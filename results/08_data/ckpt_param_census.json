@@ -1,0 +1,128 @@
+{
+ "run": "PEM_fine_tuned-trianed_models-light_attentionkf_anchor_w0.3_s42",
+ "meta_keys": null,
+ "census": {
+  "GAT0": {
+   "n": 75992,
+   "tensors": 14,
+   "keys": [
+    "GAT_layers.0.gat1.att[1, 8, 64]",
+    "GAT_layers.0.gat1.bias[512]",
+    "GAT_layers.0.gat1.lin_l.weight[512, 36]",
+    "GAT_layers.0.gat1.lin_l.bias[512]",
+    "GAT_layers.0.gat1.lin_r.weight[512, 36]",
+    "GAT_layers.0.gat1.lin_r.bias[512]"
+   ]
+  },
+  "GAT1": {
+   "n": 75992,
+   "tensors": 14,
+   "keys": [
+    "GAT_layers.1.gat1.att[1, 8, 64]",
+    "GAT_layers.1.gat1.bias[512]",
+    "GAT_layers.1.gat1.lin_l.weight[512, 36]",
+    "GAT_layers.1.gat1.lin_l.bias[512]",
+    "GAT_layers.1.gat1.lin_r.weight[512, 36]",
+    "GAT_layers.1.gat1.lin_r.bias[512]"
+   ]
+  },
+  "GAT2": {
+   "n": 75992,
+   "tensors": 14,
+   "keys": [
+    "GAT_layers.2.gat1.att[1, 8, 64]",
+    "GAT_layers.2.gat1.bias[512]",
+    "GAT_layers.2.gat1.lin_l.weight[512, 36]",
+    "GAT_layers.2.gat1.lin_l.bias[512]",
+    "GAT_layers.2.gat1.lin_r.weight[512, 36]",
+    "GAT_layers.2.gat1.lin_r.bias[512]"
+   ]
+  },
+  "GCN_layers": {
+   "n": 14340,
+   "tensors": 18,
+   "keys": [
+    "GCN_layers.0.gcn1.bias[64]",
+    "GCN_layers.0.gcn1.lin.weight[64, 36]",
+    "GCN_layers.0.gcn2.bias[36]",
+    "GCN_layers.0.gcn2.lin.weight[36, 64]",
+    "GCN_layers.0.inst_norm.inst_norm.weight[36]",
+    "GCN_layers.0.inst_norm.inst_norm.bias[36]"
+   ]
+  },
+  "fc1_gcn": {
+   "n": 3392,
+   "tensors": 2,
+   "keys": [
+    "fc1_gcn.weight[64, 52]",
+    "fc1_gcn.bias[64]"
+   ]
+  },
+  "fc2_gcn": {
+   "n": 2340,
+   "tensors": 2,
+   "keys": [
+    "fc2_gcn.weight[36, 64]",
+    "fc2_gcn.bias[36]"
+   ]
+  },
+  "fc1_gat": {
+   "n": 2368,
+   "tensors": 2,
+   "keys": [
+    "fc1_gat.weight[64, 36]",
+    "fc1_gat.bias[64]"
+   ]
+  },
+  "fc2_gat": {
+   "n": 2340,
+   "tensors": 2,
+   "keys": [
+    "fc2_gat.weight[36, 64]",
+    "fc2_gat.bias[36]"
+   ]
+  },
+  "inst_norm1": {
+   "n": 72,
+   "tensors": 2,
+   "keys": [
+    "inst_norm1.inst_norm.weight[36]",
+    "inst_norm1.inst_norm.bias[36]"
+   ]
+  },
+  "inst_norm2": {
+   "n": 144,
+   "tensors": 2,
+   "keys": [
+    "inst_norm2.inst_norm.weight[72]",
+    "inst_norm2.inst_norm.bias[72]"
+   ]
+  },
+  "fc1": {
+   "n": 140416,
+   "tensors": 2,
+   "keys": [
+    "fc1.weight[128, 1096]",
+    "fc1.bias[128]"
+   ]
+  },
+  "fc2": {
+   "n": 129,
+   "tensors": 2,
+   "keys": [
+    "fc2.weight[1, 128]",
+    "fc2.bias[1]"
+   ]
+  },
+  "LA": {
+   "n": 21624080,
+   "tensors": 4,
+   "keys": [
+    "LA.feature_convolution.weight[1096, 1096, 9]",
+    "LA.feature_convolution.bias[1096]",
+    "LA.attention_convolution.weight[1096, 1096, 9]",
+    "LA.attention_convolution.bias[1096]"
+   ]
+  }
+ }
+}

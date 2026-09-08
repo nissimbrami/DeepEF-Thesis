@@ -1,0 +1,111 @@
+------------------------------------
+Tue 08 Sep 2026 02:07:25 IDT
+SLURM_JOBID:		21109437
+SLURM_JOB_NODELIST:	cs-cpu-05
+SLURM_SCRATCH_DIR:	
+Allocated Resouces:	cpu - 2 / mem - 8192 MB / gpu - 
+SLURM_GPU_INDEX:	
+Running as nissimb from keasar account with normal QOS
+------------------------------------
+==============================================================================
+Q1  WHAT EXPLAINS THE PER-DESTINATION SLOPE: HYDROPATHY OR SIDE-CHAIN BULK?
+==============================================================================
+checkpoints: 10   mean matched rows: 26329
+n destination residues = 20
+collinearity: corr(KD, volume) = +0.0470
+
+--- target: slope ---
+quantity                              mean r       min       max    p(ck0)
+--------------------------------------------------------------------------
+corr(slope, KD hydropathy)           -0.7360   -0.8769   -0.4524  3.90e-07
+corr(slope, residue volume)          -0.4130   -0.5431   -0.2923  7.39e-02
+corr(slope, SIDE-CHAIN volume)       -0.4130   -0.5431   -0.2923          
+corr(slope, atoms beyond CB)         -0.1628   -0.2711   -0.0055          
+PARTIAL vol | KD                     -0.6158   -0.7805   -0.3117  1.38e-04
+PARTIAL KD  | vol                    -0.7931   -0.9407   -0.4598  2.11e-09
+PARTIAL scvol | KD                   -0.6158   -0.7805   -0.3117          
+PARTIAL KD    | scvol                -0.7931   -0.9407   -0.4598          
+   sign-consistent(KD<0): 10/10
+   sign-consistent(vol<0): 10/10
+   sign-consistent(vol|KD<0): 10/10
+   sign-consistent(KD|vol<0): 10/10
+
+--- target: spearman ---
+quantity                              mean r       min       max    p(ck0)
+--------------------------------------------------------------------------
+corr(spearman, KD hydropathy)        -0.7454   -0.8265   -0.6005  1.50e-05
+corr(spearman, residue volume)       -0.4359   -0.5345   -0.0992  3.47e-02
+corr(spearman, SIDE-CHAIN volume)    -0.4359   -0.5345   -0.0992          
+corr(spearman, atoms beyond CB)      -0.2020   -0.3242   +0.1772          
+PARTIAL vol | KD                     -0.6230   -0.7805   -0.0923  2.56e-04
+PARTIAL KD  | vol                    -0.8167   -0.9079   -0.6468  2.18e-07
+PARTIAL scvol | KD                   -0.6230   -0.7805   -0.0923          
+PARTIAL KD    | scvol                -0.8167   -0.9079   -0.6468          
+   sign-consistent(KD<0): 10/10
+   sign-consistent(vol<0): 10/10
+   sign-consistent(vol|KD<0): 10/10
+   sign-consistent(KD|vol<0): 10/10
+
+--- per-destination table (abl_anchor_w0.3_s42_e14.csv) sorted by VOLUME ---
+res        n       KD  vol A^3    slope  spearman
+G       1292     -0.4     60.1   0.5058    0.6161
+A       1314      1.8     88.6   0.4187    0.5671
+S       1339     -0.8     89.0   0.5241    0.6378
+C       1203      2.5    108.5   0.2673    0.3564
+D       1272     -3.5    111.1   0.5418    0.6502
+P       1259     -1.6    112.7   0.4753    0.5584
+N       1321     -3.5    114.1   0.5653    0.6526
+T       1346     -0.7    116.1   0.4767    0.5924
+E       1211     -3.5    138.4   0.5398    0.6585
+V       1318      4.2    140.0   0.3086    0.4281
+Q       1348     -3.5    143.8   0.5457    0.6668
+H       1388     -3.2    153.2   0.5184    0.5999
+M       1384      1.9    162.9   0.3397    0.4612
+L       1286      3.8    166.7   0.2815    0.3883
+I       1352      4.5    166.7   0.3114    0.4121
+K       1234     -3.9    168.6   0.5368    0.6476
+R       1319     -4.5    173.4   0.5281    0.6489
+F       1385      2.8    189.9   0.2877    0.3808
+Y       1363     -1.3    193.6   0.3526    0.4497
+W       1395     -0.9    227.8   0.3408    0.3773
+
+DEGENERATE BASELINE (2000 destination-label shuffles, abl_anchor_w0.3_s42_e14.csv):
+  P(|r_KD_null|  >= 0.8769) = 0.0000
+  P(|r_vol_null| >= 0.4083) = 0.0700
+
+==============================================================================
+Q2  DOES THE COMPRESSION DEPEND ON BURIAL OF THE MUTATED POSITION?
+==============================================================================
+burial = Shrake-Rupley rel.SASA of the WT residue (Tien 2013 max SASA)
+  buried rel<0.25 | mid 0.25-0.50 | exposed rel>0.50
+rows dropped for PDB-numbering mismatch: 0 (mean per checkpoint)
+
+--- global slope by burial bucket (mean over 10 checkpoints) ---
+bucket            n     slope  spearman  var_true
+buried         8627    0.2293    0.4103    1.4947
+mid            8921    0.2109    0.3584    0.7748
+exposed        8781    0.1717    0.2673    0.4334
+
+--- KEY TEST: corr(slope, volume) computed SEPARATELY within each bucket ---
+if packing is the mechanism, |r| must be LARGER at buried positions
+bucket      n_ck  n_res r_slope_vol  r_slope_KD part vol|KD part KD|vol
+buried        10   20.0     -0.2638     -0.7140     -0.3629     -0.7287
+mid           10   20.0     -0.4302     -0.5013     -0.4787     -0.5428
+exposed       10   20.0     -0.3491     -0.0094     -0.3583     -0.0156
+
+--- slope of the 5 LARGEST hydrophobics (F,I,L,M,W) by burial ---
+bucket           n    slope spearman  cells
+  [BIG-PHOBIC]
+buried        2212   0.1415   0.3215     50
+mid           2296   0.1535   0.2699     50
+exposed       2294   0.1264   0.2123     50
+  [POLAR]
+buried        2113   0.2245   0.3836     50
+mid           2171   0.2188   0.4041     50
+exposed       2073   0.1497   0.2712     50
+  [SMALL]
+buried        1271   0.1945   0.3654     30
+mid           1362   0.2088   0.3574     30
+exposed       1312   0.1735   0.2854     30
+
+wrote results/sidechain_mech.json

@@ -1,0 +1,80 @@
+------------------------------------
+Tue 08 Sep 2026 00:55:45 IDT
+SLURM_JOBID:		21108337
+SLURM_JOB_NODELIST:	ise-cpu-intl-07
+SLURM_SCRATCH_DIR:	/scratch/nissimb/21108337
+Allocated Resouces:	cpu - 4 / mem - 24576 MB / gpu - 
+SLURM_GPU_INDEX:	
+Running as nissimb from keasar account with normal QOS
+------------------------------------
+eval CSVs: 22
+proteins common to all CSVs: 28
+b_p: mean -0.1733 std 1.2392  min -3.3793 max 2.1081
+a_p: mean 0.3769 std 0.1754  median 0.3699
+
+=== Q1 contextual vs lookup ===
+shape per shard = [n_variants, L, 1024]
+example 1GYZ: L=59 shards=12 variants/shard=128
+
+within-residue-type max distance vs mean ||v|| (a lookup would give exactly 0):
+  1GYZ                 within-type maxdist=10.0427   mean||v||=5.5946
+  1PSE                 within-type maxdist=11.4298   mean||v||=5.5493
+  1QKH                 within-type maxdist=11.1733   mean||v||=5.9644
+  1QP2                 within-type maxdist=10.5061   mean||v||=5.4912
+  1TUC                 within-type maxdist=12.0062   mean||v||=6.1725
+  1W4H                 within-type maxdist=10.5520   mean||v||=5.8848
+  2BTH                 within-type maxdist=10.6034   mean||v||=5.8954
+  2K1B                 within-type maxdist=11.3127   mean||v||=6.0653
+  2K28                 within-type maxdist=11.6945   mean||v||=6.0287
+  2K5H                 within-type maxdist=11.4056   mean||v||=6.0565
+
+=== Q2 LOPO ridge: mean embedding (1024-d) -> b_p ===
+X shape = (28, 1024)
+  target b_p:
+    lam=1e+01     heldout R2=-0.4216  PCC=+0.0315
+    lam=1e+02     heldout R2=-0.1577  PCC=+0.1384
+    lam=1e+03     heldout R2=-0.0460  PCC=+0.0957
+    lam=1e+04     heldout R2=-0.0579  PCC=-0.2925
+    lam=1e+05     heldout R2=-0.0736  PCC=-0.9616
+    lam=1e+06     heldout R2=-0.0753  PCC=-0.9996
+    PERM NULL (200 perms, lam=1e+03): mean R2=-0.2118  p95=+0.0948  p(null>=obs)=0.150
+  target a_p:
+    lam=1e+01     heldout R2=-1.3672  PCC=-0.0687
+    lam=1e+02     heldout R2=-0.2377  PCC=+0.1949
+    lam=1e+03     heldout R2=+0.0163  PCC=+0.2364
+    lam=1e+04     heldout R2=-0.0181  PCC=-0.0234
+    lam=1e+05     heldout R2=-0.0671  PCC=-0.9103
+    lam=1e+06     heldout R2=-0.0746  PCC=-0.9991
+    PERM NULL (200 perms, lam=1e+03): mean R2=-0.2078  p95=+0.0904  p(null>=obs)=0.100
+
+=== Q3 embedding distance -> |b_p| difference ===
+  Mantel r(emb dist, |db_p|) = +0.1580  perm p=0.0074  (pairs=378, proteins=28)
+  Mantel r(emb dist, |da_p|) = +0.0580  perm p=0.2688  (pairs=378, proteins=28)
+  1-NN readout:
+    b_p: 1-NN mean|diff|=1.2417  random-other=1.3984  gain=+0.1567  p=0.1424
+    a_p: 1-NN mean|diff|=0.1659  random-other=0.1968  gain=+0.0309  p=0.1227
+
+=== Q4 per-dimension correlation, Bonferroni 0.05/1024 ===
+scipy available: True
+  target b_p (n=28; p<.05 needs |r|>0.374)
+    dim  716  r=-0.6660  p=1.096e-04  p<.05
+    dim  976  r=+0.6650  p=1.133e-04  p<.05
+    dim  141  r=-0.6165  p=4.762e-04  p<.05
+    dim  334  r=-0.6022  p=6.979e-04  p<.05
+    dim  359  r=+0.5719  p=1.476e-03  p<.05
+    dim  551  r=-0.5654  p=1.718e-03  p<.05
+    dim  360  r=-0.5316  p=3.598e-03  p<.05
+    dim  502  r=-0.5315  p=3.609e-03  p<.05
+    dims p<.05: 76 (chance expectation 51)   Bonferroni survivors: 0
+  target a_p (n=28; p<.05 needs |r|>0.374)
+    dim  189  r=-0.6188  p=4.478e-04  p<.05
+    dim  316  r=+0.6063  p=6.259e-04  p<.05
+    dim   36  r=+0.5579  p=2.035e-03  p<.05
+    dim  635  r=+0.5544  p=2.202e-03  p<.05
+    dim  949  r=-0.5484  p=2.516e-03  p<.05
+    dim  956  r=+0.5439  p=2.773e-03  p<.05
+    dim  972  r=-0.5377  p=3.170e-03  p<.05
+    dim  976  r=+0.5309  p=3.655e-03  p<.05
+    dims p<.05: 82 (chance expectation 51)   Bonferroni survivors: 0
+
+wrote results/embedding_probe.json

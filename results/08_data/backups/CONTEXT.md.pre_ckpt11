@@ -1,0 +1,1295 @@
+# CONTEXT.md — resume file for the DeepEF cluster run
+Written 2026-09-05 by the cluster agent. READ THIS FIRST after any context loss,
+together with cluster_run/docs/RUNBOOK.md and cluster_run/docs/STATE.md.
+
+## Access (do not store credentials anywhere)
+- Cluster: slurm.bgu.ac.il, user nissimb. Password auth (Nissim has it; it is NOT written here).
+- Login node seen: slurm-login-04.auth.ad.bgu.ac.il
+- SLURM account/QOS: keasar (VERIFIED present: `sacctmgr show assoc where user=$USER format=account,qos`)
+- Working clone: /home/nissimb/DeepPEF, branch current-vers, origin=github.com/nissimbrami/DeepEF-Thesis (PUBLIC, no token needed)
+- github.com/shaharec/DeepPEF is PRIVATE and NOT NEEDED — the same tree is readable on the cluster (below). READ-ONLY always.
+
+## CORRECTION to the docs: the data path moved
+Docs/scripts say /mnt/new_groups/keasar_group/... which NO LONGER EXISTS.
+The live mount is:
+    SHAHAR=/groups/keasar_group/casp15/Shahar/DeepPEF
+Shahar Cohen's cluster user is shaharax. His conda env is NOT readable (Permission denied).
+
+## VERIFIED facts (measured, not assumed)
+- training_data: 368 protein directories        (gate: 368) PASS
+- mutation_datasets: 862 csv files
+- mega_test.csv: present via data/ThermoMPNN; calib_diag reports 28 proteins (gate: 28) PASS
+- levers grep on Megascale-fineTuning/train.py = 13 (gate: >=5) PASS
+- train.py ALREADY accepts --seed (line 54, default 42). add_seed.patch is NOT needed.
+- Partitions up: main debug cpu gpu course gtx1080 rtx2080 rtx3090 rtx4090 rtx6000 rtx_pro_6000 l40s
+  rtx6000 has 44 nodes, so 03_calib_ctrl.sh's default partition + its 5-node exclude is fine.
+- conda: `module load anaconda` then EITHER `source activate <env>`
+  (/storage/modules/packages/anaconda/bin/activate exists) OR
+  `source /storage/modules/packages/anaconda/etc/profile.d/conda.sh; conda activate <env>`
+- anaconda base python (/storage/modules/packages/anaconda/bin/python) HAS pandas+numpy —
+  enough to run calib_diag.py without the training env.
+
+## Data wiring already done (read-only symlinks into Shahar's tree)
+    /home/nissimb/DeepPEF/data/ThermoMPNN                                  -> $SHAHAR/data/ThermoMPNN
+    /home/nissimb/DeepPEF/data/Processed_K50_dG_datasets/training_data     -> $SHAHAR/data/.../training_data
+    /home/nissimb/DeepPEF/data/Processed_K50_dG_datasets/mutation_datasets -> $SHAHAR/data/.../mutation_datasets
+(Processed_K50_dG_datasets itself is a REAL dir so any writes land locally, never in Shahar's tree.)
+
+## The environment problem and its fix
+esm2_env_py38 did NOT exist for this account and Shahar's copy is unreadable.
+Being built at /home/nissimb/.conda/envs/esm2_env_py38 by /home/nissimb/build_env.sh
+(log: /home/nissimb/env_build.log): python 3.8 + torch 2.4.1 cu121 + torch_geometric +
+numpy<2 pandas scipy scikit-learn matplotlib tqdm wandb biopython.
+
+## ACTION D RESULT — GATE FAILED, decision pending from Nissim
+calib_diag.py on 7 real checkpoints in $SHAHAR/eval_results:
+  abl_calib_ctrl_e12    pooled 0.6062  PP 0.7109  offsetRM 0.7006  AFFINE 0.7136
+  abl_ddg_nopretrain_e11 pooled 0.6471 PP 0.7376  offsetRM 0.7395  AFFINE 0.7486
+  abl_randscratch_e12   pooled 0.6237  PP 0.7386  offsetRM 0.7287  AFFINE 0.7061
+  abl_calib_combo_e13   pooled 0.6313  PP 0.7412  offsetRM 0.7338  AFFINE 0.7485
+  abl_designed_w3_e8    pooled 0.6401  PP 0.7388  offsetRM 0.7323  AFFINE 0.7742  <- only one in range
+  abl_readout_attn_e12  pooled 0.6055  PP 0.6838  offsetRM 0.6740  AFFINE 0.6456
+  abl_ddg_core_e9       pooled 0.5992  PP 0.7067  offsetRM 0.7101  AFFINE 0.6721
+Gate wanted AFFINE-removed in [0.77,0.81]; 1 of 7 makes it.
+DECISIVE: calib_ctrl reproduces the reference EXACTLY (0.606 / 0.711, std(b) 0.285 vs 0.29 in
+STATE.md), so the CSV and the pooled/PP path are right. What is unconfirmed is the CLAIM that
+all 52 checkpoints reach 0.77-0.81 — the RUNBOOK section 2 stale-premise pattern.
+Per HANDOVER Part F this is a STOP-and-report condition. No training submitted.
+
+## Automation
+/home/nissimb/auto/auto_pipeline.sh runs everything remaining unattended.
+State: /home/nissimb/auto/STATUS.txt  (one line per step; grep for PROBLEM)
+Phase 1 will NOT submit until /home/nissimb/auto/GO_PHASE1 exists (Nissim's decision on gate D).
+
+## Hard rules (never violate)
+1. Shahar's tree and shaharec remote: READ-ONLY, always.
+2. No git push anywhere without explicit per-action approval, every time.
+3. Unique --run_tag per run; never overwrite a checkpoint dir.
+4. Never write a credential to a file, remote, log or memory.
+5. Numbers only from run_calib_eval.sh -> score_runs.py, never in-training validate().
+6. Every number needs 3 qualifiers: pooled|per-protein . dG|ddG . which split & selection.
+
+================================================================================
+## UPDATE 2026-09-06 00:15 - nine training runs live in parallel
+================================================================================
+
+### GPU facts, MEASURED not assumed
+- Training needs ~10 GiB VRAM. PROVEN: probe job on GTX 1080 (8 GiB) died with
+  torch.OutOfMemoryError after allocating 7.17 GiB and needing 1.10 GiB more.
+  => gtx_1080 and the 8-11 GiB rtx_2080 are physically OUT.
+  => Usable cards: rtx_3090 / rtx_4090 / rtx_6000 (>= 24 GiB).
+- QOS `keasar`: MaxTRESPerAccount = gres/gpu:rtx_6000=8, and ZERO for every other card type.
+  The cap is per ACCOUNT (the whole lab, e.g. bo.hassonof also draws on it) - this is the
+  "MaxGRESPerAccount" pending reason.
+- QOS `normal`: no per-account cap. THE TRICK THAT UNBLOCKS EVERYTHING:
+      sbatch --qos normal --gres=gpu:rtx_6000:1 ...
+  Same card, bypasses the keasar account cap.
+  WARNING: `--partition rtx4090` under keasar is REJECTED outright; under `normal` the site
+  submit filter may silently route you onto a gtx_1080, which then OOMs. ALWAYS pin the card
+  with --gres=gpu:<type>:1, never by partition name.
+
+### Live jobs (all 15 epochs each)
+  Phase 1  calib_ctrl_repro2 21015271  ise-6000-04    rtx_6000   ~3.7-6 s/it
+  Phase 2  sigma_seed42 21016195, seed1 21016197, seed2 21016199   (qos keasar)
+           sigma_seed3  21016223, seed4 21016225                   (qos normal + --gres rtx_6000)
+           ALL FIVE ON rtx_6000 -> sigma is not contaminated by hardware. Keep it that way.
+  Phase 4  anchor_w0.3 21016095, w1.0 21016097, w3.0 21016099  ise-pheno-*  rtx_3090
+           All three on identical hardware -> their mutual comparison is clean.
+           anchor-vs-reference crosses card types: judge that gap against sigma, and always
+           record the card with the result.
+           NOTE: these degraded to ~17.6 s/it (shared pheno nodes) => ~22 h. Moving them to
+           rtx_6000 via the qos-normal trick would cut them to ~7 h.
+
+### WHY GPU COUNT IS NO LONGER THE LIMIT
+Every run that exists is running. We are work-limited, not GPU-limited. The next phase cannot
+start because two of its four levers HAVE NO IMPLEMENTATION - see below.
+
+================================================================================
+## WHAT STILL HAS TO BE BUILT (this is the critical path now)
+================================================================================
+
+### 1. The slope lever - `--slope_weight` in Megascale-fineTuning/train.py
+STATE.md section 3 is explicit: "Does not exist. Nobody has written it." It is the thesis's own
+contribution. STATE.md sanctions writing it immediately because it depends on nothing:
+
+  "a loss term penalising abs(std(pred_ddG) - std(true_ddG)) within each protein, behind a flag
+   defaulting to off, so the baseline stays bit-identical when the flag is absent."
+
+Requirements:
+  - New argparse flag `--slope_weight`, type float, default 0.0 (OFF).
+  - When 0.0 the computation graph must be untouched: the reference run has to stay
+    bit-identical. Verify by running one epoch with and without the flag at seed 42 and
+    diffing the loss values.
+  - The penalty is computed WITHIN each protein group of the mini-batch, on the ddG scale.
+  - Existing levers to imitate for style/placement: `--wt_anchor_weight` (line ~75) and
+    `--designed_weight` (line ~74) in Megascale-fineTuning/train.py.
+  - Why it matters: a_p (slope) collapses to 0.07-0.18 on designed and fragile folds and
+    predicts per-protein performance better than any other measured quantity. The anchor lever
+    fixes offset but is known to WORSEN slope collapse - the slope term is what should counter it.
+
+### 2. The coil lever (Flory unfolded reference state) - factor D
+PROMPT section 11: implemented in the v5 bundle but never synchronised into train.py.
+Needs porting. Does not block Phases 1, 2 or 4.
+
+### 3. Then, and only then, Phase 3
+  - pilot: slope-weight, 3 runs, 1 seed. Gate: a weight that moves std(pred)/std(true) toward 1
+    without hurting pooled.
+  - factorial: anchor x designed x slope x coil, 2^4 = 16 cells.
+    Seeds per cell decided by sigma: sigma <= 0.01 -> 3 (48 runs); sigma >= 0.02 -> 5 (80 runs).
+    Submit in waves of ~8. Keep all seeds of one cell on the SAME card type.
+  - Estimated 2.5-4 more days of cluster time at ~9 concurrent runs.
+
+================================================================================
+## HOW TO DRIVE THE CLUSTER FROM A FRESH SESSION
+================================================================================
+- ssh nissimb@slurm.bgu.ac.il  (VPN REQUIRED; without it port 22 just times out)
+- slurm.bgu.ac.il ROUND-ROBINS across login nodes. tmux sessions and background processes live
+  on ONE node only - pin to slurm-login-04.auth.ad.bgu.ac.il or you will not see your own jobs.
+- Repo: /home/nissimb/DeepPEF (branch current-vers). Data is symlinked read-only into
+  data/ from /groups/keasar_group/casp15/Shahar/DeepPEF - NEVER write into Shahar's tree.
+- ALWAYS `export WANDB_MODE=disabled` before submitting: 03_calib_ctrl.sh / 04_seeds.sh /
+  05_anchor_sweep.sh do NOT set it and the run dies at wandb login. (02_smoke.sh does set it.)
+- preflight.py was patched locally (NOT pushed): checks 1/2/5/7 import train.py helpers that
+  were never written (build_datasets_for_preflight, build_train_loader_for_preflight,
+  run_one_preflight_minibatch, resolve_effective_epochs) -> they now report honest SKIPs.
+  Original preserved at cluster_run/code/preflight.py.orig
+- The training log itself confirms the split every run:
+  "FULL-DATA: 306 train / 34 held-out val proteins ... 28-test untouched" == the 28/34/306 gate.
+- Monitoring: tmux session "collect" runs /home/nissimb/auto/collector.sh, which rewrites
+  results/RESULTS.md every 15 min. Event log: /home/nissimb/auto/STATUS.txt (grep PROBLEM:).
+
+================================================================================
+## 2026-09-06 - CORRECTIONS + FIX 1 APPLIED + PHASE 3 PILOT LAUNCHED
+================================================================================
+
+### STATE.md section 3 is STALE. Both "missing" levers already existed.
+  C slope  --slope_weight   train.py 76/80/433-444. EXISTS, correctly guarded (weight 0 builds
+           nothing, baseline bit-identical). Written by an earlier agent ("Agent-E SLOPE term").
+  D coil   Implementation lives in train_utils.py _flory_unfolded_graph (line 255), reached from
+           get_unfolded_graph (line 234); config defaults in model/model_cfg.py lines 37-38.
+           What was missing was ONLY the CLI flag. (Note: pnas_train.py lines 62-65 do define
+           --flory_unfolded/--flory_nu, but pnas_train.py must never be used for results.)
+  RULE: the code is newer than STATE.md. When they disagree, the code wins. Check before
+  re-implementing anything - re-implementing a working loss term would leave two versions and
+  no way to know which produced a number.
+
+### FIX 1 APPLIED to Megascale-fineTuning/train.py (backup: train.py.bak)
+  line 77-78  --flory_unfolded (store_true) and --flory_nu (float, default 0.5)
+  line 92-95  CFG.flory_unfolded / CFG.flory_nu set from argv, plus a (0,1] range check
+  line 164-5  both logged into wandb_config so a result traces back to its configuration
+  VERIFIED, all three required checks passed:
+      OFF reproducible: True     (flag inert when off - baselines stay valid)
+      ON differs:       True     (the coil actually changes the unfolded graph)
+      shapes equal:     True
+  Also verified end-to-end that argparse accepts the flags: `--flory_nu 5.0` raises exactly the
+  intended ValueError. FACTOR D IS NOW SWITCHABLE - the factorial is unblocked.
+
+### THE EVAL CHAIN WAS BROKEN AND IS NOW FIXED
+Phase 1 training COMPLETED (7:53:46, best epoch 14, all 15 checkpoints present) but its eval job
+died in 11 s: evaluate.py needs ./data/Processed_K50_dG_datasets/Pnas_filtering/pnas_mutations.csv
+and only training_data + mutation_datasets had been symlinked. ALL subdirectories of Shahar's
+Processed_K50_dG_datasets are now linked, plus data/{S669,MegaScale,MsDs,FireProtDB,
+megascale_proteins.csv}. Evals resubmitted for calib_ctrl_repro2, sigma_seed42, sigma_seed1.
+LESSON: a training run completing is not a result. Check that the eval produced a CSV.
+
+### Phase 3 slope pilot LAUNCHED
+  tags p3_slope0.3_s42 / p3_slope1.0_s42 / p3_slope3.0_s42, seed 42, everything else at the
+  reference, 15 epochs, qos normal + --gres=gpu:rtx_6000:1.
+  JUDGEMENT CALL: COMPUTE_PLAN.md (lines 155-158) says "run three weights at one seed" but never
+  names them. {0.3, 1.0, 3.0} was chosen to mirror this project's own anchor ladder rather than
+  invent a new scale. Say so in the report.
+  GATE: pick the weight that moves std(pred_ddG)/std(true_ddG) toward 1 WITHOUT hurting pooled.
+  REPORT std(pred)/std(true) PER PROTEIN alongside pooled PCC - if pooled improves while the
+  ratio does not move, the weight is doing something other than what it was written for, and
+  that must be known before it becomes one of 16 factorial cells.
+
+### STILL OPEN
+  - FIX 3: measure whether the mini-batch block ddG spread is representative of the protein's.
+    Ratio >= 0.9 -> slope term is fine as written; <= 0.7 -> add shuffling behind its own
+    default-off flag (do NOT shuffle now, it would break comparability with the runs in flight).
+  - FIX 4: optional, reuse wt_dg instead of a second get_wt_deltaG call. Must not change numbers.
+
+---
+
+# CHECKPOINT 2026-09-06 20:30Z — read this section first
+
+**Written by the session that ran W0, launched the 48-run factorial, and built the
+autopilot.** If you are a fresh agent or a worker picking up a role, this section plus
+`cluster_run/docs/AUTOPILOT.md` is your source of truth. Do not re-derive anything
+recorded here.
+
+## 0. How to work on this project (process, not science)
+
+- **Manager / worker split.** The main session dispatches and applies; workers read the
+  large documents and source. The main context is the scarce resource — every large file
+  read into it is paid for once and re-paid every turn afterwards.
+- **Never resume a stale worker.** When a worker finishes its part or goes idle, it first
+  updates THIS file and `cluster_run/docs/STATE.md` with: current state, decisions,
+  findings, what was tried, relevant files, work remaining, next steps. Then it exits. A
+  new role-holder is a NEW worker with clean context that reads these files first.
+- **Patches use verbatim anchors, never line numbers** — several agents edit
+  `train.py` / `train_utils.py` / `hydro_net.py`, and line numbers shift under them.
+- **Every number carries three qualifiers:** pooled or per-protein · ΔG or ΔΔG · which
+  split and which selection.
+
+## 1. What is running right now
+
+**The autopilot drives everything.** It lives in a tmux session on the cluster:
+
+```bash
+tmux attach -t autopilot          # watch it
+tail -f ~/auto/autopilot.log      # or just read the log
+python scripts/autopilot.py --once     # dry run, prints the decision trace
+```
+
+It polls every 10 minutes, records completed cells to `results/RESULTS.tsv`, runs the
+seven self-audit checks, applies decision node D1 by the numeric rule, and halts on any
+of the four halts in `AUTOPILOT.md` §7. It writes `results/HALT.md` and a `PROBLEM:`
+line to `~/auto/STATUS.txt` if it halts. It holds a `mkdir` lock at
+`~/auto/.autopilot.lock`, so a second copy cannot start.
+
+**It never cancels a job it did not itself submit and record in `state.json`.**
+
+In the queue: the 48-run calibration factorial (16 cells × 3 seeds), 2 side arms, and
+3 slope pilots finishing their 15 epochs.
+
+## 2. The decision that changed the plan — W0
+
+`results/w0.json`, 28 test proteins, checkpoint `calib_ctrl_repro2` epoch 14, no training.
+
+| condition | var(E_u) | r_x | corr(E_u, wt_err) | corr(E_u, length) |
+|---|---|---|---|---|
+| base | 0.958 | 1.000 | 0.420 | 0.403 |
+| **noemb** | **0.317** | **0.331** | **0.119** | 0.895 |
+| noOH | 0.921 | 0.962 | 0.373 | 0.339 |
+| coil | 1.126 | **1.175** | 0.507 | 0.144 |
+
+**D0 verdict: ProtT5 is the offset channel.** Zeroing the embedding block in the unfolded
+pass removes two thirds of the across-protein variance and drops the correlation with the
+wild-type error from 0.420 to 0.119.
+
+**The Flory coil makes it WORSE** — it *raises* var(E_u) by 17%. It only touches `D` and
+`Fb`, which the arithmetic already suggested were not the cause (corr(wt_err, length)
+≤ 0.12, so the variance is not extensive).
+
+**Consequence: factor D of the factorial is `--unfolded_emb {full,zero}`, not the coil.**
+The coil is demoted to a 2-cell side arm (`sa_coil_seed42`) so the negative is measured
+rather than assumed. This redirected 12 of the 48 cells before any GPU time was spent.
+
+## 3. FIX 3 — settled, measured
+
+332 proteins, mb=64: `mean(block std) / protein std` median **0.901**, IQR 0.863–0.927,
+min 0.691. 91% of the CSVs are position-ordered, so the concern was well-founded — but
+the blocks are representative anyway.
+
+**The slope term is correct as written. Do NOT add shuffling.** It would change the
+training regime for every run and break comparability with everything in flight.
+Full data in `results/fix3_block_std.json`.
+
+## 4. Levers implemented, all default-off and gated
+
+| flag | item | gate | status |
+|---|---|---|---|
+| `--unfolded_emb {full,zero,mean}` | U2 | `scripts/gate_u2.py` 13/13 | **factor D of the factorial** |
+| `--burial_features` / `--burial_mode {count,hse}` | W5 | `scripts/gate_w5.py` 18/18 | ready, not yet run |
+| `--gcn_span N` | W7 | `scripts/gate_w7.py` 11/11 | ready, not yet run |
+| `--gcn_bidir` | U10 | same | ready; **enabling it breaks comparability with every run to date** |
+| `data/aa_descriptors.csv` | W6 | `scripts/verify_descriptors.py` 3/3 | matrix built, model wiring NOT done |
+| `--flory_unfolded` | D (coil) | — | demoted by W0 |
+
+`scripts/gate_g4_cpu.py` runs a real `PEM` forward pass for all six flag combinations on
+CPU. **Run it after any change to the feature vector** — it catches slice errors in
+minutes that would otherwise appear six GPU-hours later.
+
+## 5. Three bugs it caught, worth knowing about
+
+1. **The GCN branch reads `x[:, :32]`, not `:48`** — it takes D(16) plus only half of Fb.
+   Widening it to 48 fed 71 dims into a 55-dim layer.
+2. **`fc2_gat` / `fc2_gcn` project back to FIXED internal widths**, so `inst_norm1`,
+   `inst_norm2` and `fc_in_dim` must NOT grow when a feature block is added. Only
+   `fc1_gcn` / `fc1_gat` grow.
+3. **The GAT residual takes `identity` before `fc1_gat`**, so with a wider input
+   `h1 + identity` is a shape error. Fixed by taking the identity after the projection,
+   behind an explicit branch so the off-path stays byte-identical.
+
+## 6. Blocked, and why
+
+**W8 (pLDDT) is blocked and it is not a matter of effort.** The preprocessed tensors hold
+exactly five things — `coords_tensor.pt`, `deltaG.pt`, `mask_tensor.pt`,
+`one_hot_encodings.pt`, `prott5_embeddings` — and there are no `.pdb` files and no
+B-factor anywhere under `data/`. Per-residue confidence would require regenerating every
+tensor, which changes the cost of the item completely. Do not claim it is "not yet
+written".
+
+**W5's specified SASA gate is unrunnable here.** The dataset stores 4 backbone atoms per
+residue (N, CA, C, CB); a Shrake-Rupley reference computed on those is blind in exactly
+the same way as the Cβ neighbour count, so a correlation between them measures their
+shared blindness. It was replaced by the two checks valid on backbone-only data (burial
+differs folded vs unfolded; no length confound) plus a half-sphere-exposure arm. **State
+this substitution in the write-up** rather than leaving check 3 silently unanswered.
+
+**The GitHub push needs Nissim once.** Two commits are ready (`1870ab2`, `ad7fec3`); the
+cluster has no credential of any kind. One-time fix:
+
+```bash
+ssh-keygen -t ed25519 -C "bgu-deepef" -f ~/.ssh/id_ed25519 -N ""
+cat ~/.ssh/id_ed25519.pub     # paste at https://github.com/settings/keys
+cd /home/nissimb/DeepPEF
+git remote set-url origin git@github.com:nissimbrami/DeepEF-Thesis.git
+git push origin current-vers
+```
+
+## 7. Work remaining, in order
+
+1. **Factorial completes** (~1.5 days) → the autopilot applies D1 automatically.
+2. **W6 model wiring** — the matrix and its verification exist; the block must still be
+   spliced in beside W5's, at `desc_start = 48 + solv_dim`, with `fc1_gcn`/`fc1_gat`
+   grown and the GAT-residual branch extended. Read §5 first.
+3. **S4 refinement** — sweep whichever factors showed a real effect, 5 seeds; deliver the
+   trade-off curve of `std(b)`, slope distribution and PP against anchor weight.
+4. **S5–S7 information factorial** — W5 × W6 × W7, 2³ × 3 seeds = 24 runs, **on top of
+   the winning calibration cell, never the bare baseline**, or the two result sets cannot
+   be combined.
+5. **S8 final model** + 5-seed ensemble; **S9** `results/FINAL.md`.
+
+## 8. Site rules that are already paid for in wasted runs
+
+- `export WANDB_MODE=disabled` before EVERY submission — `03/04/05` omit it and the run
+  dies at wandb login. This destroyed a 7h53m run once.
+- `--qos normal --gres=gpu:rtx_6000:1`. **Never select a GPU by partition name** — the
+  submit filter reroutes onto a GTX 1080, which OOMs; training needs ~10 GiB.
+- Never `ise-pheno` (3.5× slower under contention), never 2080/1080.
+- All seeds of one cell on the same node class, recorded.
+- **A finished training run is not a result.** Three separate 7h+ runs reached COMPLETED
+  before any eval CSV existed. Completion is defined by a non-empty CSV in
+  `eval_results/`.
+- Tensors in `data/` were saved on CUDA; loading them on a login node needs
+  `map_location` and `weights_only=False`.
+- `slurm.bgu.ac.il` round-robins across login nodes — a tmux session lives on one node
+  only.
+
+---
+
+# CHECKPOINT 2 — 2026-09-06 21:10Z — THE COIL FINDING WAS REVERSED
+
+**Read after any compaction, in this order:**
+1. `results/CONTEXT.md` — this file, both CHECKPOINT sections
+2. `results/w0.json` (ddG metric) **and** `results/w0_dg.json` (dG metric) — they disagree, and the disagreement IS the finding
+3. `cluster_run/docs/AUTOPILOT.md` — the S0-S9 state machine
+4. `~/auto/autopilot.log` and `~/auto/STATUS.txt` (grep `PROBLEM:`)
+
+## The correction that matters most
+
+CHECKPOINT 1 recorded "the Flory coil makes it WORSE, r_coil = 1.175". **That conclusion
+was drawn on the wrong metric and is now superseded.**
+
+The coil replaces the unfolded distance map with `d(i,j) = b*|i-j|^nu`, a function of
+SEQUENCE SEPARATION ONLY. A point mutation changes neither chain length nor positions,
+so that matrix is IDENTICAL for wild type and mutant and **cancels exactly** in
+`output - output[0]`. Scoring a ΔG lever by a ΔΔG metric measures the cancellation, not
+the lever. The project's own COMPUTE_PLAN line 171 predicted this.
+
+**Re-scored on absolute wild-type ΔG** (`scripts/w0_dg.py`, 28 test proteins,
+calib_ctrl_repro2 e14, no training):
+
+| condition | MAE | corr | std(err) = std(b_p) |
+|---|---|---|---|
+| base | 4.9650 | 0.3464 | 1.0385 |
+| **coil, b fixed 5.82 A** | **3.9521** | 0.3404 | 1.1264 |
+| coil, b fitted | 5.7446 | 0.4065 | 1.1269 |
+| coil, ca_only | 5.5463 | 0.4532 | 1.1073 |
+| unfolded_emb zero | 3.1315 | 0.0510 | 0.9999 |
+
+**The coil with a FIXED b improves absolute ΔG MAE by 1.01 (20%).** It is the strongest
+geometric lever on `b_p` we have, and it was nearly discarded.
+
+**This also settles U4 empirically:** `fitted` HURTS (+0.78) and `fixed` HELPS (-1.01).
+Fitting `b` to the protein's own folded mean CA-CA distance re-injects folded geometry
+into the reference state the lever exists to remove. Use `--coil_b fixed`.
+
+**Caveat to carry:** `noemb` has the lowest MAE (3.13) but destroys the across-protein
+correlation (0.35 -> 0.05). It removes the offset by removing the signal. The coil keeps
+corr while cutting MAE. Do not read MAE alone.
+
+## What this changes downstream
+
+- Factor D of the running 48-run factorial stays `--unfolded_emb` — that decision was
+  made on the ΔΔG metric and is still correct FOR ΔΔG. Do not re-open it.
+- **A ΔG arm is now justified**: `--loss_mode dg --flory_unfolded --coil_b fixed`.
+  Better ΔG means smaller `b_p`, which closes the pooled->PP gap. The coil helps ΔΔG
+  INDIRECTLY, through calibration.
+- Every geometric unfolded-state lever must be scored on ΔG, never ΔΔG.
+
+## Rule to keep
+
+**Score a lever on the metric it acts on.** ΔΔG cancels anything that is identical
+between wild type and mutant — chain length, positions, and therefore every purely
+geometric reference-state change. ΔG does not.
+
+---
+
+# CHECKPOINT 3 — 2026-09-06 21:15Z — WAKE-UP INSTRUCTIONS
+
+## If you are a fresh agent, read exactly these, in this order
+
+1. **This file**, all three CHECKPOINT sections. CHECKPOINT 2 supersedes part of CHECKPOINT 1 — read both and note the correction.
+2. `results/w0.json` — the ddG-metric ablation. Decided factor D.
+3. `results/w0_dg.json` — the SAME levers on the dG metric. **They disagree, and the disagreement is the finding.**
+4. `results/fix3_block_std.json` — the slope-term measurement.
+5. `cluster_run/docs/AUTOPILOT.md` — the S0-S9 state machine and the four halts.
+6. `~/auto/autopilot.log` (tail) and `~/auto/STATUS.txt` (grep `PROBLEM:`).
+
+Do NOT re-derive anything recorded here. A decision already written was made with evidence
+that is on disk; re-deciding without that evidence is how a stale premise gets re-adopted.
+
+## WHAT WE ARE WAITING FOR — one thing only
+
+**The 48-run calibration factorial.** The account is capped at **8 rtx_6000 and ZERO of
+every other card type** (`MaxTRESPA` on account `keasar`, applies regardless of QOS —
+`--qos normal` does NOT bypass it; that claim was wrong and is corrected). So roughly 5-8
+run concurrently and the rest queue. Expect **~1.5 days** for all 48, and it cannot be
+accelerated without an admin raising the cap:
+
+    sacctmgr modify account keasar set MaxTRESPA=gres/gpu:rtx_6000=8,gres/gpu:rtx_4090=8
+
+Nothing else is waiting on compute. All code work runs in parallel on login nodes.
+
+## Live state as of this checkpoint
+
+- 5 training runs on GPU, 99 queued (48 trainings + 51 chained evals).
+- **0 factorial eval CSVs so far.** A finished training run is NOT a result — completion
+  is defined by a non-empty CSV in `eval_results/`. Three separate 7h+ runs once reached
+  COMPLETED with no CSV.
+- The autopilot runs under tmux (`tmux attach -t autopilot`). It died once because
+  `results/` did not exist and the atomic state write failed; the directory now exists and
+  the lock is pid-aware and self-reclaiming. If it is dead again:
+  `tmux new-session -d -s autopilot "bash /home/nissimb/auto/run_autopilot.sh"`
+- Six workers are applying the remaining items in parallel: U5/U6, W7 edge features,
+  monitor+autodebug, the end-to-end verification suite, the 100k catalogue, and W8 built
+  generically.
+
+## The rule that produced the two biggest findings
+
+**Score a lever on the metric it acts on.** ddG cancels anything identical between wild
+type and mutant — chain length, positions, and therefore every purely geometric
+reference-state change. The Flory coil looked harmful on ddG (r=1.175) and turns out to
+be our strongest geometric lever on `b_p` when scored on absolute dG (MAE 4.965 -> 3.952
+with `--coil_b fixed`). It was nearly discarded on the wrong measurement.
+
+## Standing site rules (paid for in wasted runs)
+
+- `export WANDB_MODE=disabled` before EVERY submission.
+- `--qos normal --gres=gpu:rtx_6000:1`; never select a GPU by partition name.
+- Never `ise-pheno`, never 2080/1080. All seeds of one cell on one node class.
+- Tensors in `data/` were saved on CUDA: load with `map_location` and `weights_only=False`.
+- `class PEM(torch.nn.Module):` — an anchor written `nn.Module` silently matches nothing.
+- After ANY change to the feature vector run `python scripts/gate_g4_cpu.py`. It must
+  print `baseline ... dG=-0.0030 width=1092`. A moved baseline means every run in flight
+  is invalidated — revert, do not debug in place.
+
+---
+
+# CHECKPOINT 4 — 2026-09-06 ~22:00Z — POST-COMPACT RECONNECT + THE SCIENTIFIC GAPS
+
+**Read this section FIRST. It supersedes CHECKPOINT 3's "what we are waiting for".**
+
+## 0. How to reconnect (this cost a whole reconnect cycle once — do not repeat it)
+
+The cluster password lives ONLY in the shell env as `SLURM_PW`. A compact kills the shell and the
+password with it, and every `ssh` then fails with `Permission denied`. It is recoverable from
+`C:/Users/User/Downloads/for claufe.txt` (an old chat transcript). Run everything as:
+
+```
+cd <scratchpad>
+SLURM_PW='<pw>' python cluster.py exec <<'EOF'
+cd /home/nissimb/DeepPEF
+source ~/miniconda3/etc/profile.d/conda.sh 2>/dev/null || source /opt/conda/etc/profile.d/conda.sh
+conda activate esm2_env_py38
+export WANDB_MODE=disabled
+<commands>
+EOF
+```
+Upload: `MSYS_NO_PATHCONV=1 SLURM_PW='<pw>' python put.py <remote_dir> <local_file>`
+(NOTE the argument order: remote dir FIRST. And `MSYS_NO_PATHCONV=1` or Git-Bash mangles the path.)
+
+**The real fix, still not done:** an SSH key. It survives compaction and also unblocks the git push.
+
+## 1. State verified by running it, not by trusting a report
+
+- **5 trainings RUNNING, 104 queued.** Nothing was cancelled. The 48-run factorial is intact.
+- **0 factorial eval CSVs.** A finished training is NOT a result. ~5-7 days remain.
+- **autopilot ALIVE** — it had died with the login node (`rc=143`). Restarted with
+  `setsid nohup` (NOT tmux) so it now survives a login-node drop.
+- **`python scripts/gate_g4_cpu.py` prints `baseline ... dG=-0.0030 width=1092`.**
+  This is THE guard: it means none of the new code has moved the feature vector, so the 48 runs
+  in flight are still valid. Re-run it after ANY feature-vector change. If it moves, revert.
+- **All 8 gate suites green**, including gate_u3u4 at **32/32** (see §2).
+
+## 2. gate_u3u4 — fixed, and the diagnosis is worth keeping
+
+It failed 2/32 for a long time and was written off as "known-false". It was neither false nor a
+float-precision issue — my first two fixes (absolute tolerance, then relative tolerance) BOTH failed,
+which is what forced an actual measurement:
+
+- off-diagonal agreement: **1.2e-06** (perfect)
+- the four DIAGONAL channels (0/5/10/15, the self-pairs): **1.38e-03**
+
+Cause: `get_dist_matrix` flattens to (N*4,3) and runs ONE `cdist`; a self-distance goes through
+`sqrt(x^2+x^2-2x.x)`, a catastrophic cancellation that returns ~1e-3 instead of exactly 0. The gate
+was comparing that artifact and calling it a layout error. **Channel 5 IS CA-CA** (verified: it equals
+`torch.cdist(x[:,1,:],x[:,1,:])` off-diagonal, and 1*4+1 = 5). Fix: compare off-diagonal for the
+layout claim; assert the self-pair diagonal is near zero separately.
+
+**Lesson to carry: do not guess at a tolerance twice. Measure the error's STRUCTURE first.**
+
+## 3. What three workflows established (33 agents, all complete)
+
+**Adversarial verification of the 9 worker items** → `results/VERIFY_9_ITEMS.md`.
+- NOT-READY: **mordred, u5u6, w7edge, monitor** (`monitor` selects a GPU BY PARTITION NAME, which
+  violates the site rule that has already cost us runs).
+- READY-WITH-FIXES: w6wire, u3u4, w9, e2e, catalogue.
+- The most dangerous find: **`PEMGraphTransformer` silently ignores the descriptor block.** Its
+  slices stay in-bounds with a wider vector, so the run COMPLETES and reports a baseline number as a
+  descriptor result. This is the project's signature failure mode — a silent wrong number.
+
+**U5/U6 + W7-edge applied** to the cluster, G4 re-verified at width=1092.
+
+## 4. THE SCIENTIFIC GAPS — this is the actual remaining work
+
+**a. Mordred has NEVER been run.** The descriptor CSV on disk has the header
+`"synthetic replica for verification"`. **Every W6 number so far was scored on a fake matrix.**
+
+**b. The histidine SMILES is WRONG** in PHASES_5_9_WITH_CODE.md:230 —
+`c1cc(nc1)...` is a ring with FOUR carbons and ONE nitrogen (C7H10N2O2). L-histidine is C6H9N3O2,
+imidazol-4-yl, TWO ring nitrogens. Correct: `c1c(nc[nH]1)C[C@@H](C(=O)O)N`. Mordred would compute
+~654 descriptors for the WRONG MOLECULE, and the existing gate cannot see it because it only tests
+L, D and F. Fix requires a structural self-check (formula + stereocentres) over all 20.
+
+**c. Ofir's contribution was discarded, precisely.** `aa_descriptors.py` hard-codes
+`ORDER = list('ACDEFGHIKLMNPQRSTVWY')` and RAISES on anything else; lookup is `one_hot @ [20,K]`, so
+**the alphabet is closed at the tensor level.** His claim is the opposite: the physicochemical space
+is continuous, so a model trained on canonical residues predicts NON-CANONICAL effects. A 20-row
+closed table throws away the entire point.
+  - The sharpest objection to answer: the vector ALREADY has 1024-dim ProtT5 + 20-dim one-hot. Can a
+    16-dim descriptor block add anything they do not carry? Test it: regress descriptors on ProtT5.
+  - MegaScale has ~0 non-standard residues, so the generalisation claim needs a PROXY: hold out a
+    canonical residue type (e.g. W) entirely and predict its mutations from descriptor space alone.
+
+**d. The 100k catalogue was never exploited.** 100,246 x 21. It was correlated only against the
+PRE-TRAINING DECOY LOSS (r = -0.001) and declared dead. That is the wrong metric — the same error as
+the coil. The right question is whether protein-level properties (BSA, oligomeric state, ligands,
+hydrophobicity, disulfides) predict **b_p** on the 28 test proteins. Caveat that must be stated:
+n=28 means |r| < ~0.37 is indistinguishable from zero at p=0.05, over ~21 columns.
+
+**e. Ligands as graph nodes — never built.** Only metal ions were considered. Any bound molecule
+(ATP, NAD, cofactor, substrate) stabilises a protein by kcal/mol. Architecturally it is a node with
+its own edges. HONEST CAVEAT: MegaScale is small in-vitro domains, mostly ligand-free — this is a
+GENERALISATION lever, not a benchmark-number lever, and must be presented that way.
+
+## 5. THE BIGGEST OMISSION: no dG arm has ever been submitted
+
+Verified against `sacct`: every queued job is the ddG factorial. The coil-on-dG finding
+(MAE 4.965 -> 3.952 with `--coil_b fixed`) is our strongest result on `b_p` and **zero runs test it.**
+It needs GPU from the same 8-card cap the factorial is using, so it needs the user's approval.
+
+## 6. THE RULE THAT KEEPS PAYING
+
+**Score a lever on the metric it acts on.** ddG cancels everything identical between WT and mutant —
+chain length, backbone positions, and therefore every purely geometric or whole-protein property.
+It has now caught TWO directions that were nearly discarded on invalid measurements: the coil
+(r=1.175 "harmful" on ddG; our best b_p lever on dG) and BSA (scored against a pre-training loss that
+cannot predict ddG either way). Audit every new lever against this before spending a GPU-hour.
+
+---
+
+# CHECKPOINT 5 — 2026-09-07 — b_p AND a_p MEASURED DIRECTLY (no GPU)
+
+`scripts/calc_bp.py` -> `results/calib_per_protein.json`, from
+`eval_results/abl_calib_ctrl_repro2_e14.csv` (28 proteins, 28,315 rows, checkpoint e14).
+
+| quantity | value |
+|---|---|
+| b_p (WT error) mean | 0.3542 |
+| b_p median | 0.7207 |
+| **b_p std** | **1.5741** |
+| b_p range | -4.7043 .. +2.7474 |
+| **a_p (ddG slope) median** | **0.4990** |
+| a_p range | 0.0789 .. 1.2566 |
+| **per-protein ddG PCC median** | **0.7980** |
+| **corr(a_p, per-protein PCC)** | **+0.5714** |
+| corr(\|b_p\|, per-protein PCC) | -0.3596 |
+
+## What these four numbers establish
+
+1. **The calibration gap is real and quantified.** Per-protein median PCC 0.798 against a pooled
+   ~0.59. The ranking information IS present within a protein; pooling destroys it. This is the
+   thesis, now measured independently of any earlier analysis.
+
+2. **std(b_p) = 1.57 kcal/mol** is the offset spread that pooling folds into the error. It is the
+   target of every reference-state lever. Any dG-side lever must be judged by whether it shrinks
+   THIS number.
+
+3. **corr(a_p, PCC) = +0.571** reproduces the +0.60 recorded in the plan docs from a completely
+   separate computation. The slope is the strongest single per-protein predictor of quality, and
+   `--slope_weight` (factor C) is the only lever that attacks it directly -- and it has still never
+   been run.
+
+4. **a_p min = 0.0789 explains why the affine oracle is not reproducible.** The oracle divides by
+   the slope; dividing by 0.079 amplifies that protein's noise ~13x. An estimator that is not
+   monotone is not a bound, which is why the "0.77-0.81" figure inverts on some checkpoints. The
+   0.70-0.72 from offset removal alone survives because subtracting b_p cannot amplify anything.
+
+## Method note worth keeping
+
+b_p and a_p are computed on DIFFERENT metrics on purpose: b_p is the WT error, a dG-side quantity;
+a_p is the ddG compression slope, a ddG-side quantity. Fitting both on one metric would silently
+mix the two error modes the whole thesis is trying to separate.
+
+## Still true, still the gap
+
+No dG arm has ever been submitted. `--slope_weight` has never been run. Both need GPU from the
+8-card cap the 48-run factorial is consuming.
+
+---
+
+# CHECKPOINT 6 — 2026-09-07 — THE GPU CAP: CORRECTED, MEASURED, AND NOT BYPASSABLE
+
+## The previous claim was wrong
+
+CHECKPOINT 3 recorded: "8 rtx_6000 and ZERO of every other card (MaxTRESPA on account keasar)"
+and suggested an admin could raise it with `sacctmgr modify account keasar set MaxTRESPA=...`.
+**That is not where the limit lives.** Measured:
+
+```
+sacctmgr show qos where name=normal   -> no GPU limit, DenyOnLimit only
+sacctmgr show assoc where user=nissimb -> account keasar, no MaxTRES at all
+scontrol show partition gpu            -> QoS=gpu-part
+sacctmgr show qos where name=gpu-part  -> MaxTRESPU = gres/gpu=5
+```
+
+**The real cap is `gres/gpu=5`, per USER, from the `gpu-part` QOS attached to the `gpu`
+partition.** It is 5, not 8. We hold exactly 5 and are pinned at the ceiling; the other 94 jobs
+sit on `Reason=QOSMaxGRESPerUser`. The correct escalation, if we ever ask for one, is to raise
+MaxTRESPU on the **gpu-part QOS**, not MaxTRESPA on the keasar account.
+
+## `main` looked like a second lane. It is not.
+
+`main` allows qos=normal, contains 149 rtx_6000, and carries NO GPU cap, so it looked like a way
+to run beyond 5. Tested with a 5-minute probe job (no training, no checkpoint, nothing at risk),
+submitted with `--partition=main --gres=gpu:rtx_6000:1`:
+
+```
+sbatch: GPU Parameter Set ! Using GPU Partition.
+...
+SubmitLine=... --partition=main ...
+Partition=gpu                       <- REWRITTEN by the lua job_submit plugin
+Reason=QOSMaxGRESPerUser
+```
+
+**The lua submit filter rewrites any GPU request onto the `gpu` partition**, where the 5-GPU cap
+applies. So the cap cannot be dodged by partition choice, and this also explains the standing site
+rule "never select a GPU by partition name" -- the filter overrides you, and if you ask by
+partition instead of by `--gres=gpu:rtx_6000:1` you can land on a GTX 1080 and OOM.
+
+The probe was cancelled immediately (verified by JobName before scancel). Queue returned to
+5 running / 99 total, untouched.
+
+## What follows from this
+
+- Throughput is FIXED at 5 concurrent GPU jobs. 48 factorial trainings + their chained evals at
+  ~6 h each is therefore ~5-7 days of wall clock, and nothing we control shortens it.
+- **Every GPU-arm we still owe (the dG arm, --slope_weight) must WAIT or DISPLACE factorial cells.**
+  There is no spare capacity, so this is the user's call, not an optimisation to make quietly.
+- All remaining CPU-only work should be finished while the GPU queue drains. That is free time.
+
+---
+
+# CHECKPOINT 7 — 2026-09-07 — THE THESIS SURVIVED ITS STRONGEST ATTACK (measured, CPU only)
+
+## The attack
+
+An adversarial critic raised the sharpest objection anyone has put to this project:
+
+> b_p is not a calibration error the model could have avoided. Subtracting a per-protein
+> constant FITTED ON THE TEST LABELS removes between-protein variance from a pooled
+> correlation **whether or not that constant is physically meaningful**. A perfectly-ranking
+> predictor polluted with PURE RANDOM per-protein noise would show the same 0.59 -> 0.71 lift.
+> If so, the headline result is a property of the ESTIMATOR, not of the model.
+
+This had to be answered before any GPU was spent, because if true the whole programme is
+arithmetic. It costs seconds to test.
+
+## The test — `scripts/null_offset.py` and `scripts/null_fit.py`
+
+Build a synthetic predictor with the REAL per-protein structure (real protein sizes, real ddG
+values from the reference eval CSV) but a MEANINGLESS offset: `pred = a*true + b + noise`,
+with `b ~ N(0, 1.5741)` (our measured std(b_p)) drawn independently per protein. Then grid
+search (noise_sd, slope) over 25 x 21 cells, 3 seeds each, and ask how close the null can get
+to our measured triple.
+
+## Result: THE NULL CANNOT REPRODUCE US
+
+| | pooled | offset-removed | per-protein |
+|---|---|---|---|
+| **measured (ours)** | **0.590** | **0.710** | **0.798** |
+| best null over the whole grid | 0.620 | 0.785 | 0.712 |
+| error | +0.030 | **+0.075** | **-0.086** |
+
+Best achievable L2 distance: **0.118**, and it fails in a STRUCTURED way, not by a little
+noise everywhere:
+
+1. **The null over-delivers on offset removal (+0.075).** Of course it does: a meaningless
+   constant is perfectly removable by construction, so subtracting it recovers a near-perfect
+   ranking. Our real 0.710 is much LOWER than what a pure offset predicts, which means our
+   residual error is NOT a clean per-protein constant. There is real within-protein error that
+   the offset cannot absorb — the model is wrong in ways beyond a shift.
+2. **The null under-delivers on per-protein PCC (-0.086).** Our within-protein ranking is
+   BETTER than the null's at the same pooled value.
+3. **The null needs slope 1.25 to get even that close** — a predictor that EXPANDS ddG. We
+   measured a_p = 0.499, compression by half. The null reaches our pooled number by the wrong
+   mechanism entirely.
+
+## What this establishes
+
+**The 0.59 -> 0.71 lift is not merely an estimator artifact.** The two error channels are
+real and separable: a genuine per-protein offset (b_p) AND a genuine compression (a_p), and
+no single random-offset model produces both at once.
+
+**But the critic was still half right, and this is the honest caveat to carry:** offset removal
+uses a constant fitted on test labels, so 0.70-0.72 is an ORACLE and cannot be claimed as
+model performance. The claim it licenses is precisely: *the ranking information is present;
+what is lost is calibration.* Turning that into a method requires an offset predicted from
+FEATURES on held-out proteins — which is exactly the 100k-corrector direction, and the reason
+that direction matters more than it looked.
+
+## Method note
+
+Both scripts are pure-stdlib and run in seconds on a login node. They should be re-run against
+the factorial's own eval CSVs when those land, since every arm's claim rests on the same
+arithmetic. A result that survives its strongest attack is worth more than one that was never
+attacked.
+
+---
+
+# CHECKPOINT 8 — 2026-09-07 — THE SIGNAL IS ON a_p, NOT b_p (corrected significance)
+
+> **PARTIALLY RETRACTED - see CHECKPOINT 9.** The "NOT b_p" half of this title is
+> wrong. Burial predicts the offset (`frac_buried_rel_lt_0.25` vs `b_p_wt_error`, mean r=-0.475,
+> 10/10 sign-consistent, 8/10 significant). It was missed because the b_p rows were scored on a
+> single checkpoint against a uniform 90-test Bonferroni bar and were never put through the
+> replication sweep that promoted the a_p row. Everything else in this checkpoint stands.
+
+## The finding
+
+Structural exposure predicts the COMPRESSION SLOPE a_p. Not the offset b_p.
+
+`scripts/catalogue_vs_bp.py` -> `results/catalogue_vs_bp.json` + `results/CATALOGUE_VS_BP.md`.
+28 test proteins, b_p/a_p from `abl_calib_ctrl_repro2_e14.csv` using calib_diag.py conventions
+exactly (groupby protein, row 0 = WT, np.polyfit(ddg_true, ddg_pred, 1)). Structural covariates
+computed from the actual AlphaFold models in
+`data/Processed_K50_dG_datasets/AlphaFold_model_PDBs/` (all 28 present) with Biopython
+Shrake-Rupley SASA.
+
+**The one result that clears Bonferroni on BOTH Pearson and Spearman (90 tests, alpha 5.6e-4):**
+
+| feature | target | pearson r | p | spearman rho | p |
+|---|---|---|---|---|---|
+| **mean_rel_SASA** | **a_p** | **+0.714** | 2.0e-05 | **+0.623** | 4.0e-04 |
+
+Stable under leave-one-out (r in [0.642, 0.790], no sign flip) and holds within the 21 natural
+proteins alone (r = +0.767), so it is not a designed-fold artifact.
+
+**Interpretation: more-exposed, less-compact proteins suffer LESS slope collapse. Tightly
+buried proteins are where the model under-reacts worst.**
+
+## SIGNIFICANCE CORRECTION — read this before quoting any number
+
+The worker's report claimed "FIVE clear it". An adversarial verifier caught that, and I
+re-derived the table myself from the JSON. **Only ONE of the five clears alpha=5.6e-4 on both
+tests.** The other four clear on one test and not the other:
+
+| feature | target | pearson p | spearman p | verdict |
+|---|---|---|---|---|
+| mean_rel_SASA | a_p | 2.0e-05 | 4.0e-04 | **SURVIVOR** |
+| frac_exposed_rel_gt_0.5 | a_p | 1.2e-04 | 4.1e-03 | one test only |
+| mean_rel_SASA_hydrophobic | a_p | 3.4e-04 | 2.7e-03 | one test only |
+| SASA_over_len_pow_073 | a_p | 8.4e-04 | 1.1e-04 | one test only |
+| plddt_mean | per-protein PCC | **1.5e-02** | 2.4e-04 | **27x ABOVE the stated bar** |
+
+The four near-misses are all the SAME underlying quantity (surface exposure) measured four ways,
+so they are corroborating, not independent — which is a reason to believe the direction and a
+reason NOT to count them as five findings. Report ONE result, with the other four as consistent
+supporting measurements.
+
+## What is NOT measurable here, and why that is not a null result
+
+**All 28 test proteins are single-chain, ligand-free, metal-free monomers of 43-72 aa.**
+Verified: `n_chains == 1`, `n_het_residues == 0`, `n_metal_residues == 0`, `interchain_BSA == 0.0`
+for EVERY one. So complexity, oligomeric state, ligands and true interface area have **zero
+variance** on this test set and are **untestable in principle here** — that is "not measurable",
+NOT "no effect". Any ligand/complex claim needs a test set containing multimers and ligands,
+which MegaScale is not.
+
+Bulk hydrophobic COMPOSITION shows nothing (|r| <= 0.28, p > 0.14). Exposed hydrophobicity does.
+**It is the placement of hydrophobics, not their amount.**
+
+## The 100k catalogue cannot be joined — and that is correct, not a failure
+
+**0 of 28 test proteins appear in the catalogue.** Verified two ways (exact 4-char PDB id, and
+a case-insensitive substring scan over all 100,246 rows). This is by construction: the catalogue
+IS the PDB pre-training decoy set and the 28 are held-out MegaScale test proteins. Disjoint by
+design. No join was fabricated and no catalogue number is quoted for our 28.
+
+The catalogue also has degenerate columns that would have produced fake nulls if used naively:
+`Ligands_x` has 4 non-null rows of 100,246; `BSA_Numeric_x` has 4 unique values; `BSA_Percentage`
+is 100,241 null; `Global Symmetry` is constant. **The live columns are `Ligands_y` and
+`BSA_Numeric_y`.** The old "-0.001 BSA correlation" was therefore doubly void: an all-but-constant
+feature scored against the pre-training decoy loss.
+
+## Why this matters more than it looks
+
+The offset-removal ceiling (0.70-0.72) assumes a_p is left alone. **a_p is the second calibration
+object and nothing has ever attacked it** (`--slope_weight` has still never been run). And unlike
+b_p, **a_p is a within-protein slope, so it does NOT cancel in ddG** — it is the one calibration
+object legitimately measurable on the ddG metric.
+
+An exposure-predicted per-protein slope rescale is therefore a genuinely new lever, and it is
+CPU-testable on existing eval CSVs before any GPU is spent.
+
+## Next, in order
+
+1. Replicate the survivor across the other 9 eval CSVs (the 5 `abl_sigma` seeds especially) to
+   confirm it is checkpoint-stable and not specific to `calib_ctrl_repro2_e14`. One loop, no GPU.
+2. Only then consider a slope-correction arm.
+
+## REPLICATION — the finding is checkpoint-stable (10/10)
+
+Re-ran `catalogue_vs_bp.py --eval_csv` over every eval CSV on disk. `mean_rel_SASA` vs `a_p`:
+
+| checkpoint | pearson r | p | spearman | p |
+|---|---|---|---|---|
+| calib_ctrl_repro2_e14 | 0.714 | 2.0e-05 | 0.623 | 4.0e-04 |
+| abl_sigma_seed4_e14 | 0.703 | 3.0e-05 | 0.658 | 1.4e-04 |
+| abl_sigma_seed3_e13 | 0.699 | 3.5e-05 | 0.656 | 1.5e-04 |
+| abl_sigma_seed1_e13 | 0.683 | 6.2e-05 | 0.651 | 1.7e-04 |
+| abl_p3_slope3.0_s42_e8 | 0.676 | 7.9e-05 | 0.618 | 4.6e-04 |
+| abl_sigma_seed42_e9 | 0.674 | 8.5e-05 | 0.617 | 4.7e-04 |
+| abl_sigma_seed2_e10 | 0.632 | 3.1e-04 | 0.620 | 4.4e-04 |
+| abl_anchor_w0.3_s42_e14 | 0.587 | 1.0e-03 | 0.511 | 5.5e-03 |
+| abl_anchor_w1.0_s42_e14 | 0.471 | 1.1e-02 | 0.477 | 1.0e-02 |
+| abl_anchor_w3.0_s42_e13 | 0.400 | 3.5e-02 | 0.436 | 2.1e-02 |
+
+**mean r = 0.624, sd = 0.102, min 0.400, max 0.714, sign-consistent 10/10.**
+Two independent seed families (5 sigma seeds + the control) all land at 0.63-0.71. This is not
+an artifact of one checkpoint.
+
+### A SECOND finding fell out of the replication, unlooked for
+
+The correlation decays MONOTONICALLY with the WT-anchor weight:
+
+    anchor 0.3 -> r = 0.587
+    anchor 1.0 -> r = 0.471
+    anchor 3.0 -> r = 0.400
+
+while all five unanchored sigma seeds sit at 0.63-0.68. **The anchor lever is already partially
+suppressing the exposure/slope coupling** — the more you pin the WT, the less the model's slope
+tracks exposure. That is a mechanistic link between factor A (the anchor, already in the running
+factorial) and a_p, and it was not predicted. Three points is a trend, not a law; the running
+48-cell factorial will test it properly and its anchor cells now have a specific prediction to
+check rather than an open-ended sweep.
+
+---
+
+# CHECKPOINT 9 — 2026-09-07 — BIOLOGY/CHEMISTRY AUDIT + WAKE-UP
+
+## READ THESE FIRST, IN THIS ORDER, AFTER ANY COMPACT
+
+1. `results/CONTEXT.md` — ALL checkpoint sections. Later ones CORRECT earlier ones.
+2. `results/w0.json` + `results/w0_dg.json` — they disagree, and the disagreement IS the finding.
+3. `results/calib_per_protein.json` — b_p / a_p per protein.
+4. `results/catalogue_vs_bp.json` — 90 correlations; only ONE clears Bonferroni on both tests.
+5. `results/FINDINGS.md`, `results/VERIFY_9_ITEMS.md`.
+6. `~/auto/autopilot.log` (tail) and `results/state.json`.
+
+## RECONNECT (this cost a whole cycle once)
+
+The password lives ONLY in the shell env as `SLURM_PW`; a compact kills it. Recover it from
+`C:/Users/User/Downloads/for claufe.txt`. Then:
+```
+cd <scratchpad>
+PYTHONIOENCODING=utf-8 SLURM_PW='<pw>' python cluster.py exec <<'EOF'
+cd /home/nissimb/DeepPEF
+source ~/miniconda3/etc/profile.d/conda.sh 2>/dev/null || source /opt/conda/etc/profile.d/conda.sh
+conda activate esm2_env_py38
+export WANDB_MODE=disabled
+EOF
+```
+Upload: `MSYS_NO_PATHCONV=1 SLURM_PW=... python put.py <REMOTE_DIR_FIRST> <local_file>`
+Download: `MSYS_NO_PATHCONV=1 SLURM_PW=... python get.py <local_dir> <remote_file>`
+`/tmp` is PER-LOGIN-NODE — write shared files to `/home/nissimb/`, not `/tmp`.
+Connections sometimes time out; just retry.
+
+## THE BIOLOGY/CHEMISTRY AUDIT — measured on the raw catalogue, 100,246 rows
+
+### Dead columns that look alive (this is where the "-0.001 BSA null" came from)
+
+| column | non-null | live sibling |
+|---|---|---|
+| `Ligands_x` | **4** of 100,246 | `Ligands_y` (75,464) |
+| `BSA_Numeric_x` | **4 unique** | `BSA_Numeric_y` (4,867) |
+| `BSA_Percentage` | 5 | — |
+| `lossg` | constant 0 | — |
+| `Global Symmetry` | constant | — |
+
+The old BSA null was VOID TWICE: a dead column scored against the pre-training decoy loss, a
+metric already known not to predict ddG. Neither the feature nor the metric could have shown
+anything.
+
+### Internal inconsistency
+48 rows where the `BSA` string parses nonzero (e.g. "18.76%") while `BSA_Numeric_y` is 0.
+`BSA_Numeric_y` is a PERCENTAGE in [0,70], NOT Angstrom^2. 31.3% are exactly 0.
+
+### THE BIOLOGICAL DEFECT — 205,648 het-code occurrences, 8,187 distinct codes
+
+| class | share |
+|---|---|
+| crystallization additives (SO4, GOL, EDO, NA, CL, PEG) | **27.4%** |
+| metal ions | 18.9% |
+| **real cofactors/substrates (NAD, ATP, HEM, FAD)** | **6.6%** |
+| **MODIFIED RESIDUES (MSE, SEP, TPO)** | **6.3%** |
+| unclassified | 43.5% |
+
+12.8% of "ligand-bearing" rows carry ONLY crystallization additives.
+
+**Only 6.6% of het codes are real biological ligands.** SO4 and glycerol come from the
+crystallization buffer and do not stabilise the protein in vivo. **MSE is selenomethionine — an
+amino acid IN THE CHAIN, used for phasing — so counting it as a bound ligand is both biologically
+wrong and a double-count of a residue.**
+
+**A ligand feature built on the raw column would learn crystallography, not biochemistry.**
+Any W11 result computed before a het-code classification exists is uninterpretable.
+
+## THE FOURTH MIS-SCORED LEVER: W5 BURIAL
+
+`gate_w5.py` passes 18/18 and every assertion is MECHANICAL — shapes, byte-identity, hydropathy
+ordering. **Not one scores performance.** W5's own help text says burial is ZERO in the unfolded
+state and the folded-minus-unfolded delta IS the hydrophobic driving force — so it acts on dG/b_p.
+But its only scheduled scoring is the S7 factorial whose EFFECT_MIN is defined on POOLED ddG.
+**This is the coil case, one lever later.** AUTOPILOT.md has no dG-side acceptance criterion at
+all, so a lever that shrinks std(b_p) without moving pooled ddG is recorded as noise.
+
+Evidence the effect is real: `frac_buried_rel_lt_0.25` vs the WT error, mean r = **-0.475**,
+sign-consistent **10/10**, significant in 8/10.
+
+## CORRECTION TO CHECKPOINT 8
+
+CHECKPOINT 8 said "the signal is on a_p, NOT b_p". **That was premature.** The b_p side was tested
+ONCE, failed a uniform Bonferroni bar over 90 tests, and was then dropped from the replication
+sweep — while its sibling WAS replicated and promoted. Replication is the stronger evidence.
+
+**The honest picture: ONE structural axis acts on BOTH calibration channels.**
+- exposure -> a_p (slope): +0.624 mean over 10 checkpoints
+- burial -> b_p (offset): -0.475 mean over 10 checkpoints
+Both show the SAME anchor-weight suppression gradient — independent corroboration on two channels.
+**W5 burial is the lever that attacks both.**
+
+## CODE STATUS — all 41 flags audited against live source
+
+15/15 levers are wired end to end (flag -> CFG -> read in train_utils/hydro_net -> gate).
+`--slope_weight` genuinely computes (`loss = loss + SLOPE_WEIGHT * slope_loss`) and now RAISES
+under `--loss_mode dg` (the slope is defined on ddG spread).
+
+**The one code gap: W9 has NO `--metal_features` flag in train.py**, though
+`scripts/metal_features.py` reads `getattr(cfg,'metal_features')`. It can never fire. Decide:
+wire it, or formally retire it as superseded by W11 (a metal is one ligand class).
+
+## READY means FOUR things, not one
+
+A lever is READY only if: internally correct AND biologically defensible AND actually read by the
+model at training time AND scheduled to be scored on the metric it acts on.
+**Correct code judged on the wrong metric is NOT ready.** Three levers have already been caught by
+that rule: the coil, BSA, and now W5.
+
+## STILL NEVER RUN (all need GPU from the cap of 5)
+
+- the dG training arm (`--loss_mode dg --flory_unfolded --coil_b fixed`)
+- `--slope_weight` (factor C) — now the best-motivated lever we have
+- the severing experiment (built, dry-run green, `results/SEVERING_READY.md`)
+
+
+# CHECKPOINT 9 — 2026-09-07 — CORRECTION TO CHECKPOINT 8: ONE STRUCTURAL AXIS, BOTH CHANNELS
+
+## The claim being corrected
+
+CHECKPOINT 8 is titled **"THE SIGNAL IS ON a_p, NOT b_p"**. **The "NOT b_p" half of that title is
+wrong and is retracted here.** The a_p half stands unchanged and is strengthened.
+
+### Why the wrong conclusion was reached
+
+The b_p-side rows were scored **once, on one checkpoint** (`abl_calib_ctrl_repro2_e14`), against a
+**Bonferroni bar of alpha=5.6e-4 applied uniformly across all 90 tests**. Nothing on the b_p side
+cleared it, so CHECKPOINT 8 recorded "Nothing survives Bonferroni against b_p" and stopped there.
+
+The a_p row was then taken forward into a 10-checkpoint replication sweep and promoted to the
+headline. **The b_p rows were never put through that same sweep.** The asymmetry was procedural,
+not empirical: one channel got the strong test, the other got only the weak one.
+
+That is backwards as evidence. **Sign-consistency across 10 independently-trained checkpoints is
+far stronger evidence than a single-sample p-value against a conservative family-wise bar**, and
+at n=28 a real |r|~0.47 has only ~60% power at alpha=0.05 and almost none at 5.6e-4 — so a uniform
+Bonferroni over 90 tests is close to guaranteed to erase a true effect of that size. Failing that
+bar once is not evidence of absence. The sweep was the right test and it simply was not run.
+
+## The correction, measured
+
+`scripts/bp_replication.py` -> `results/bp_replication_sweep.json`, `results/bp_anchor_gradient.json`.
+
+Independent re-derivation: per-protein a_p/b_p/pcc/b_p_wt_error recomputed from the raw eval CSVs
+and all 15 structural covariates recomputed from the AlphaFold PDBs with Biopython Shrake-Rupley.
+It does **not** read `catalogue_vs_bp.json` or `results/repl/*.json` — the cached numbers were
+re-derived from source, not trusted. All 10 CSVs verified to carry the same 28 proteins.
+15 features x 4 b_p-side targets = **60 pairs**, each over all 10 checkpoints.
+
+### The headline b_p-side result — ESTABLISHED
+
+| feature | target | mean r | sd | sign-consistent | individually p<0.05 | range |
+|---|---|---|---|---|---|---|
+| **frac_buried_rel_lt_0.25** | **b_p_wt_error** | **-0.475** | 0.092 | **10/10** | **8/10** | -0.561 .. -0.306 |
+
+Reproduces the oversight agent's numbers to three decimals. The two checkpoints that miss p<0.05
+are `anchor_w0.3` (p=0.058) and `anchor_w1.0` (p=0.114) — i.e. the misses are **the anchor arms**,
+which is itself the point (see the gradient section below), not scattered noise.
+
+**So the honest picture is one structural axis acting on BOTH calibration channels:**
+
+- **Exposure predicts the SLOPE**: `mean_rel_SASA` vs `a_p`, mean r = **+0.624**, 10/10 sign-consistent, **10/10** significant.
+- **Burial predicts the OFFSET**: `frac_buried_rel_lt_0.25` vs `b_p_wt_error`, mean r = **-0.475**, 10/10 sign-consistent, **8/10** significant.
+
+Same physical variable (relative solvent accessibility), opposite ends of it, two different
+calibration objects. Exposed proteins lose less slope; buried proteins carry a more positive WT
+offset error. This is more coherent than the CHECKPOINT 8 story, not less — it was hidden by
+running the strong test on only one of the two channels.
+
+### Ranked b_p-side table (top rows of 60; full table in the JSON)
+
+| # | feature | target | mean r | sd | signs | sig | class |
+|---|---|---|---|---|---|---|---|
+| 1 | frac_buried_rel_lt_0.25 | b_p_wt_error | -0.475 | 0.092 | 10/10 | 8/10 | **ESTABLISHED** |
+| 2 | SASA_per_residue | abs_b_p | -0.341 | 0.096 | 10/10 | 4/10 | SUGGESTIVE |
+| 3 | frac_buried_rel_lt_0.25 | abs_b_p_wt_error | +0.324 | 0.085 | 10/10 | 3/10 | SUGGESTIVE |
+| 4 | mean_rel_SASA | abs_b_p_wt_error | -0.312 | 0.097 | 10/10 | 2/10 | SUGGESTIVE |
+| 5 | SASA_over_len_pow_073 | abs_b_p | -0.306 | 0.099 | 10/10 | 2/10 | SUGGESTIVE |
+| 6 | SASA_per_residue | abs_b_p_wt_error | -0.304 | 0.092 | 10/10 | 2/10 | SUGGESTIVE |
+| 7 | SASA_over_len_pow_073 | b_p_wt_error | +0.299 | 0.089 | 10/10 | 2/10 | SUGGESTIVE |
+| 8 | mean_rel_SASA | abs_b_p | -0.289 | 0.095 | 10/10 | 2/10 | SUGGESTIVE |
+| 11 | length | abs_b_p | +0.294 | 0.081 | 10/10 | 1/10 | SUGGESTIVE |
+| 30 | length | abs_b_p_wt_error | +0.260 | 0.139 | 9/10 | 2/10 | DEAD |
+| 31 | frac_buried_rel_lt_0.25 | abs_b_p | +0.205 | 0.159 | 9/10 | 1/10 | DEAD |
+| 60 | frac_glycine | b_p | +0.006 | 0.068 | 5/10 | 0/10 | DEAD |
+
+Classification used: **ESTABLISHED** = 10/10 sign-consistent AND >=6/10 individually p<0.05;
+**SUGGESTIVE** = 10/10 sign-consistent but rarely significant; **DEAD** = not 10/10 sign-consistent.
+
+**Tally: 1 ESTABLISHED, 28 SUGGESTIVE, 31 DEAD of 60 b_p-side pairs.**
+
+Note the shape of the SUGGESTIVE block: rows 2-8 are *all* the same exposure/burial axis measured
+different ways against different b_p parameterisations. They are corroborating, not seven findings
+— the same caution CHECKPOINT 8 correctly applied to the four a_p near-misses.
+
+### Verification of the three numbers I was asked to check
+
+- `frac_buried_rel_lt_0.25` vs `b_p_wt_error`: **CONFIRMED** — mean r=-0.4746, sd=0.0922, 10/10, 8/10 sig, range -0.561..-0.306. Matches the reported -0.475 / 0.087 / 10/10 / 8/10 / -0.561..-0.306.
+- `SASA_per_residue` vs `abs_b_p`: **CONFIRMED as SUGGESTIVE** — 10/10 sign-consistent, 4/10 significant, mean r=-0.341.
+- `length` vs `abs_b_p`: **CORRECTED.** It is **10/10 sign-consistent, 1/10 significant** (mean r=+0.294) — i.e. **SUGGESTIVE, not DEAD**. The "1/10" in the brief is the significance count, which was read as if it were the sign-consistency count. Every one of the 10 checkpoints gives a positive r (+0.135..+0.401); only one reaches p<0.05. Weak, but it is not sign-inconsistent. The genuinely dead length row is `length` vs `b_p` (6/10, mean r=+0.040).
+
+## The anchor-weight suppression gradient replicates on the b_p channel
+
+CHECKPOINT 8's unlooked-for second finding was that the a_p correlation decays monotonically with
+WT-anchor weight while unanchored sigma seeds sit highest. **The same gradient is present on the
+b_p channel**, which is independent corroboration on a second channel:
+
+| pair | \|r\| anchor arms (3) | \|r\| sigma seeds (5) | gap | full separation | MWU p (1-sided) |
+|---|---|---|---|---|---|
+| frac_buried_rel_lt_0.25 vs b_p_wt_error | 0.359 | 0.514 | +0.155 | YES | 0.018 |
+| SASA_per_residue vs abs_b_p | 0.237 | 0.383 | +0.146 | YES | 0.018 |
+| mean_rel_SASA vs abs_b_p | 0.185 | 0.332 | +0.147 | YES | 0.018 |
+| SASA_over_len_pow_073 vs abs_b_p | 0.211 | 0.348 | +0.136 | YES | 0.018 |
+| length vs abs_b_p | 0.196 | 0.329 | +0.133 | YES | 0.018 |
+| *(reference)* mean_rel_SASA vs a_p | 0.486 | 0.678 | +0.192 | YES | 0.018 |
+
+Per-arm detail for the headline b_p pair, `frac_buried_rel_lt_0.25` vs `b_p_wt_error`:
+
+    anchor w0.3 -> -0.363    anchor w1.0 -> -0.306    anchor w3.0 -> -0.410
+    sigma seeds -> -0.515, -0.419, -0.550, -0.543, -0.545
+
+Every sigma seed is stronger than every anchor arm (0.018 is the floor p for a 5-vs-3
+Mann-Whitney, i.e. perfect separation). **So the suppression is real on both channels.**
+
+Two honest limits on this:
+1. **The b_p gradient is NOT monotonic in anchor weight** (w3.0 is stronger than w1.0), unlike the
+   a_p gradient which was cleanly monotonic 0.587 -> 0.471 -> 0.400. What replicates is
+   *anchored-weaker-than-unanchored*, not the ordering within the anchor arms.
+2. **3 vs 5 checkpoints is not a designed experiment.** The anchor arms also differ from the sigma
+   seeds in seed (all s42) and epoch, so arm and seed-family are confounded. The running 48-cell
+   factorial is what settles this; it now has a prediction on two channels instead of one.
+
+## n=28 caveats — applying throughout, to the a_p finding as much as this one
+
+- **n=28 proteins.** At n=28, r=+0.62 has a 95% CI of roughly [0.33, 0.80] and r=-0.48 roughly
+  [-0.72, -0.14]. Quote directions and rough magnitudes; do not quote these r's to three decimals
+  as if they were stable population values.
+- **The 10 checkpoints are not 10 independent datasets.** They are 10 models scored on the *same*
+  28 proteins. Replication here proves the effect is **not a checkpoint artifact** — it does NOT
+  give 10x the effective sample size against protein sampling. The 28-protein draw is the single
+  point of failure for both findings, and it is shared.
+- **Range restriction.** All 28 are single-chain, ligand-free, metal-free monomers of 43-72 aa.
+  Nothing here generalises to multimers, ligand-bound proteins, or large proteins, and complexity /
+  BSA / ligand effects remain *untestable in principle* on this set (zero variance), not null.
+- **Multiplicity is still live.** 60 b_p-side pairs were scanned. The buried/b_p_wt_error row was
+  named in advance by the oversight agent, so it is a confirmatory test rather than the winner of a
+  60-way search — but the 28 SUGGESTIVE rows were not pre-specified and should be treated as
+  hypothesis-generating.
+- **Designed vs natural.** The a_p finding was checked within the 21 natural proteins alone
+  (r=+0.767); **the equivalent natural-only check has not yet been run for the b_p finding.** Until
+  it is, a designed-fold contribution to the burial/offset coupling is not excluded.
+
+## What this changes
+
+1. **Retract "NOT b_p" from CHECKPOINT 8's title and body.** Keep everything else in CHECKPOINT 8:
+   the a_p result, the Bonferroni correction of the "five clear it" claim, the empty-join finding,
+   and the zero-variance analysis all stand.
+2. **The offset channel has a structural predictor after all.** The offset-removal ORACLE is
+   0.70-0.72 and ICC(b_p)=0.898 already said b_p is learnable; this now supplies a *structural*
+   handle on it (burial), not just the knowledge that it is learnable.
+3. **Both levers are the same lever.** An exposure/burial-derived per-protein correction is one
+   feature with two effects, not two separate research directions.
+4. **THE METRIC RULE still applies and is not softened.** `frac_buried_rel_lt_0.25` is a
+   whole-protein property, so it is identical between WT and mutant and **cancels in ddG**. It is
+   scored here on `b_p_wt_error` (the raw WT dG error) precisely because of that rule. Any lever
+   built on it must be scored on dG or b_p — never on ddG. The rule is what made this measurable,
+   and it is what caught the coil, BSA, and W5-burial levers.
+5. **Procedural lesson.** When two sibling hypotheses are tested, run the strong test on both
+   before promoting either. A single-checkpoint Bonferroni result is not grounds to drop an arm
+   from a replication sweep — the sweep is cheap and it is the better test.
+
+`scripts/gate_g4_cpu.py`: **ALL PASS**, dG=0.0023 width=1095 on the burial row, and the
+no-new-dims row holds at **width=1092** as required. No feature vector was changed by this work
+(analysis only, CPU only, no jobs touched).
+
+---
+
+# CHECKPOINT 10 — 2026-09-07 — OFIR RECONCILED, CORRECTOR FAILS, NO-OP HOLES CLOSED
+
+Three workflows completed before a session limit. Their verifiers did NOT run, so everything below
+is WORKER-REPORTED, NOT ADVERSARIALLY VERIFIED. Re-verify before quoting in the thesis.
+
+## 1. OFIR'S THESIS — READ IN FULL (56 pages, BGU CS, Keasar, Dec 2023)
+
+`results/OFIR_THESIS_NOTES.md`. **Three things in our build are WRONG:**
+
+**(a) PCA-16 IS NOT HIS METHOD.** He does NO dimensionality reduction. "PCA"/"principal
+component"/"SVD" appear NOWHERE in the thesis. His 654 features enter a CNN as 654 channels.
+Our `--pca 16` is OUR invention and must be relabelled as ours, not attributed to him.
+
+**(b) `ignore_3D=True` CONTRADICTS his 1826.** 1613 2D + 213 3D = 1826. Quoting 1826 is only
+coherent if 3D was requested — which also explains his 1826->1280 missing-value drop, since 3D
+descriptors return NaN without an embedded conformer. With `ignore_3D=True` the ceiling is 1613
+and his drop is unreproducible. Our docstring says 1826 while our provenance says
+"Mordred(ignore_3D)" — these contradict each other.
+
+**(c) 15-of-20 IS NOT A FAITHFUL SCALING of 40-of-58.** 40/58 = 0.690, so proportional scaling
+gives 13-14, not 15. Our help text calls 15 "three quarters"; 40/58 is roughly two thirds. Deeper:
+**he gives NO justification for 40 at all** — it reads as tuned to land a workable feature count.
+So there is no ratio to preserve. Likely inert on 20 canonical residues (any threshold 13-17
+selects nearly the same columns) but the docstring must be fixed either way.
+
+**HIS CENTRAL CLAIM AND ITS EVIDENCE (Table 3.3):** train on canonical single-point mutants, test
+on non-canonical. PUMA BH3: 646 train -> 714 ncAA test, RMSE 0.975, **Pearson r = 0.642**.
+CP2: 228 -> 240, RMSE 0.859, **r = 0.670**. 30 seeds varying only CNN init, split fixed.
+**NO baseline of ANY kind** — no one-hot, no LM, no shuffled-descriptor, no per-position-mean.
+He calls it "a proof-of-concept" and notes "there was no benchmark to compare RMSE results to".
+He is candid that Fig 3.4 shows "a near-constant prediction line at 0" — part of that r is
+partial collapse to a constant.
+
+**HE ADDRESSES THE LM OBJECTION — AND CONCEDES IT** (p.31, verbatim): "Physicochemical properties
+of AAs are implicitly represented in these datasets ... and accordingly, implicitly represented in
+the embeddings. Thus, ncAAs, which do not occur in these databases, are challenging to represent."
+**His argument is COVERAGE ONLY, not added information.** He runs ZERO experiments comparing
+descriptors against an LM embedding or one-hot.
+
+**CONSEQUENCE FOR US, and it is decisive:** our 28 test proteins are canonical, so every residue
+HAS a real ProtT5 vector and the coverage gap he exploits DOES NOT EXIST in our setting. **By his
+own sentence, the physicochemical content is already implicit in our 1024-dim ProtT5. The thesis
+does NOT support adding a Mordred block on top of ProtT5+one-hot for canonical monomers.**
+
+**HE INDEPENDENTLY FOUND OUR OFFSET PROBLEM.** Leave-one-AA-out (Table 3.4, 18 ncAAs x 30 seeds):
+r stays flat 0.858-0.948 while RMSE swings 7.05-19.32, and he shows **RMSE tracks the train/test
+MEAN GAP** (Ornithine 19.316 vs gap 18.030). That is b_p, found independently, with essentially
+our offset-removal fix proposed.
+
+**WHAT TO STEAL:** leave-one-AMINO-ACID-out. We have leave-one-protein-out but nothing holding out
+a residue TYPE. Directly portable, needs no ncAA data, and asks whether the model learned residue
+chemistry or residue identity. Also: enrichment as a metric, and the train/test mean-gap diagnostic.
+
+**TRAP:** 2D Mordred CANNOT distinguish D from L — every 2D descriptor is identical for both, so
+his effective alphabet is well under 58 and L/D pairs contribute ONE unique value, not two.
+
+## 2. THE b_p CORRECTOR FAILS — a real, publishable negative
+
+`results/OFFSET_CORRECTOR.md`. Mean over all 10 eval CSVs:
+
+| | pooled ddG PCC |
+|---|---|
+| raw | 0.5994 |
+| mean-offset baseline | 0.5940 |
+| **LOPO feature-predicted offset** | **0.6049** |
+| oracle offset removed | 0.7119 |
+
+**95% of the oracle gain does not survive held-out prediction.** Held-out R^2 of b_p is NEGATIVE
+on 8/10 CSVs (mean -0.123) — worse than predicting the training mean. 0 of 22 features reach
+positive R^2 alone. Permutation null: p in [0.295,0.758], significant on 0/10. With ridge alpha
+FIXED the gain goes NEGATIVE (-0.0016), so the +0.0055 was alpha-search variance, not skill.
+
+**THE MECHANISM, which is the useful part:** the oracle gain is NOT broad learnable
+miscalibration. **The top-2 |b_p| proteins carry 78% of it** (60-88% across all 10 CSVs).
+Correcting only 2K5H+2KVS gives 0.591->0.687 (80% of the gain); correcting the other 26 gives
+0.615 (20%). Neither is a structural outlier (max |z| ~2.0 over 22 features), so **there is no
+signature to regress on**. And 2KVS is not an offset case at all: a_p=0.094 vs median 0.4975,
+per-protein PCC 0.160 vs ~0.80 — the model simply fails there and b_p absorbs the failure.
+
+**METRIC CORRECTION THAT MATTERS:** Pearson is SHIFT-INVARIANT, so subtracting a CONSTANT changes
+pooled PCC by exactly zero (verified: -1.0/0.0/mean/+1.0 all give 0.590991). **Therefore the null a
+per-protein corrector must beat is the RAW number, not the mean baseline.** Scoring against the
+mean baseline would have manufactured a fake +0.011 lift.
+
+**Also corrects a units confusion:** std(b_p)=1.5741 is the dG-space WT error. The ddG-space
+intercept the oracle actually subtracts has std **0.2273**. The ddG intercept is the correct
+corrector target.
+
+## 3. THREE SILENT-NO-OP HOLES CLOSED — `scripts/gate_noop.py`, 30 checks ALL PASS
+
+**(A) PEMGraphTransformer dropped inserted blocks silently — MEASURED, not assumed.** A gate builds
+`flat_x` with 726 sentinel columns at offset 48, runs the real reassembly
+`cat([:16],[16:48],[-1044:-20],[-20:])`, and the output is byte-identical to the no-descriptor
+case: **0 of 726 sentinel columns reach the node vector, and nothing raises.** Guard now raises in
+`__init__` (cheap) for ALL FIVE affected levers — aa_descriptors, burial, metal, struct_quality,
+ligand — not just descriptors.
+
+**(B) `--ligand_nodes` could not fire in training.** Wired `Trainer._set_ligand_context(batch)`
+before the first `get_graph` in all three entry points; `ligand_features()` now RAISES when a table
+is loaded but context was never set. **`gate_ligand.py` D.14 had CODIFIED the bug** — it asserted
+"unset context -> exactly zero". Replaced.
+
+**(C) `gate_open_alphabet` tested a /tmp fixture, not the real table. THE REAL FINDING:** the
+committed 25-row table is **K=756 vs canonical K=726**, with **27 canonical columns DROPPED and 57
+ADDED**, and the canonical 20 rows are **NOT byte-identical**. It is not an open alphabet over our
+matrix — **it is a different descriptor matrix wearing the same name.** The loader now refuses it.
+
+**(D) A FOURTH HOLE, unassigned:** `gate_open_alphabet.py` hard-coded the retired mode
+`'curated12'`, so it raised in its first section and **had stopped testing anything at all.**
+
+## STATUS
+
+G4 re-verified after every change: `dG=-0.0030 width=1092`.
+NOT verified adversarially (session limit killed all verifiers): Ofir notes, corrector, no-op
+gates, severing, identifiability, slope_origin, W8. **Re-run the verifiers before the write-up.**

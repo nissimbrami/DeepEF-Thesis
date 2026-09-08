@@ -1,0 +1,66 @@
+------------------------------------
+Tue 08 Sep 2026 02:14:25 IDT
+SLURM_JOBID:		21109587
+SLURM_JOB_NODELIST:	cs-cpu-05
+SLURM_SCRATCH_DIR:	
+Allocated Resouces:	cpu - 2 / mem - 8192 MB / gpu - 
+SLURM_GPU_INDEX:	
+Running as nissimb from keasar account with normal QOS
+------------------------------------
+================================================================================
+A  MODEL COMPARISON on the mean per-destination slope (n = 20 residues)
+================================================================================
+LORO = leave-one-RESIDUE-out cross-validated R^2. In-sample R^2 always rises
+with parameters at n=20; LORO is the number that can go NEGATIVE and does.
+
+model                        k       R^2   adj R^2  LORO R^2
+--------------------------------------------------------------------------------
+KD                           1    0.7155    0.6997    0.6659
+dGtr                         1    0.7987    0.7875    0.7527
+VOL                          1    0.1749    0.1291    0.0305
+POLARSA                      1    0.5479    0.5228    0.4561
+BETA                         1    0.6009    0.5787    0.5332
+KD + VOL                     2    0.8590    0.8424    0.8011
+dGtr + VOL                   2    0.8013    0.7779    0.7072
+KD + dGtr                    2    0.8417    0.8231    0.7942
+KD + POLARSA                 2    0.7217    0.6890    0.6209
+dGtr + POLARSA               2    0.8055    0.7826    0.7285
+KD + dGtr + VOL              3    0.8799    0.8574    0.8067
+
+BEST BY LORO: KD + dGtr + VOL (LORO R^2 = 0.8067)
+VOLUME VERDICT: VOL alone LORO = 0.0305;  adding VOL to KD moves LORO 0.6659 -> 0.8011 (+0.1351)
+
+================================================================================
+B  IS THE AXIS ALREADY IN THE INPUT? -- the arithmetic point
+================================================================================
+The feature vector ends in one_hot(20) = the destination residue, exact and
+lossless. A per-residue scalar table T is the matrix product one_hot @ T,
+i.e. a rank-1 linear projection of a block fc1 ALREADY receives.
+Demonstration: the saturated one-hot model has k=20 free parameters on n=20
+points, so it interpolates every table exactly.
+   one_hot @ w_KD     reproduces the table exactly, max|err| = 0.0e+00
+   one_hot @ w_dGtr   reproduces the table exactly, max|err| = 0.0e+00
+   one_hot @ w_VOL    reproduces the table exactly, max|err| = 0.0e+00
+
+   => a scalar descriptor block adds ZERO INFORMATION to fc1_gcn/fc1_gat.
+      It can only change the OPTIMISATION (a better-conditioned, lower-
+      dimensional parameterisation), never the hypothesis class.
+      This is the same conclusion FINDINGS 8.1 reached for W6 by a different
+      route (ProtT5 decodes identity at accuracy 1.000).
+
+================================================================================
+C  BURIAL x DESTINATION-CLASS INTERACTION, permutation-tested
+================================================================================
+observed (polar - big-phobic) slope gap, mean over 10 checkpoints:
+   buried    0.0947
+   mid       0.0708
+   exposed   0.0235
+   monotone buried > mid > exposed in 7/10 checkpoints
+   buried-minus-exposed = 0.0712
+
+NULL: shuffle the burial label WITHIN each protein (preserves each protein's
+      burial distribution, its destination mix, and its slope), 500 draws,
+      one checkpoint. Statistic = gap[buried] - gap[exposed].
+   observed (ck0) = +0.1495   null mean -0.0187  sd 0.0307   P(null >= obs) = 0.0000
+
+wrote results/sidechain_mech4.json

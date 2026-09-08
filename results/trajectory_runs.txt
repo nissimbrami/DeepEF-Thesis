@@ -1,0 +1,35 @@
+# results/trajectory_runs.txt -- ALLOWLIST for runs with more than one scored TEST epoch.
+#
+# Read scripts/gate_epoch_selection.py first. Every run in this project is scored on the
+# 28-protein test set exactly ONCE, at the epoch chosen by validation ddG PCC
+# (Megascale-fineTuning/run_calib_eval.sh line 15). A run with several scored test epochs
+# creates the opportunity to quote the best of them, which is test-set peeking. The two
+# runs below have six scored epochs each for a legitimate reason, recorded here.
+#
+# THE CANONICAL EPOCH IS BINDING. It is the val-selected epoch -- argmax of the
+# "ddG PCC=" lines in the training log, the same parse run_calib_eval.sh performs.
+# Any table, abstract, or thesis sentence quoting one of these runs MUST quote the
+# canonical epoch. The other scored epochs exist only to plot a trajectory.
+#
+# FORMAT (pipe-separated, one record per line):
+#   <run_tag> | canonical=e<N> | <one-line reason>
+#
+# ---------------------------------------------------------------------------------------
+# PROVENANCE OF THE CANONICAL EPOCHS (recomputed 2026-09-08, not assumed):
+#   gld_slope1.0_s42  <- logs/gld_slope_21080862.out   (SLURM 21080862, job name gld_slope)
+#       val ddG PCC by epoch: e0 .623 e1 .674 e2 .660 e3 .703 e4 .713 e5 .724 e6 .717
+#                             e7 .719 e8 .723 e9 .737 e10 .740 e11 .710 e12 .740
+#                             e13 .730 e14 .722
+#       argmax = 0.740, attained at e10 AND e12 (log prints 3 decimals, so the tie is real).
+#       run_calib_eval.sh uses python max(range(n), key=...), which returns the FIRST
+#       maximum -> e10. NOTE: the value 'e14' asserted in OPEN_PROBLEMS.md P0 step 3 is
+#       WRONG for this run; e14 has val PCC 0.722, the 8th-best of 15 epochs.
+#   gld_dg_coil_s42   <- logs/gld_dg_coil_21080861.out (SLURM 21080861, job name gld_dg_coil)
+#       val ddG PCC by epoch: e0 .541 e1 .579 e2 .569 e3 .603 e4 .607 e5 .607 e6 .621
+#                             e7 .648 e8 .700 e9 .702 e10 .737 e11 .743 e12 .758
+#                             e13 .747 e14 .769
+#       argmax = 0.769 at e14, uniquely. e14 is correct for this run.
+# ---------------------------------------------------------------------------------------
+
+gld_slope1.0_s42 | canonical=e10 | Trajectory arm for --slope_weight 1.0: scored at e0/4/8/12/13/14 to show r stays flat (0.79) while s climbs, testing a_p = r*s. Val argmax is e10 (PCC 0.740; e12 ties, first-max wins) -- NOT e14.
+gld_dg_coil_s42 | canonical=e14 | Trajectory arm for the dG coil reference state: scored at e0/4/8/12/13/14 to show the arm never recovers. Val argmax is e14 (PCC 0.769), uniquely.

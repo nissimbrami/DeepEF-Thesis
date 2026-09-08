@@ -1,0 +1,43 @@
+n=28  (designed=7 natural=21)
+
+=== A. POWER of the n=21 partial test (r(SASA,len)=-0.884) ===
+  observed partial SASA|len at n=21: +0.4109
+    true partial=0.30 -> power = 28.4%
+    true partial=0.40 -> power = 46.4%
+    true partial=0.50 -> power = 70.5%
+    true partial=0.60 -> power = 90.3%
+    true partial=0.70 -> power = 99.1%
+  => at n=21 with this collinearity, a p=0.072 result is EXPECTED even
+     when the true partial effect is real and moderate.
+
+=== B. Is DESIGNED the real driver? ===
+  mean a_p designed=0.3420 (n=7)  natural=0.4713 (n=21)  Welch p=0.1014
+  mean SASA designed=0.3892  natural=0.3868
+  partial SASA|designed        = +0.6882 p=7.266e-05
+  partial SASA|(length,designed) = +0.5876 p=0.001596  (df=24)
+  partial length|(SASA,designed) = +0.1579 p=0.4411  (df=24)
+
+=== C. WITHIN-LENGTH-STRATUM r(SASA, a_p), all 10 checkpoints ===
+  checkpoint                          short<=56        long>56
+  abl_anchor_w0.3_s42_e14.csv           +0.6741        +0.4262
+  abl_anchor_w1.0_s42_e14.csv           +0.5392        +0.3594
+  abl_anchor_w3.0_s42_e13.csv           +0.2841        +0.4419
+  abl_calib_ctrl_repro2_e14.csv         +0.7516        +0.5314
+  abl_p3_slope3.0_s42_e8.csv            +0.7263        +0.4601
+  abl_sigma_seed1_e13.csv               +0.7905        +0.4358
+  abl_sigma_seed2_e10.csv               +0.7032        +0.4097
+  abl_sigma_seed3_e13.csv               +0.7677        +0.4506
+  abl_sigma_seed42_e9.csv               +0.7774        +0.3888
+  abl_sigma_seed4_e14.csv               +0.7519        +0.5074
+  MEAN                                  +0.6766        +0.4411
+  sign-consistent                         10/10          10/10
+  n_short=15 (r_crit=0.514)  n_long=13 (r_crit=0.553)
+  natural-only length>=56 band: n=15  r(SASA,a)=+0.4354 p=0.1048  len 56-72
+  natural-only length<=56 band: n=8  r(SASA,a)=+0.5936 p=0.1208  len 44-56
+
+=== D. BOOTSTRAP: sr2(SASA) - sr2(length), n=28, 10000 resamples ===
+  point estimate = 0.3781
+  95% CI = [0.0300, 0.6338]
+  P(SASA explains more unique variance than length) = 0.984
+
+[wrote] results/length_confound3.json

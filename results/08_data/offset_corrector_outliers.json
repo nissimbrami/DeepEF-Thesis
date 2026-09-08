@@ -1,0 +1,502 @@
+{
+  "abl_anchor_w0.3_s42_e14.csv": {
+    "raw": 0.6157315677838243,
+    "oracle": 0.7294001443231708,
+    "gain": 0.11366857653934648,
+    "top": [
+      {
+        "k": 1,
+        "proteins": [
+          "2K5H"
+        ],
+        "pooled": 0.6963663404375484,
+        "frac_of_oracle_gain": 0.7093849074973883
+      },
+      {
+        "k": 2,
+        "proteins": [
+          "2K5H",
+          "3DKM"
+        ],
+        "pooled": 0.7063715927183736,
+        "frac_of_oracle_gain": 0.7974061758675595
+      },
+      {
+        "k": 3,
+        "proteins": [
+          "2K5H",
+          "3DKM",
+          "r18_3_TrROS_Hall"
+        ],
+        "pooled": 0.7113116160081057,
+        "frac_of_oracle_gain": 0.8408660610894184
+      },
+      {
+        "k": 5,
+        "proteins": [
+          "2K5H",
+          "3DKM",
+          "r18_3_TrROS_Hall",
+          "r12_757_TrROS_Hall",
+          "2L33"
+        ],
+        "pooled": 0.717222758668795,
+        "frac_of_oracle_gain": 0.892869374939691
+      }
+    ],
+    "all_except_top2": {
+      "pooled": 0.639177590063561,
+      "frac_of_oracle_gain": 0.20626652495838046
+    }
+  },
+  "abl_anchor_w1.0_s42_e14.csv": {
+    "raw": 0.6018048360626403,
+    "oracle": 0.706568144099486,
+    "gain": 0.10476330803684564,
+    "top": [
+      {
+        "k": 1,
+        "proteins": [
+          "2K5H"
+        ],
+        "pooled": 0.6833966716412715,
+        "frac_of_oracle_gain": 0.7788207255724972
+      },
+      {
+        "k": 2,
+        "proteins": [
+          "2K5H",
+          "3DKM"
+        ],
+        "pooled": 0.6940795065897469,
+        "frac_of_oracle_gain": 0.8807918750967013
+      },
+      {
+        "k": 3,
+        "proteins": [
+          "2K5H",
+          "3DKM",
+          "r18_3_TrROS_Hall"
+        ],
+        "pooled": 0.697950199557987,
+        "frac_of_oracle_gain": 0.9177389039827948
+      },
+      {
+        "k": 5,
+        "proteins": [
+          "2K5H",
+          "3DKM",
+          "r18_3_TrROS_Hall",
+          "2KVS",
+          "r12_757_TrROS_Hall"
+        ],
+        "pooled": 0.6957038054697563,
+        "frac_of_oracle_gain": 0.89629633854337
+      }
+    ],
+    "all_except_top2": {
+      "pooled": 0.6137421244618418,
+      "frac_of_oracle_gain": 0.11394531752474929
+    }
+  },
+  "abl_anchor_w3.0_s42_e13.csv": {
+    "raw": 0.5972146366712713,
+    "oracle": 0.6834305174394275,
+    "gain": 0.08621588076815623,
+    "top": [
+      {
+        "k": 1,
+        "proteins": [
+          "2K5H"
+        ],
+        "pooled": 0.6455672751557634,
+        "frac_of_oracle_gain": 0.5608321582252064
+      },
+      {
+        "k": 2,
+        "proteins": [
+          "2K5H",
+          "2K28"
+        ],
+        "pooled": 0.6487275804950386,
+        "frac_of_oracle_gain": 0.5974878800147181
+      },
+      {
+        "k": 3,
+        "proteins": [
+          "2K5H",
+          "2K28",
+          "2K1B"
+        ],
+        "pooled": 0.6534598073690614,
+        "frac_of_oracle_gain": 0.6523759914839753
+      },
+      {
+        "k": 5,
+        "proteins": [
+          "2K5H",
+          "2K28",
+          "2K1B",
+          "2L33",
+          "1GYZ"
+        ],
+        "pooled": 0.6617963026351726,
+        "frac_of_oracle_gain": 0.7490692594971964
+      }
+    ],
+    "all_except_top2": {
+      "pooled": 0.6284111838387566,
+      "frac_of_oracle_gain": 0.36184223706275404
+    }
+  },
+  "abl_calib_ctrl_repro2_e14.csv": {
+    "raw": 0.5909905844745712,
+    "oracle": 0.7113383026010308,
+    "gain": 0.12034771812645961,
+    "top": [
+      {
+        "k": 1,
+        "proteins": [
+          "2KVS"
+        ],
+        "pooled": 0.6337802217206836,
+        "frac_of_oracle_gain": 0.35555005040602167
+      },
+      {
+        "k": 2,
+        "proteins": [
+          "2KVS",
+          "2K5H"
+        ],
+        "pooled": 0.6872839702685806,
+        "frac_of_oracle_gain": 0.8001263945264478
+      },
+      {
+        "k": 3,
+        "proteins": [
+          "2KVS",
+          "2K5H",
+          "3DKM"
+        ],
+        "pooled": 0.6972001905129479,
+        "frac_of_oracle_gain": 0.8825228071775587
+      },
+      {
+        "k": 5,
+        "proteins": [
+          "2KVS",
+          "2K5H",
+          "3DKM",
+          "r18_3_TrROS_Hall",
+          "r12_757_TrROS_Hall"
+        ],
+        "pooled": 0.7026234502519014,
+        "frac_of_oracle_gain": 0.9275860607512978
+      }
+    ],
+    "all_except_top2": {
+      "pooled": 0.6151567142246792,
+      "frac_of_oracle_gain": 0.2008025588380047
+    }
+  },
+  "abl_p3_slope3.0_s42_e8.csv": {
+    "raw": 0.562395336215164,
+    "oracle": 0.6973629427813117,
+    "gain": 0.1349676065661477,
+    "top": [
+      {
+        "k": 1,
+        "proteins": [
+          "2KVS"
+        ],
+        "pooled": 0.6126276446899793,
+        "frac_of_oracle_gain": 0.3721804791003419
+      },
+      {
+        "k": 2,
+        "proteins": [
+          "2KVS",
+          "2K5H"
+        ],
+        "pooled": 0.6691074282079604,
+        "frac_of_oracle_gain": 0.790649658149615
+      },
+      {
+        "k": 3,
+        "proteins": [
+          "2KVS",
+          "2K5H",
+          "r18_3_TrROS_Hall"
+        ],
+        "pooled": 0.6745131352479292,
+        "frac_of_oracle_gain": 0.8307015430240752
+      },
+      {
+        "k": 5,
+        "proteins": [
+          "2KVS",
+          "2K5H",
+          "r18_3_TrROS_Hall",
+          "3DKM",
+          "HEEH_KT_rd6_0793"
+        ],
+        "pooled": 0.6926994343509402,
+        "frac_of_oracle_gain": 0.9654472021174506
+      }
+    ],
+    "all_except_top2": {
+      "pooled": 0.5909218784937803,
+      "frac_of_oracle_gain": 0.21135843632698198
+    }
+  },
+  "abl_sigma_seed1_e13.csv": {
+    "raw": 0.5948225001128529,
+    "oracle": 0.7005415542023027,
+    "gain": 0.10571905408944982,
+    "top": [
+      {
+        "k": 1,
+        "proteins": [
+          "2KVS"
+        ],
+        "pooled": 0.6378196831375178,
+        "frac_of_oracle_gain": 0.4067117644496198
+      },
+      {
+        "k": 2,
+        "proteins": [
+          "2KVS",
+          "2K5H"
+        ],
+        "pooled": 0.6828157242364974,
+        "frac_of_oracle_gain": 0.8323307929826225
+      },
+      {
+        "k": 3,
+        "proteins": [
+          "2KVS",
+          "2K5H",
+          "3DKM"
+        ],
+        "pooled": 0.6909739103112388,
+        "frac_of_oracle_gain": 0.9094993426353528
+      },
+      {
+        "k": 5,
+        "proteins": [
+          "2KVS",
+          "2K5H",
+          "3DKM",
+          "r18_3_TrROS_Hall",
+          "2K1B"
+        ],
+        "pooled": 0.6972474806758583,
+        "frac_of_oracle_gain": 0.9688412504745147
+      }
+    ],
+    "all_except_top2": {
+      "pooled": 0.6122528331479079,
+      "frac_of_oracle_gain": 0.16487409185771826
+    }
+  },
+  "abl_sigma_seed2_e10.csv": {
+    "raw": 0.6575170975981701,
+    "oracle": 0.7502562534069525,
+    "gain": 0.09273915580878234,
+    "top": [
+      {
+        "k": 1,
+        "proteins": [
+          "2K5H"
+        ],
+        "pooled": 0.721228930537638,
+        "frac_of_oracle_gain": 0.6870003547458909
+      },
+      {
+        "k": 2,
+        "proteins": [
+          "2K5H",
+          "3DKM"
+        ],
+        "pooled": 0.7314442286538917,
+        "frac_of_oracle_gain": 0.7971512185009638
+      },
+      {
+        "k": 3,
+        "proteins": [
+          "2K5H",
+          "3DKM",
+          "r18_3_TrROS_Hall"
+        ],
+        "pooled": 0.7351932741581797,
+        "frac_of_oracle_gain": 0.8375769208010593
+      },
+      {
+        "k": 5,
+        "proteins": [
+          "2K5H",
+          "3DKM",
+          "r18_3_TrROS_Hall",
+          "HEEH_KT_rd6_0793",
+          "2LQK"
+        ],
+        "pooled": 0.7444197768296962,
+        "frac_of_oracle_gain": 0.9370656706290228
+      }
+    ],
+    "all_except_top2": {
+      "pooled": 0.6767141115746413,
+      "frac_of_oracle_gain": 0.20700009407087225
+    }
+  },
+  "abl_sigma_seed3_e13.csv": {
+    "raw": 0.5798580035643223,
+    "oracle": 0.7177923930992908,
+    "gain": 0.1379343895349685,
+    "top": [
+      {
+        "k": 1,
+        "proteins": [
+          "2KVS"
+        ],
+        "pooled": 0.6355503890147078,
+        "frac_of_oracle_gain": 0.4037599734058104
+      },
+      {
+        "k": 2,
+        "proteins": [
+          "2KVS",
+          "2K5H"
+        ],
+        "pooled": 0.6883631034268186,
+        "frac_of_oracle_gain": 0.7866428396015674
+      },
+      {
+        "k": 3,
+        "proteins": [
+          "2KVS",
+          "2K5H",
+          "3DKM"
+        ],
+        "pooled": 0.6986265886479464,
+        "frac_of_oracle_gain": 0.8610512975338497
+      },
+      {
+        "k": 5,
+        "proteins": [
+          "2KVS",
+          "2K5H",
+          "3DKM",
+          "HEEH_KT_rd6_0793",
+          "r12_757_TrROS_Hall"
+        ],
+        "pooled": 0.7115282532020717,
+        "frac_of_oracle_gain": 0.9545860903989355
+      }
+    ],
+    "all_except_top2": {
+      "pooled": 0.6084685481249763,
+      "frac_of_oracle_gain": 0.20742140271988388
+    }
+  },
+  "abl_sigma_seed42_e9.csv": {
+    "raw": 0.592876266492947,
+    "oracle": 0.7016155253351669,
+    "gain": 0.10873925884221991,
+    "top": [
+      {
+        "k": 1,
+        "proteins": [
+          "2K5H"
+        ],
+        "pooled": 0.6412206271464683,
+        "frac_of_oracle_gain": 0.4445897568942302
+      },
+      {
+        "k": 2,
+        "proteins": [
+          "2K5H",
+          "2KVS"
+        ],
+        "pooled": 0.6711295257955695,
+        "frac_of_oracle_gain": 0.7196412789254667
+      },
+      {
+        "k": 3,
+        "proteins": [
+          "2K5H",
+          "2KVS",
+          "3DKM"
+        ],
+        "pooled": 0.6815766547534827,
+        "frac_of_oracle_gain": 0.8157163218230089
+      },
+      {
+        "k": 5,
+        "proteins": [
+          "2K5H",
+          "2KVS",
+          "3DKM",
+          "r18_3_TrROS_Hall",
+          "HEEH_KT_rd6_0793"
+        ],
+        "pooled": 0.6939103986197456,
+        "frac_of_oracle_gain": 0.9291412614224138
+      }
+    ],
+    "all_except_top2": {
+      "pooled": 0.6233611082228803,
+      "frac_of_oracle_gain": 0.28034807349723256
+    }
+  },
+  "abl_sigma_seed4_e14.csv": {
+    "raw": 0.6007836123576714,
+    "oracle": 0.7204401863291686,
+    "gain": 0.1196565739714972,
+    "top": [
+      {
+        "k": 1,
+        "proteins": [
+          "2K5H"
+        ],
+        "pooled": 0.6581875527887244,
+        "frac_of_oracle_gain": 0.4797391277868855
+      },
+      {
+        "k": 2,
+        "proteins": [
+          "2K5H",
+          "2KVS"
+        ],
+        "pooled": 0.6959418670434596,
+        "frac_of_oracle_gain": 0.795261401253686
+      },
+      {
+        "k": 3,
+        "proteins": [
+          "2K5H",
+          "2KVS",
+          "r18_3_TrROS_Hall"
+        ],
+        "pooled": 0.7002039777692431,
+        "frac_of_oracle_gain": 0.8308809295781289
+      },
+      {
+        "k": 5,
+        "proteins": [
+          "2K5H",
+          "2KVS",
+          "r18_3_TrROS_Hall",
+          "3DKM",
+          "r12_757_TrROS_Hall"
+        ],
+        "pooled": 0.711933607067951,
+        "frac_of_oracle_gain": 0.9289083835607396
+      }
+    ],
+    "all_except_top2": {
+      "pooled": 0.6253021308476081,
+      "frac_of_oracle_gain": 0.2049074085622502
+    }
+  }
+}

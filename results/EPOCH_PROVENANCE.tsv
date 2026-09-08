@@ -1,0 +1,50 @@
+tag	epoch	canonical_epoch	val_pcc	val_lines	log	is_canonical	pooled	pp	a_p	n_proteins	n_mut
+anchor_w0.3_s42	14			0	eval_anchor_w0.3_s42_21016096.out	False	0.6105	0.7271	0.5422	27	27189
+anchor_w1.0_s42	14			0	eval_anchor_w1.0_s42_21016098.out	False	0.5942	0.702	0.5741	27	27189
+anchor_w3.0_s42	13			0	eval_anchor_w3.0_s42_21016100.out	False	0.5364	0.6387	0.1474	27	27189
+calib_ctrl_repro2	14			0	eval_calib_ctrl_repro2_21015272.out	False	0.5635	0.7262	0.496	27	27189
+gld_dg_coil_s42	0			0	sc14_gld_dg_coil_s42_21109744.out	False	0.1758	0.3195	0.0262	27	27189
+gld_dg_coil_s42	4			0	sc14_gld_dg_coil_s42_21109744.out	False	0.2163	0.2604	0.0492	27	27189
+gld_dg_coil_s42	8			0	sc14_gld_dg_coil_s42_21109744.out	False	0.2002	0.2971	0.0833	27	27189
+gld_dg_coil_s42	12			0	sc14_gld_dg_coil_s42_21109744.out	False	0.213	0.347	0.0908	27	27189
+gld_dg_coil_s42	13			0	sc14_gld_dg_coil_s42_21109744.out	False	0.2482	0.3714	0.1029	27	27189
+gld_dg_coil_s42	14			0	sc14_gld_dg_coil_s42_21109744.out	False	0.2212	0.3478	0.0911	27	27189
+gld_slope1.0_s42	0			0	sc_gld_slope1.0_s42_e13_21109527.out	False	0.5712	0.6635	0.4796	27	27189
+gld_slope1.0_s42	4			0	sc_gld_slope1.0_s42_e13_21109527.out	False	0.5899	0.7216	0.5748	27	27189
+gld_slope1.0_s42	8			0	sc_gld_slope1.0_s42_e13_21109527.out	False	0.5837	0.7287	0.7039	27	27189
+gld_slope1.0_s42	10			0	sc_gld_slope1.0_s42_e13_21109527.out	False	0.5798	0.725	0.721	27	27189
+gld_slope1.0_s42	12			0	sc_gld_slope1.0_s42_e13_21109527.out	False	0.571	0.7274	0.6945	27	27189
+gld_slope1.0_s42	13			0	sc_gld_slope1.0_s42_e13_21109527.out	False	0.581	0.7301	0.7397	27	27189
+gld_slope1.0_s42	14			0	sc_gld_slope1.0_s42_e13_21109527.out	False	0.576	0.7302	0.7117	27	27189
+gld_u10bidir_s42	14			0		False	0.5893	0.7358	0.2371	27	27189
+gld_w5_dg_s42	14			0		False	0.5956	0.7299	0.6644	27	27189
+gld_w7edge_s42	14			0		False	0.5808	0.7307	0.3271	27	27189
+gld_w7span4_s42	12			0		False	0.5757	0.7295	0.316	27	27189
+loroW_onehot_s42	12			0		False	0.5716	0.7226	0.6169	27	27189
+p3_a0_d0_s0_D0_coil_seed1	13			0	p3_a0_d0_s0_D0_coil_seed1_21050063.out	False	0.5917	0.7339	0.3822	27	27189
+p3_a0_d0_s0_D0_coil_seed2	6			0	p3_a0_d0_s0_D0_coil_seed2_21050065.out	False	0.6258	0.7254	0.4487	27	27189
+p3_a0_d0_s0_D1_uemb_seed42	9			0	gev_p3_a0_d0_s0_D1_uemb_seed42_21081119.out	False	0.2006	0.1593	0.0068	27	27189
+p3_a0_d0_s1_D0_coil_seed1	13			0	p3_a0_d0_s1_D0_coil_seed1_21050068.out	False	0.5413	0.7252	0.3261	27	27189
+p3_a0_d0_s1_D0_coil_seed2	12			0	p3_a0_d0_s1_D0_coil_seed2_21050071.out	False	0.6097	0.7371	0.3705	27	27189
+p3_a0_d0_s1_D1_uemb_seed42	11			0	p3_a0_d0_s1_D1_uemb_seed42_21050047.out	False	0.1467	0.1294	0.0048	27	27189
+p3_a0_d1_s0_D0_coil_seed1	11			0	p3_a0_d1_s0_D0_coil_seed1_21050074.out	False	0.6145	0.7412	0.3793	27	27189
+p3_a0_d1_s0_D0_coil_seed2	7			0	p3_a0_d1_s0_D0_coil_seed2_21050077.out	False	0.5969	0.7274	0.4062	27	27189
+p3_a0_d1_s0_D1_uemb_seed42	13			0	gev_p3_a0_d1_s0_D1_uemb_seed42_21081175.out	False	0.2892	0.2183	0.0197	27	27189
+p3_a0_d1_s1_D0_coil_seed42	5			0	gev_p3_a0_d1_s1_D0_coil_seed42_21081174.out	False	0.5763	0.7249	0.3718	27	27189
+p3_a0_d1_s1_D1_uemb_seed42	6			0	p3_a0_d1_s1_D1_uemb_seed42_21050051.out	False	0.3172	0.2583	0.0113	27	27189
+p3_a1_d0_s0_D0_coil_seed42	14			0	p3_a1_d0_s0_D0_coil_seed42_21049411.out	False	0.5891	0.7067	0.5248	27	27189
+p3_a1_d0_s0_D1_uemb_seed42	14			0	p3_a1_d0_s0_D1_uemb_seed42_21050053.out	False	0.076	0.1574	0.0158	27	27189
+p3_a1_d0_s1_D0_coil_seed42	12			0	p3_a1_d0_s1_D0_coil_seed42_21049413.out	False	0.6028	0.7066	0.5707	27	27189
+p3_a1_d0_s1_D1_uemb_seed42	12			0	p3_a1_d0_s1_D1_uemb_seed42_21050055.out	False	0.1	0.1253	0.0052	27	27189
+p3_a1_d1_s0_D0_coil_seed42	13			0	gev_p3_a1_d1_s0_D0_coil_seed42_21081123.out	False	0.5915	0.6936	0.5075	27	27189
+p3_a1_d1_s0_D1_uemb_seed42	12			0	p3_a1_d1_s0_D1_uemb_seed42_21050057.out	False	-0.0741	0.1333	0.011	27	27189
+p3_a1_d1_s1_D0_coil_seed42	13			0	p3_a1_d1_s1_D0_coil_seed42_21049417.out	False	0.5803	0.7018	0.7156	27	27189
+p3_a1_d1_s1_D1_uemb_seed42	14			0	p3_a1_d1_s1_D1_uemb_seed42_21050059.out	False	0.1507	0.1749	0.0156	27	27189
+p3_slope0.3_s42	9			0	gev_p3_slope0.3_s42_21081176.out	False	0.5676	0.7296	0.3981	27	27189
+p3_slope1.0_s42	13			0	p3_slope1.0_s42_21024049.out	False	0.621	0.7445	0.5073	27	27189
+p3_slope3.0_s42	8			0	ev_p3_slope3.0_s42_21024110.out	False	0.5362	0.7132	0.3262	27	27189
+sigma_seed1	13			0	reeval_sigma_seed1_21024040.out	False	0.5607	0.7177	0.3808	27	27189
+sigma_seed2	10			0	sigma_seed2_21016040.out	False	0.6382	0.7379	0.4099	27	27189
+sigma_seed3	13			0	ev4_sigma_seed3_21024080.out	False	0.5564	0.7288	0.3438	27	27189
+sigma_seed4	14			0	ev4_sigma_seed42_21024078.out	False	0.5759	0.7269	0.3267	27	27189
+sigma_seed42	9			0	ev4_sigma_seed42_21024078.out	False	0.5592	0.7261	0.4335	27	27189

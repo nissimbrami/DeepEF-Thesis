@@ -1,0 +1,58 @@
+{
+  "b_p_wt": {
+    "ICC1_oneway_LOWER_bound": 0.8978216801985802,
+    "ICC_C1_twoway_seedshift_removed": 0.9515061460241213,
+    "ICC1_epoch_matched_pair_e13_only": 0.972220864041649,
+    "MS_column_seed_effect": 3.418907670388715,
+    "MS_error_after_removing_seed_shift": 0.09836784051929039,
+    "per_seed_column_mean": {
+      "seed1_e13": -0.1749192292857143,
+      "seed2_e10": -0.1825387342857143,
+      "seed3_e13": -0.2053566714285715,
+      "seed4_e14": -0.396035813,
+      "seed42_e9": 0.5147168685714284
+    },
+    "corr_columnmean_vs_epoch": -0.8053047564217316
+  },
+  "b_ddg": {
+    "ICC1_oneway_LOWER_bound": 0.8780256101020903,
+    "ICC_C1_twoway_seedshift_removed": 0.8772165676276895,
+    "ICC1_epoch_matched_pair_e13_only": 0.961271677884608,
+    "MS_column_seed_effect": 0.0031364297223711495,
+    "MS_error_after_removing_seed_shift": 0.003942452014727773,
+    "per_seed_column_mean": {
+      "seed1_e13": -0.021083694859043874,
+      "seed2_e10": -0.039005259164063784,
+      "seed3_e13": -0.010711058147971853,
+      "seed4_e14": -0.025183164320914775,
+      "seed42_e9": -0.030741437907602386
+    },
+    "corr_columnmean_vs_epoch": 0.6834700449353417
+  },
+  "a_p": {
+    "ICC1_oneway_LOWER_bound": 0.8449808134484463,
+    "ICC_C1_twoway_seedshift_removed": 0.9242771615146979,
+    "ICC1_epoch_matched_pair_e13_only": 0.8060322750145921,
+    "MS_column_seed_effect": 0.10750925243175952,
+    "MS_error_after_removing_seed_shift": 0.0031186983209256173,
+    "per_seed_column_mean": {
+      "seed1_e13": 0.46740177311270925,
+      "seed2_e10": 0.4495793331546585,
+      "seed3_e13": 0.3675242305223617,
+      "seed4_e14": 0.35963162972842205,
+      "seed42_e9": 0.49878454341049283
+    },
+    "corr_columnmean_vs_epoch": -0.7681081963669549
+  },
+  "achievable": {
+    "mean_raw_pooled_PCC": 0.6051714960251928,
+    "mean_offset_oracle_pooled_PCC": 0.7181291824745762,
+    "ICC_b_p_wt": 0.8978216801985802,
+    "ICC_b_ddg": 0.8780256101020903,
+    "bound_with_ICC_b_p_wt": 0.7074151650462355,
+    "bound_with_ICC_b_ddg": 0.7053206071721799,
+    "oracle_gain_PCC": 0.11295768644938342,
+    "identifiable_gain_PCC_b_ddg": 0.1001491111469871,
+    "lost_to_seed_noise_PCC": 0.012808575302396319
+  }
+}

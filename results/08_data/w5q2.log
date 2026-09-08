@@ -1,0 +1,48 @@
+test proteins: 28
+
+==============================================================================
+Q2  ZERO-INIT PLUMBING IDENTITY  (measures NO effect, by construction)
+==============================================================================
+Loads the W5-off checkpoint into a W5-ON model and zeroes the three new
+weight COLUMNS. The forward pass must then be identical to W5-off. This
+proves the block is wired where the model reads it. It is NOT evidence
+that burial helps -- a zeroed column cannot help.
+
+Naive "just switch the flag on" strict load -> RuntimeError:
+   size mismatch for fc1_gcn.weight: copying a param with shape torch.Size([64, 52]) from checkpoint, the shape in current model is torch.Size([64, 55]).
+   size mismatch for fc1_gat.weight: copying a param with shape torch.Size([64, 36]) from checkpoint, the shape in current model is torch.Size([64, 39]).
+
+zero-init load: missing=0 unexpected=0
+
+proteins compared: 28
+max |dG(zero-init W5 on) - dG(W5 off)| = 4.434e+00
+COLUMN-LEVEL IDENTITY: NOT ACHIEVABLE -- and the reason is a REAL
+ARCHITECTURAL FINDING, not a bug in this script. Verified by forward hooks:
+  fc1_gat / fc1_gcn outputs are BIT-IDENTICAL (max diff 0.000e+00), so the
+  zero-padding of those two weight matrices is correct and the three new
+  columns are provably unread -- zeroing the solvation columns in the DATA
+  changes the output by exactly nothing.
+  The divergence enters LATER, at inst_norm2. hydro_net.forward_gat takes a
+  STRUCTURALLY DIFFERENT BRANCH when solv_dim is set: the residual
+  `identity` becomes the PROJECTED x (after fc2_gat) instead of the raw
+  36-dim input, because the wider input can no longer be added to a
+  fixed-width output. That branch is chosen by the FLAG, not by the values.
+CONSEQUENCE: --burial_features is NOT a pure feature addition. Turning it on
+changes the GAT residual topology even when every burial value is zero, so
+a W5-on run is NOT a controlled comparison against a W5-off checkpoint.
+Any W5 factorial cell therefore confounds "burial information" with "moved
+the GAT residual". This needs an honest control arm -- see W5_ON_DG.md.
+REMINDER: this arm measures PLUMBING, never effect. It cannot say whether
+burial improves dG. That question needs training (Q3, GPU).
+
+------------------------------------------------------------------------------
+Q2b  HOW BIG IS THE CONFOUND? (architecture-only shift, burial forced to 0)
+------------------------------------------------------------------------------
+shift in predicted dG from the residual-branch change alone:
+  mean +0.7073   sd 1.7002   min -2.1375   max +4.4339
+  std(dG_off) across proteins = 1.7311
+  the architecture-only shift is 98.2% of the between-protein dG spread
+This is the size of the effect a W5 cell would show even if burial carried
+NO information at all. It is the control arm the factorial currently lacks.
+
+wrote results/w5_dg_q2.json

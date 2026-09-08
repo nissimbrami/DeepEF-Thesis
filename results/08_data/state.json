@@ -1,0 +1,10 @@
+{
+  "state": "S3_FACTORIAL",
+  "entered": "2026-09-07T16:46Z",
+  "cells_done": 14,
+  "cells_total": 16,
+  "decisions": [],
+  "blocked": [],
+  "retries": {},
+  "submitted": []
+}

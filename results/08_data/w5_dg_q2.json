@@ -1,0 +1,197 @@
+{
+  "Q2": {
+    "question": "is the W5 block wired where the model reads it (zero-init identity; measures no effect)",
+    "max_abs_diff": 4.433878183364868,
+    "identical": false,
+    "n_proteins": 28,
+    "naive_strict_load_error": [
+      "size mismatch for fc1_gcn.weight: copying a param with shape torch.Size([64, 52]) from checkpoint, the shape in current model is torch.Size([64, 55]).",
+      "size mismatch for fc1_gat.weight: copying a param with shape torch.Size([64, 36]) from checkpoint, the shape in current model is torch.Size([64, 39])."
+    ],
+    "finding": "fc1_gat/fc1_gcn outputs are bit-identical under zero-init, so the new columns are provably unread; the divergence enters at inst_norm2 because forward_gat switches the residual `identity` from the raw input to the projected x whenever solv_dim is set. --burial_features changes the GAT residual topology, not only the feature set.",
+    "per_protein": [
+      {
+        "protein": "1GYZ",
+        "dG_off": 1.5831758975982666,
+        "dG_zeroinit": 0.030678868293762207,
+        "diff": -1.5524970293045044
+      },
+      {
+        "protein": "1PSE",
+        "dG_off": -2.1244125366210938,
+        "dG_zeroinit": -0.10371670126914978,
+        "diff": 2.020695835351944
+      },
+      {
+        "protein": "1QKH",
+        "dG_off": -2.2003464698791504,
+        "dG_zeroinit": -0.08965983241796494,
+        "diff": 2.1106866374611855
+      },
+      {
+        "protein": "1QP2",
+        "dG_off": -1.7991714477539062,
+        "dG_zeroinit": -0.11771544814109802,
+        "diff": 1.6814559996128082
+      },
+      {
+        "protein": "1TUC",
+        "dG_off": 1.590457558631897,
+        "dG_zeroinit": -0.027960658073425293,
+        "diff": -1.6184182167053223
+      },
+      {
+        "protein": "1W4H",
+        "dG_off": -1.3656370639801025,
+        "dG_zeroinit": -0.07654249668121338,
+        "diff": 1.2890945672988892
+      },
+      {
+        "protein": "2BTH",
+        "dG_off": -0.34722328186035156,
+        "dG_zeroinit": -0.03167843818664551,
+        "diff": 0.31554484367370605
+      },
+      {
+        "protein": "2K1B",
+        "dG_off": -0.17222735285758972,
+        "dG_zeroinit": -0.09526056051254272,
+        "diff": 0.076966792345047
+      },
+      {
+        "protein": "2K28",
+        "dG_off": 0.15628445148468018,
+        "dG_zeroinit": -0.03543722629547119,
+        "diff": -0.19172167778015137
+      },
+      {
+        "protein": "2K5H",
+        "dG_off": 1.109865665435791,
+        "dG_zeroinit": 0.036224365234375,
+        "diff": -1.073641300201416
+      },
+      {
+        "protein": "2KVS",
+        "dG_off": -4.242201805114746,
+        "dG_zeroinit": -0.05838155746459961,
+        "diff": 4.1838202476501465
+      },
+      {
+        "protein": "2KWH",
+        "dG_off": -1.2479636669158936,
+        "dG_zeroinit": -0.06641703844070435,
+        "diff": 1.1815466284751892
+      },
+      {
+        "protein": "2KXD",
+        "dG_off": -2.3053574562072754,
+        "dG_zeroinit": -0.15819746255874634,
+        "diff": 2.147159993648529
+      },
+      {
+        "protein": "2L33",
+        "dG_off": 1.056796908378601,
+        "dG_zeroinit": -0.04590880870819092,
+        "diff": -1.102705717086792
+      },
+      {
+        "protein": "2LQK",
+        "dG_off": -4.548507213592529,
+        "dG_zeroinit": -0.11462903022766113,
+        "diff": 4.433878183364868
+      },
+      {
+        "protein": "2WXC",
+        "dG_off": -1.6401171684265137,
+        "dG_zeroinit": -0.08890831470489502,
+        "diff": 1.5512088537216187
+      },
+      {
+        "protein": "3DKM",
+        "dG_off": -1.1300973892211914,
+        "dG_zeroinit": -0.07595646381378174,
+        "diff": 1.0541409254074097
+      },
+      {
+        "protein": "4C26",
+        "dG_off": -1.2332042455673218,
+        "dG_zeroinit": -0.026778921484947205,
+        "diff": 1.2064253240823746
+      },
+      {
+        "protein": "6EWS",
+        "dG_off": -0.6871004104614258,
+        "dG_zeroinit": -0.0293961763381958,
+        "diff": 0.65770423412323
+      },
+      {
+        "protein": "6EWT",
+        "dG_off": 0.09960436820983887,
+        "dG_zeroinit": -0.04628920555114746,
+        "diff": -0.14589357376098633
+      },
+      {
+        "protein": "6EWU",
+        "dG_off": 0.37813234329223633,
+        "dG_zeroinit": -0.040271639823913574,
+        "diff": -0.4184039831161499
+      },
+      {
+        "protein": "HEEH_KT_rd6_0746",
+        "dG_off": -1.004469633102417,
+        "dG_zeroinit": -0.014622211456298828,
+        "diff": 0.9898474216461182
+      },
+      {
+        "protein": "HEEH_KT_rd6_0793",
+        "dG_off": -4.135743618011475,
+        "dG_zeroinit": -0.06016707420349121,
+        "diff": 4.075576543807983
+      },
+      {
+        "protein": "HHH_rd1_0142",
+        "dG_off": -1.3298864364624023,
+        "dG_zeroinit": -0.07744649052619934,
+        "diff": 1.252439945936203
+      },
+      {
+        "protein": "HHH_rd1_0244",
+        "dG_off": 0.2799452841281891,
+        "dG_zeroinit": -0.02960062026977539,
+        "diff": -0.3095459043979645
+      },
+      {
+        "protein": "r11_1081_TrROS_Hall",
+        "dG_off": 2.1554512977600098,
+        "dG_zeroinit": 0.017925739288330078,
+        "diff": -2.1375255584716797
+      },
+      {
+        "protein": "r12_757_TrROS_Hall",
+        "dG_off": 0.8096168041229248,
+        "dG_zeroinit": 0.0073250532150268555,
+        "diff": -0.802291750907898
+      },
+      {
+        "protein": "r18_3_TrROS_Hall",
+        "dG_off": 1.044606328010559,
+        "dG_zeroinit": -0.025162696838378906,
+        "diff": -1.069769024848938
+      }
+    ]
+  },
+  "Q2b": {
+    "question": "magnitude of the architecture-only shift when --burial_features is on but burial is zero",
+    "mean": 0.7073492586080518,
+    "sd": 1.700226529239021,
+    "min": -2.1375255584716797,
+    "max": 4.433878183364868,
+    "std_dG_off": 1.7311456789626936,
+    "pct_of_between_protein_spread": 98.21394871041707
+  },
+  "Q3": {
+    "question": "does W5 reduce MAE / std(err) on absolute WT dG",
+    "status": "NOT MEASURABLE WITHOUT TRAINING",
+    "why": "W5 widens fc1_gat 36->39 and fc1_gcn 52->55. A W5-off checkpoint has no weights for those columns; loading it into a W5-on model raises a size mismatch. Any number produced by forcing it would be attributable to untrained columns, not to burial."
+  }
+}

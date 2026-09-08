@@ -122,7 +122,14 @@ you something the mean alone hides.
 | **D0 (coil reference)** | 7 | 0.5939 +/- 0.0165 | 0.5030 |
 | **D1 (`--unfolded_emb zero`)** | 8 | 0.1508 +/- 0.1243 | 0.0113 |
 
-**D0 - D1 = 0.4431 pooled = 7.4 seed sigmas.**
+**D0 - D1 = 0.4431 pooled = 7.4 seed sigmas** (sigma = the +/-0.060 seed band).
+
+> **Which sigma?** MASTER 5.2 quotes this separation as **14.4 sigma** using *D0's own
+> sd* (0.0091) as the denominator. This table deliberately uses the **seed band**
+> (+/-0.060) instead, which is the more conservative choice and the bar every other
+> lever in this report is held to. Same gap, different yardstick -- 7.4 sigma here vs
+> 14.4 there. Quote the denominator whenever you quote the number; a sigma without its
+> definition is exactly the kind of unqualified statistic MASTER 1.4 corrects.
 
 Read the *spreads*, not only the means. D0's own sd is 0.0165, **3.6x tighter than the
 +/-0.060 seed band**; D1's is 0.1243, an order of magnitude wider, and it contains a cell that
@@ -236,11 +243,11 @@ a0_d1_s0_D0_coil_seed42            max ckpt e14
 **Training stopped short of epoch 14 (7):**
 
 ```
-a1_d1_s1_D0_coil_seed1             max ckpt e5
-a0_d0_s0_D1_uemb_seed1             max ckpt e3
-a0_d0_s1_D1_uemb_seed1             max ckpt e0
-a1_d1_s1_D0_coil_seed2             max ckpt e3
-a0_d0_s0_D1_uemb_seed2             max ckpt e1
+a1_d1_s1_D0_coil_seed1             max ckpt e6
+a0_d0_s0_D1_uemb_seed1             max ckpt e4
+a0_d0_s1_D1_uemb_seed1             max ckpt e1
+a1_d1_s1_D0_coil_seed2             max ckpt e4
+a0_d0_s0_D1_uemb_seed2             max ckpt e2
 a0_d0_s0_D0_coil_seed42            max ckpt e9
 a0_d0_s1_D0_coil_seed42            max ckpt e9
 ```
@@ -262,6 +269,34 @@ a1_d0_s1_D1_uemb_seed2             no dir
 a1_d1_s0_D1_uemb_seed2             no dir
 a1_d1_s1_D1_uemb_seed2             no dir
 ```
+
+## 4b. The scoring backlog
+
+**14 run(s) have a `kf_all_epoch_14.pt` and no CSV.** Scoring is a forward pass over the
+test proteins and never needed a GPU (MASTER 6.6), so this backlog is CPU-recoverable at
+zero GPU cost -- it is a throughput problem, not a science problem.
+
+```
+loroW_desc_s42
+p3_a0_d0_s1_D0_coil_seed1
+p3_a0_d0_s1_D0_coil_seed2
+p3_a0_d1_s0_D0_coil_seed1
+p3_a0_d1_s0_D0_coil_seed2
+p3_a0_d1_s0_D0_coil_seed42
+p3_a0_d1_s1_D0_coil_seed1
+p3_a0_d1_s1_D0_coil_seed2
+p3_a1_d0_s0_D0_coil_seed1
+p3_a1_d0_s0_D0_coil_seed2
+p3_a1_d0_s1_D0_coil_seed1
+p3_a1_d0_s1_D0_coil_seed2
+p3_a1_d1_s0_D0_coil_seed1
+p3_a1_d1_s0_D0_coil_seed2
+```
+
+**A finished training run is NOT a result** (MASTER 12.3). Track
+`ls eval_results/abl_*.csv | wc -l`, never a DONE message: `run_calib_eval.sh` prints
+`DONE ... -> abl_<tag>.csv` *after* a crash, with no CSV on disk. Every row in this
+report was built by reading a CSV off disk, so the artifact is the evidence.
 
 ## 5. Suppressed epochs -- NOT run results
 

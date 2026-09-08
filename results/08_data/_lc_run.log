@@ -1,0 +1,103 @@
+eval CSVs found: 10
+   eval_results/abl_anchor_w0.3_s42_e14.csv
+   eval_results/abl_anchor_w1.0_s42_e14.csv
+   eval_results/abl_anchor_w3.0_s42_e13.csv
+   eval_results/abl_calib_ctrl_repro2_e14.csv
+   eval_results/abl_p3_slope3.0_s42_e8.csv
+   eval_results/abl_sigma_seed1_e13.csv
+   eval_results/abl_sigma_seed2_e10.csv
+   eval_results/abl_sigma_seed3_e13.csv
+   eval_results/abl_sigma_seed42_e9.csv
+   eval_results/abl_sigma_seed4_e14.csv
+
+structural features computed for 28 proteins
+
+=== CONFOUND: corr(length, mean_rel_SASA), n=28 ===
+  pearson  r = -0.6662  p=0.000109
+  spearman r = -0.6280  p=0.000347
+  length range: 43 - 72 aa
+  |r| < 0.374 is indistinguishable from 0 at p=0.05 (n=28)
+
+=== RAW CORRELATIONS WITH a_p, per checkpoint (n=28 each) ===
+                          csv  n  r_a_SASA   r_a_len  r_a_nmut  r_a_sdddg
+  abl_anchor_w0.3_s42_e14.csv 28  0.586610 -0.153083 -0.113349  -0.320528
+  abl_anchor_w1.0_s42_e14.csv 28  0.471364 -0.081857 -0.043756  -0.296487
+  abl_anchor_w3.0_s42_e13.csv 28  0.399722 -0.148384 -0.121485  -0.215826
+abl_calib_ctrl_repro2_e14.csv 28  0.713891 -0.284106 -0.275431  -0.251529
+   abl_p3_slope3.0_s42_e8.csv 28  0.675934 -0.238744 -0.235551  -0.338918
+      abl_sigma_seed1_e13.csv 28  0.682900 -0.233070 -0.222330  -0.322700
+      abl_sigma_seed2_e10.csv 28  0.632002 -0.247588 -0.212249  -0.282027
+      abl_sigma_seed3_e13.csv 28  0.698947 -0.286278 -0.286378  -0.304697
+      abl_sigma_seed42_e9.csv 28  0.673881 -0.220378 -0.209622  -0.327144
+      abl_sigma_seed4_e14.csv 28  0.703302 -0.255023 -0.239436  -0.278687
+
+=== PARTIAL CORRELATIONS WITH a_p (df=n-3) ===
+                          csv  pr_SASA_ctrl_len  pp_SASA_ctrl_len  pr_len_ctrl_SASA  pp_len_ctrl_SASA
+  abl_anchor_w0.3_s42_e14.csv          0.657607          0.000193          0.393648          0.042201
+  abl_anchor_w1.0_s42_e14.csv          0.560831          0.002342          0.353032          0.070876
+  abl_anchor_w3.0_s42_e13.csv          0.407960          0.034652          0.172518          0.389518
+abl_calib_ctrl_repro2_e14.csv          0.733712          0.000013          0.366751          0.059878
+   abl_p3_slope3.0_s42_e8.csv          0.713745          0.000029          0.385010          0.047356
+      abl_sigma_seed1_e13.csv          0.727552          0.000017          0.407343          0.034953
+      abl_sigma_seed2_e10.csv          0.646419          0.000270          0.300180          0.128183
+      abl_sigma_seed3_e13.csv          0.711267          0.000032          0.336361          0.086258
+      abl_sigma_seed42_e9.csv          0.724575          0.000019          0.414883          0.031410
+      abl_sigma_seed4_e14.csv          0.739719          0.000010          0.402817          0.037229
+
+=== SASA controlling for the STATISTICAL confounds ===
+                          csv  pr_SASA_ctrl_nmut  pp_SASA_ctrl_nmut  pr_SASA_ctrl_sdddg  pp_SASA_ctrl_sdddg
+  abl_anchor_w0.3_s42_e14.csv           0.703177           0.000043            0.529491            0.004508
+  abl_anchor_w1.0_s42_e14.csv           0.606471           0.000798            0.404840            0.036197
+  abl_anchor_w3.0_s42_e13.csv           0.437696           0.022413            0.351127            0.072518
+abl_calib_ctrl_repro2_e14.csv           0.749954           0.000007            0.690890            0.000066
+   abl_p3_slope3.0_s42_e8.csv           0.726795           0.000018            0.627886            0.000454
+      abl_sigma_seed1_e13.csv           0.747037           0.000008            0.639309            0.000331
+      abl_sigma_seed2_e10.csv           0.683526           0.000085            0.590992            0.001170
+      abl_sigma_seed3_e13.csv           0.720308           0.000023            0.661550            0.000172
+      abl_sigma_seed42_e9.csv           0.744450           0.000008            0.628010            0.000453
+      abl_sigma_seed4_e14.csv           0.762436           0.000004            0.672401            0.000122
+
+=== SUMMARY over 10 checkpoints ===
+  r_a_SASA               mean=+0.6239  median=+0.6749  min=+0.3997  max=+0.7139  sign-consistent=10/10  p<.05 in 10/10
+  r_a_len                mean=-0.2149  median=-0.2359  min=-0.2863  max=-0.0819  sign-consistent=10/10  p<.05 in 0/10
+  r_a_nmut               mean=-0.1960  median=-0.2173  min=-0.2864  max=-0.0438  sign-consistent=10/10  p<.05 in 0/10
+  r_a_sdddg              mean=-0.2939  median=-0.3006  min=-0.3389  max=-0.2158  sign-consistent=10/10  p<.05 in 0/10
+  pr_SASA_ctrl_len       mean=+0.6623  median=+0.7125  min=+0.4080  max=+0.7397  sign-consistent=10/10  p<.05 in 10/10
+  pr_len_ctrl_SASA       mean=+0.3533  median=+0.3759  min=+0.1725  max=+0.4149  sign-consistent=10/10  p<.05 in 5/10
+  pr_SASA_ctrl_nmut      mean=+0.6882  median=+0.7236  min=+0.4377  max=+0.7624  sign-consistent=10/10  p<.05 in 10/10
+  pr_SASA_ctrl_sdddg     mean=+0.5796  median=+0.6279  min=+0.3511  max=+0.6909  sign-consistent=10/10  p<.05 in 9/10
+  rho_a_SASA             mean=+0.5866  median=+0.6188  min=+0.4357  max=+0.6585  sign-consistent=10/10  p<.05 in n/a
+  rho_a_len              mean=-0.1020  median=-0.1071  min=-0.1735  max=-0.0316  sign-consistent=10/10  p<.05 in n/a
+
+=== STRUCTURE TABLE (checkpoint-independent) ===
+            protein  length  mean_rel_SASA  frac_buried_rel_lt_0.25  plddt_mean  total_SASA  SASA_per_residue  mean_hydropathy_KD
+   HEEH_KT_rd6_0746      43       0.412159                 0.279070         NaN 3728.149918         86.701161           -0.706977
+       HHH_rd1_0244      43       0.379038                 0.372093         NaN 3409.117803         79.281809           -1.616279
+   HEEH_KT_rd6_0793      43       0.376348                 0.279070         NaN 3439.779207         79.994865           -1.183721
+       HHH_rd1_0142      43       0.350977                 0.372093         NaN 3355.927209         78.044819           -1.432558
+               1W4H      44       0.468365                 0.272727   81.625455 3853.825084         87.586934           -0.477273
+               2WXC      44       0.469360                 0.318182   82.390227 3891.261308         88.437757           -0.425000
+               2BTH      44       0.466353                 0.295455   83.712955 3858.339390         87.689532           -0.425000
+               2K1B      49       0.416145                 0.326531   90.235918 4282.948696         87.407116           -0.875510
+r11_1081_TrROS_Hall      49       0.425343                 0.265306   88.119184 4090.162237         83.472699           -0.336735
+               2K28      50       0.411801                 0.300000   93.039800 4300.857207         86.017144           -0.990000
+               2KWH      52       0.423509                 0.250000   89.119808 4765.137414         91.637258           -0.875000
+   r18_3_TrROS_Hall      52       0.383477                 0.288462   89.638654 4306.867162         82.824368           -0.775000
+ r12_757_TrROS_Hall      54       0.397390                 0.240741   87.556111 4460.228141         82.596817           -0.544444
+               6EWS      56       0.374006                 0.357143   87.571250 4353.097934         77.733892           -0.673214
+               6EWU      56       0.372915                 0.339286   86.139286 4258.579437         76.046061           -0.451786
+               6EWT      57       0.392859                 0.315789   87.295789 4563.101943         80.054420           -0.696491
+               1TUC      59       0.381084                 0.338983   93.206102 4426.757437         75.029787           -0.520339
+               1GYZ      59       0.374084                 0.372881   87.958475 4431.853930         75.116168           -0.006780
+               2LQK      62       0.383613                 0.354839   88.534032 4476.048083         72.194324           -0.100000
+               4C26      62       0.373256                 0.370968   95.837742 4436.710631         71.559849           -0.459677
+               2K5H      62       0.361546                 0.338710   87.135323 4243.541877         68.444224            0.090323
+               1QP2      63       0.348866                 0.301587   94.384127 4391.714592         69.709755           -0.276190
+               2KVS      67       0.343078                 0.432836   94.197015 4616.005546         68.895605           -0.347761
+               1QKH      68       0.319255                 0.441176   94.901324 4404.964699         64.778893           -0.191176
+               1PSE      68       0.394985                 0.308824   94.855294 5114.712218         75.216356           -0.164706
+               2KXD      71       0.373232                 0.394366   88.335493 4964.753458         69.926105           -0.540845
+               2L33      71       0.339158                 0.366197   96.316338 4831.450215         68.048595           -0.584507
+               3DKM      72       0.336355                 0.416667   94.165833 4649.785106         64.580349           -0.706944
+
+[wrote] results/length_confound.json

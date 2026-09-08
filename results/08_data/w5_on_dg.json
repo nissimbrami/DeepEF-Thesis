@@ -1,0 +1,36 @@
+{
+ "eval_csv": "eval_results/abl_calib_ctrl_repro2_e14.csv",
+ "n": 19,
+ "correlations": {
+  "mean_burial~b_p": {
+   "pearson": -0.34299064315161837,
+   "spearman": -0.2824561403508772,
+   "n": 19
+  },
+  "mean_burial~abs_b_p": {
+   "pearson": 0.1851078277196195,
+   "spearman": 0.04736842105263158,
+   "n": 19
+  },
+  "frac_buried~b_p": {
+   "pearson": -0.03941269764078355,
+   "spearman": -0.007017543859649123,
+   "n": 19
+  },
+  "frac_buried~abs_b_p": {
+   "pearson": -0.11427333901484751,
+   "spearman": -0.18947368421052632,
+   "n": 19
+  },
+  "length~b_p": {
+   "pearson": -0.3682425155875586,
+   "spearman": -0.34912280701754383,
+   "n": 19
+  },
+  "length~abs_b_p": {
+   "pearson": 0.22182109458714044,
+   "spearman": 0.007017543859649123,
+   "n": 19
+  }
+ }
+}

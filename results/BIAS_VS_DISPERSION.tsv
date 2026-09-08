@@ -1,0 +1,4 @@
+file	n_proteins	global_constant	std_b_p	mae_b_p	frac_variance_global	n_under	n_over	mae_equals_bias	a_p_median	a_p_min	a_p_max	a_p_below_0p3	pp_median
+abl_p3_slope1.0_s42_e13.csv	27	0.3582	0.4529	0.4249	0.3848	7	20	False	0.5073	0.1112	1.326	4	0.8034
+abl_calib_ctrl_repro2_e14.csv	27	0.4141	0.5064	0.4594	0.4007	5	22	False	0.496	0.0789	1.2566	4	0.7929
+abl_sigma_seed2_e10.csv	27	0.4518	0.4106	0.4669	0.5477	1	26	False	0.4099	0.0823	0.8503	5	0.7906

@@ -1,0 +1,87 @@
+------------------------------------
+Tue 08 Sep 2026 02:12:23 IDT
+SLURM_JOBID:		21109548
+SLURM_JOB_NODELIST:	cs-cpu-05
+SLURM_SCRATCH_DIR:	
+Allocated Resouces:	cpu - 2 / mem - 8192 MB / gpu - 
+SLURM_GPU_INDEX:	
+Running as nissimb from keasar account with normal QOS
+------------------------------------
+checkpoints 10   destinations 20   (within-protein centred)
+
+====================================================================================
+WHICH RESIDUE-PROPERTY TABLE EXPLAINS THE PER-DESTINATION SLOPE?
+====================================================================================
+table             r(slope)       R^2 rho(slope)  r(spear)    sign<0
+------------------------------------------------------------------------------------
+KD                 -0.7654    0.5859   -0.7542   -0.7617     10/10
+dGtr_FauchereP     -0.7308    0.5340   -0.7406   -0.8059     10/10
+VOL                -0.3724    0.1387   -0.3123   -0.4979     10/10
+POLARSA            +0.6269    0.3929   +0.6834   +0.6304      0/10
+HB_donacc          +0.5824    0.3392   +0.6454   +0.5906      0/10
+ABS_CHARGE         +0.4044    0.1635   +0.4995   +0.4547      0/10
+CHARGE             -0.0677    0.0046   -0.0053   -0.1010      7/10
+FLEX_chi           +0.0502    0.0025   +0.1546   +0.0017      4/10
+HELIX_prop         +0.3450    0.1190   +0.1931   +0.3265      0/10
+BETA_prop          -0.7329    0.5371   -0.7105   -0.7897     10/10
+
+BEST single table: KD  (|r| = 0.7654, R^2 = 0.5859)
+
+====================================================================================
+HEAD TO HEAD: every table vs KD, partial correlations (target = slope)
+====================================================================================
+table X              part(X|KD)     part(KD|X)    r(X,KD)
+------------------------------------------------------------------------------------
+dGtr_FauchereP          -0.3437        -0.4492    +0.8106
+VOL                     -0.5616        -0.8115    +0.0470
+POLARSA                 +0.0155        -0.5800    -0.8218
+HB_donacc               -0.2295        -0.6519    -0.8610
+ABS_CHARGE              -0.0962        -0.7192    -0.5915
+CHARGE                  -0.1790        -0.7763    -0.0641
+FLEX_chi                -0.4734        -0.8308    -0.4199
+HELIX_prop              +0.3937        -0.8073    -0.1085
+BETA_prop               -0.4781        -0.5570    +0.6701
+
+====================================================================================
+THE W/Y DIAGNOSTIC -- are they exceptions, or does the right axis include them?
+====================================================================================
+mean centred slope: aliphatic/aromatic AVILMFC = 0.1761   polar DEKRNQSTHG = 0.2783
+  W: slope 0.1836  KD  -0.9 (says POLAR)   dGtr +2.25 (says HYDROPHOBIC)
+  Y: slope 0.1888  KD  -1.3 (says POLAR)   dGtr +0.96 (says HYDROPHOBIC)
+  -> W/Y sit with the HYDROPHOBIC group (0.1862 vs 0.2783), so a table that scores
+     them as hydrophobic is the correct axis; KD scores them as polar.
+
+  residuals of slope ~ KD  (positive = KD under-predicts compression):
+    G    resid +0.0414   dGtr +0.00
+    S    resid +0.0387   dGtr -0.04
+    I    resid +0.0262   dGtr +1.80
+    P    resid +0.0256   dGtr +0.72
+    T    resid +0.0190   dGtr +0.26
+    A    resid +0.0188   dGtr +0.31
+    V    resid +0.0166   dGtr +1.22
+    N    resid +0.0129   dGtr -0.60
+    Q    resid +0.0053   dGtr -0.22
+    D    resid +0.0050   dGtr -0.77
+    E    resid +0.0038   dGtr -0.64
+    H    resid +0.0031   dGtr +0.13
+    K    resid +0.0015   dGtr -0.99
+    L    resid -0.0062   dGtr +1.70
+    M    resid -0.0107   dGtr +1.23
+    R    resid -0.0199   dGtr -1.01
+    F    resid -0.0233   dGtr +1.79
+    C    resid -0.0455   dGtr +1.54
+    W    resid -0.0558   dGtr +2.25
+    Y    resid -0.0566   dGtr +0.96
+
+  SSE(slope ~ KD)   = 0.015278
+  SSE(slope ~ dGtr) = 0.010809   ratio 0.707
+
+====================================================================================
+DEGENERATE BASELINE -- 5000 destination-label shuffles, best table
+====================================================================================
+  KD               |r|=0.8459   P(null >= obs) = 0.0000
+  dGtr_FauchereP   |r|=0.8937   P(null >= obs) = 0.0000
+  VOL              |r|=0.4182   P(null >= obs) = 0.0690
+  POLARSA          |r|=0.7402   P(null >= obs) = 0.0006
+
+wrote results/sidechain_mech3.json

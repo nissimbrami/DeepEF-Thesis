@@ -1,0 +1,21 @@
+=== Spearman (rank, outlier-insensitive), n=24 ===
+  plddt vs pcc_ddG   pearson -0.4899   spearman -0.6817
+  plddt vs a_p       pearson -0.5336   spearman -0.2913
+  plddt vs dG_MAE    pearson +0.3325   spearman +0.3357
+  plddt vs |b_p|     pearson +0.2555   spearman +0.1643
+
+=== leave-one-out on pearson: most influential protein per series ===
+  pcc_ddG  base r=-0.4899   drop 2L33                 -> r=-0.5439   (LOO min/max -0.5439/-0.4472)
+  a_p      base r=-0.5336   drop 1W4H                 -> r=-0.3986   (LOO min/max -0.5908/-0.3986)
+  dG_MAE   base r=+0.3325   drop r12_757_TrROS_Hall   -> r=+0.4159   (LOO min/max +0.2679/+0.4159)
+  |b_p|    base r=+0.2555   drop 2KVS                 -> r=+0.1533   (LOO min/max +0.1533/+0.3313)
+
+=== confound: is pLDDT a proxy for length? ===
+  n_residues range over the 24: 44-72
+  plddt vs length      r=+0.7120
+  length vs pcc_ddG    r=-0.5096
+  length vs a_p        r=-0.6340
+
+=== designed vs natural (the 4 no-pLDDT are all designed) ===
+  designed  n= 7  pcc_mean 0.7214  a_p_mean 0.3886  MAE_mean 1.4771
+  natural   n=21  pcc_mean 0.7342  a_p_mean 0.5642  MAE_mean 1.2123

@@ -1,0 +1,9 @@
+n=24   corr(plddt, length) = +0.7120  (p=9.52e-05)
+
+target       r_plddt   r_length   plddt|length   length|plddt
+pcc_ddG      -0.4899    -0.5096   -0.2103(p=0.34)   -0.2626(p=0.23)
+a_p          -0.5336    -0.6340   -0.1513(p=0.49)   -0.4279(p=0.042)
+dG_MAE       +0.3325    +0.1159   +0.3584(p=0.093)   -0.1825(p=0.4)
+|b_p|        +0.2555    +0.2067   +0.1578(p=0.47)   +0.0364(p=0.87)
+
+Bonferroni bar over 90 tests: 5.6e-4

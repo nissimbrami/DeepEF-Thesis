@@ -1,0 +1,114 @@
+{
+ "eval_csv": "eval_results/abl_calib_ctrl_repro2_e14.csv",
+ "n": 28,
+ "roots": [
+  "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "/groups/keasar_group/casp15/meytav/protein_tensors"
+ ],
+ "source": {
+  "2K28": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "2KXD": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "r12_757_TrROS_Hall": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "1PSE": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "4C26": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "1QKH": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "6EWS": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "1QP2": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "HHH_rd1_0244": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "2K1B": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "2K5H": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "HHH_rd1_0142": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "HEEH_KT_rd6_0746": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "3DKM": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "2KWH": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "6EWU": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "HEEH_KT_rd6_0793": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "1W4H": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "2BTH": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "1GYZ": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "2L33": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "r18_3_TrROS_Hall": "/groups/keasar_group/casp15/meytav/protein_tensors",
+  "r11_1081_TrROS_Hall": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "1TUC": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "6EWT": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "2KVS": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "2WXC": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors",
+  "2LQK": "/groups/keasar_group/casp15/meytav/MutationFineTuning/test_protein_tensors"
+ },
+ "correlations": {
+  "mean_burial~b_p": {
+   "pearson": -0.2645363285436856,
+   "spearman": -0.19376026272577998,
+   "n": 28,
+   "p": 0.17371779285764755
+  },
+  "mean_burial~abs_b_p": {
+   "pearson": 0.2327298833117623,
+   "spearman": 0.1417624521072797,
+   "n": 28,
+   "p": 0.2333416196843977
+  },
+  "frac_buried~b_p": {
+   "pearson": -0.060369039147663416,
+   "spearman": -0.002736726874657909,
+   "n": 28,
+   "p": 0.7602464174182461
+  },
+  "frac_buried~abs_b_p": {
+   "pearson": -0.09049657030594672,
+   "spearman": -0.17077175697865354,
+   "n": 28,
+   "p": 0.6469724598065028
+  },
+  "length~b_p": {
+   "pearson": -0.3028425142989193,
+   "spearman": -0.25177887246852765,
+   "n": 28,
+   "p": 0.11723759571778036
+  },
+  "length~abs_b_p": {
+   "pearson": 0.26362378997317504,
+   "spearman": 0.15270935960591134,
+   "n": 28,
+   "p": 0.1752622119179339
+  },
+  "n19_mean_burial~b_p": {
+   "pearson": -0.34299064315161837,
+   "n": 19
+  },
+  "n19_mean_burial~abs_b_p": {
+   "pearson": 0.1851078277196195,
+   "n": 19
+  },
+  "n19_frac_buried~b_p": {
+   "pearson": -0.03941269764078355,
+   "n": 19
+  },
+  "n19_frac_buried~abs_b_p": {
+   "pearson": -0.11427333901484751,
+   "n": 19
+  }
+ },
+ "threshold_p05": 0.392,
+ "n19_subset": [
+  "1GYZ",
+  "1PSE",
+  "1QKH",
+  "1QP2",
+  "1TUC",
+  "2BTH",
+  "2KVS",
+  "2KWH",
+  "2LQK",
+  "2WXC",
+  "3DKM",
+  "4C26",
+  "6EWS",
+  "6EWU",
+  "HEEH_KT_rd6_0746",
+  "HEEH_KT_rd6_0793",
+  "HHH_rd1_0142",
+  "HHH_rd1_0244",
+  "r18_3_TrROS_Hall"
+ ]
+}

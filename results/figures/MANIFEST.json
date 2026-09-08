@@ -1,0 +1,15 @@
+{
+ "figures": [
+  "fig01_calibration_decomposition.png",
+  "fig02_within_vs_pooled_and_oracle.png",
+  "fig03_ap_equals_r_times_s.png",
+  "fig04_hydrophobic_ranking_failure.png",
+  "fig05_factor_D.png",
+  "fig06_structure_two_channels.png",
+  "fig07_corrector_negative.png",
+  "fig08_prott5_chemistry.png",
+  "fig09_metric_rule_coil.png"
+ ],
+ "n_eval_csvs": 27,
+ "n_non_d1": 20
+}

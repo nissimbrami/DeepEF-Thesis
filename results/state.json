@@ -1,0 +1,17 @@
+{
+  "state": "S5_BUILD_INFO",
+  "entered": "2026-09-07T16:46Z",
+  "cells_done": 19,
+  "cells_total": 16,
+  "decisions": [
+    {
+      "node": "D1",
+      "choice": "p3_a0_d0_s0_D0_coil_seed2",
+      "evidence": "real main effect(s): A, B, D | best pooled 0.6401 slope_med 0.456 (p3_a0_d0_s0_D0_coil_seed2) | slope guard >= 0.30 rejected 8 cell(s): p3_a0_d0_s0_D1_uemb_seed42(pooled 0.2472, slope 0.006), p3_a0_d0_s1_D1_uemb_seed42(pooled 0.1001, slope 0.004), p3_a0_d1_s0_D1_uemb_seed42(pooled 0.2179, slope 0.018), p3_a0_d1_s1_D1_uemb_seed42(pooled 0.3121, slope 0.011), p3_a1_d0_s0_D1_uemb_seed42(pooled 0.0807, slope 0.022), p3_a1_d0_s1_D1_uemb_seed42(pooled 0.0507, slope 0.005), p3_a1_d1_s0_D1_uemb_seed42(pooled -0.0782, slope 0.012), p3_a1_d1_s1_D1_uemb_seed42(pooled 0.1338, slope 0.016)",
+      "ts": "2026-09-08T21:59Z"
+    }
+  ],
+  "blocked": [],
+  "retries": {},
+  "submitted": []
+}

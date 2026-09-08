@@ -1,0 +1,133 @@
+{
+  "question": "Is b_p learnable, or is it seed noise? ICC decomposition over 5 same-config seeds.",
+  "method": {
+    "source_csvs": {
+      "seed1_e13": 13,
+      "seed2_e10": 10,
+      "seed3_e13": 13,
+      "seed4_e14": 14,
+      "seed42_e9": 9
+    },
+    "n_proteins": 28,
+    "conventions": "groupby('protein',sort=False); row0=WT (verified ddG[0]==0 in all 5 CSVs); ddG=deltaG-deltaG[0]; a_p,b_ddg=np.polyfit(ddg_true,ddg_pred,1); groups len>=3 (all 28 qualify).",
+    "b_p_definition_note": "b_p_wt = pred_dG[WT]-dG[WT] (calc_bp.py, canonical, std~1.5741); b_ddg = polyfit intercept on ddG (calib_diag.py std_b, ~0.17)",
+    "estimator": "ICC(1,1) one-way random effects, balanced 28x5. ICC=(MSB-MSW)/(MSB+(k-1)MSW).",
+    "no_gpu": true,
+    "csvs_only": true
+  },
+  "b_p_wt_CANONICAL": {
+    "definition": "pred_deltaG[WT] - deltaG[WT]  (calc_bp.py; the std=1.5741 object; dG-side)",
+    "ICC1_lower_bound": 0.8978216801985802,
+    "ICC_C1_seedshift_removed": 0.9515061460241213,
+    "ICC_epoch_matched_pair_e13": 0.972220864041649,
+    "sd_protein_component": 1.380715019815142,
+    "sd_noise_component": 0.4657880942326806,
+    "mean_across_protein_std": 1.39186384220764,
+    "mean_within_protein_across_seed_std": 0.44048790045699693,
+    "pairwise_seed_PCC_mean": 0.9634929588730676,
+    "pairwise_seed_PCC_min": 0.9366125907962323,
+    "bootstrap_CI95": [
+      0.7761907187051155,
+      0.9410222718962872
+    ],
+    "leave_one_seed_out": {
+      "seed1_e13": 0.873257726686123,
+      "seed2_e10": 0.8877587684272225,
+      "seed3_e13": 0.8802004357381533,
+      "seed4_e14": 0.8948233186658611,
+      "seed42_e9": 0.961222538368899
+    }
+  },
+  "b_ddg_calib_diag_intercept": {
+    "definition": "polyfit intercept on ddG (calib_diag.py 'std_b'); NOT the 1.5741 object",
+    "ICC1_lower_bound": 0.8780256101020903,
+    "ICC_epoch_matched_pair_e13": 0.961271677884608,
+    "mean_across_protein_std": 0.17547124077575638,
+    "mean_within_protein_across_seed_std": 0.04116935555893624,
+    "pairwise_seed_PCC_mean": 0.8827573128424249
+  },
+  "a_p": {
+    "definition": "ddG compression slope, polyfit(ddg_true,ddg_pred,1)[0]",
+    "ICC1_lower_bound": 0.8449808134484463,
+    "ICC_C1_seedshift_removed": 0.9242771615146979,
+    "ICC_epoch_matched_pair_e13": 0.8060322750145921,
+    "sd_protein_component": 0.19318736413814486,
+    "sd_noise_component": 0.08274619263937494,
+    "mean_across_protein_std": 0.19603359690423994,
+    "mean_within_protein_across_seed_std": 0.07302309858397131,
+    "pairwise_seed_PCC_mean": 0.9620136415029977,
+    "bootstrap_CI95": [
+      0.7338508622685077,
+      0.8838104656307488
+    ],
+    "leave_one_seed_out": {
+      "seed1_e13": 0.8147607482519426,
+      "seed2_e10": 0.83020105504743,
+      "seed3_e13": 0.8570963203975658,
+      "seed4_e14": 0.8614027432961628,
+      "seed42_e9": 0.8574536546964496
+    }
+  },
+  "consequence": {
+    "std_b_reference": 1.5741,
+    "total_var": 2.47779081,
+    "max_removable_var_ICC_times_var": 2.224614308214801,
+    "irreducible_seed_var": 0.25317650178519896,
+    "irreducible_seed_sd": 0.5031664752198809,
+    "mean_raw_pooled_PCC": 0.6051714960251928,
+    "mean_offset_oracle_pooled_PCC": 0.7181291824745762,
+    "achievable_pooled_PCC_bound": 0.7053206071721799,
+    "PCC_lost_to_seed_noise": 0.012808575302396319,
+    "verdict": "b_p is LEARNABLE. ICC>=0.90 (lower bound); epoch-matched estimate 0.97. Seed noise removes only ~1.3% of the offset-correction headroom."
+  },
+  "epoch_confound": {
+    "seed_epochs": {
+      "seed1_e13": 13,
+      "seed2_e10": 10,
+      "seed3_e13": 13,
+      "seed4_e14": 14,
+      "seed42_e9": 9
+    },
+    "corr_columnmean_vs_epoch_b_p_wt": -0.8053047564217316,
+    "note": "Seeds differ in epoch (9-14). ICC(1,1) charges ALL epoch drift to noise, so it is a LOWER bound on the protein-attributable share. Two controls raise it: ICC(C,1) removes the per-seed additive shift -> 0.9515; the epoch-MATCHED pair (seed1_e13 vs seed3_e13, identical epoch, pure seed contrast) -> 0.9722."
+  },
+  "guard": {
+    "shuffled_protein_identity_ICC_b_p_wt": -0.004707605627085089,
+    "pure_noise_ICC_b_p_wt": 0.0036542849385527614,
+    "positive_control_identical_columns": 1.0,
+    "guard_pass": true,
+    "interpretation": "Permuting protein identity within each seed column collapses ICC to ~0.00 and identical columns give exactly 1.00, so the statistic genuinely reads per-protein identity rather than being an artifact of the arithmetic."
+  },
+  "per_seed_metrics": {
+    "seed1_e13": {
+      "pooled_ddG_PCC": 0.5948225001128531,
+      "pooled_offset_removed_PCC_bddg": 0.7005415542023027,
+      "pooled_offset_removed_PCC_bwt": -0.01171028773449903,
+      "epoch": 13
+    },
+    "seed2_e10": {
+      "pooled_ddG_PCC": 0.6575170975981702,
+      "pooled_offset_removed_PCC_bddg": 0.7502562534069523,
+      "pooled_offset_removed_PCC_bwt": -0.015579972705388325,
+      "epoch": 10
+    },
+    "seed3_e13": {
+      "pooled_ddG_PCC": 0.5798580035643222,
+      "pooled_offset_removed_PCC_bddg": 0.7177923930992904,
+      "pooled_offset_removed_PCC_bwt": -0.07341236243514758,
+      "epoch": 13
+    },
+    "seed4_e14": {
+      "pooled_ddG_PCC": 0.6007836123576714,
+      "pooled_offset_removed_PCC_bddg": 0.7204401863291685,
+      "pooled_offset_removed_PCC_bwt": -0.03518292087878942,
+      "epoch": 14
+    },
+    "seed42_e9": {
+      "pooled_ddG_PCC": 0.5928762664929471,
+      "pooled_offset_removed_PCC_bddg": 0.7016155253351668,
+      "pooled_offset_removed_PCC_bwt": -0.0067598540321299055,
+      "epoch": 9
+    }
+  }
+}

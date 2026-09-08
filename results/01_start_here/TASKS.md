@@ -131,3 +131,16 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       corr(zero-shot, oracle) = +0.548 -- so the model still matters, and zero-shot ranking is a
       POOR predictor of post-calibration ranking. Select on the oracle, not on zero-shot.
       Best k=20 so far: 0.7337 (p3_slope1.0_s42_e13). -> results/02_findings/W13B_COMPOSITION.md
+
+- [x] K21 **BUILT, VERIFIED, SUBMITTED.** --distogram_weight wired into train.py (flag 96, CFG 144,
+      run-config 299). Self-test 6/6 PASS including overfit-one-example 3.488 -> 0.009, which proves
+      the gradient path is real. gate_g4_cpu ALL PASS width 1092 (it adds a LOSS, not columns).
+      Flag proven parsed by importing train.py with argv --distogram_weight 0.25 -> CFG = 0.25.
+      Queued: 21144938/39/40 (weights 0.01/0.1/1.0) + 21144941 (x W12). Weight is 0.01-1.0, NOT
+      IFUM's 100: our CE is order ln(32)~3.5 vs an MSE of order 1.
+- [x] 12 DELIVERED SCRIPTS **RUN ON REAL DATA** (job 21144901, CPU). 4 artifacts verified with ls:
+      BIAS_VS_DISPERSION.tsv, W13_ROBUST.tsv, W13_SELECT.tsv, EPOCH_PROVENANCE.tsv.
+      Excluded: double_mutant_test (premise refuted), hydrophobic_failure (needs absent 'mut' column).
+- [x] BOTH [VERIFY] MARKERS CLOSED. f_type='features' EXISTS but is FOLDED-ONLY and n_folded must be
+      passed explicitly. coil_b_fixed=3.8 is WRONG: ours is 5.82A * 0.1 = 0.582 model units; using
+      3.8 would be ~6.5x off and saturate the Gaussian kernel -- the w5_dg.py units bug again.

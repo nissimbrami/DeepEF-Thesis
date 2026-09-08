@@ -1,0 +1,233 @@
+{
+ "k": 8,
+ "nu": 0.588,
+ "b": 5.82,
+ "per_protein": [
+  {
+   "protein": "2K5H",
+   "N": 62,
+   "analytic_mean": 32.03121083439088,
+   "ensemble_mean": 27.081790472134095,
+   "mean_abs_gap": 8.587831954839412,
+   "across_conf_sd": 4.337408432872935
+  },
+  {
+   "protein": "6EWT",
+   "N": 57,
+   "analytic_mean": 30.481039036251556,
+   "ensemble_mean": 22.66188044930537,
+   "mean_abs_gap": 10.362791925311322,
+   "across_conf_sd": 5.2912016524228855
+  },
+  {
+   "protein": "1W4H",
+   "N": 44,
+   "analytic_mean": 26.15963713972735,
+   "ensemble_mean": 23.17085702589747,
+   "mean_abs_gap": 8.164471828782343,
+   "across_conf_sd": 5.750480687827818
+  },
+  {
+   "protein": "6EWS",
+   "N": 56,
+   "analytic_mean": 30.16431929880701,
+   "ensemble_mean": 19.599745796967532,
+   "mean_abs_gap": 11.832494975036692,
+   "across_conf_sd": 3.7569423757806963
+  },
+  {
+   "protein": "1GYZ",
+   "N": 59,
+   "analytic_mean": 31.10763036849057,
+   "ensemble_mean": 24.67457820604453,
+   "mean_abs_gap": 11.356307274817999,
+   "across_conf_sd": 8.747844152403676
+  },
+  {
+   "protein": "HHH_rd1_0244",
+   "N": 42,
+   "analytic_mean": 25.4498288935647,
+   "ensemble_mean": 16.82225252170091,
+   "mean_abs_gap": 9.594059073411564,
+   "across_conf_sd": 2.5635418360586124
+  },
+  {
+   "protein": "1QP2",
+   "N": 63,
+   "analytic_mean": 32.33492449857148,
+   "ensemble_mean": 26.910028657975047,
+   "mean_abs_gap": 9.301869627878546,
+   "across_conf_sd": 5.603861143259767
+  },
+  {
+   "protein": "1TUC",
+   "N": 59,
+   "analytic_mean": 31.10763036849057,
+   "ensemble_mean": 24.907976191001165,
+   "mean_abs_gap": 9.649101927143338,
+   "across_conf_sd": 4.183800423859554
+  },
+  {
+   "protein": "1PSE",
+   "N": 68,
+   "analytic_mean": 33.82443254186664,
+   "ensemble_mean": 23.865057285583593,
+   "mean_abs_gap": 11.891212810277437,
+   "across_conf_sd": 4.602815384202589
+  },
+  {
+   "protein": "1QKH",
+   "N": 67,
+   "analytic_mean": 33.53026587744345,
+   "ensemble_mean": 27.918302109905525,
+   "mean_abs_gap": 11.626875891918125,
+   "across_conf_sd": 8.625630174508606
+  },
+  {
+   "protein": "2KWH",
+   "N": 52,
+   "analytic_mean": 28.873203534240968,
+   "ensemble_mean": 26.317458698214075,
+   "mean_abs_gap": 7.942996251462023,
+   "across_conf_sd": 5.070194419419192
+  },
+  {
+   "protein": "3DKM",
+   "N": 72,
+   "analytic_mean": 34.983572233886505,
+   "ensemble_mean": 27.434679576323767,
+   "mean_abs_gap": 10.914502708206054,
+   "across_conf_sd": 5.313452108603303
+  },
+  {
+   "protein": "r12_757_TrROS_Hall",
+   "N": 54,
+   "analytic_mean": 29.523736393840284,
+   "ensemble_mean": 24.875194849363133,
+   "mean_abs_gap": 8.991311524962875,
+   "across_conf_sd": 6.087297296912052
+  },
+  {
+   "protein": "HHH_rd1_0142",
+   "N": 42,
+   "analytic_mean": 25.4498288935647,
+   "ensemble_mean": 21.506200181322953,
+   "mean_abs_gap": 7.767978188148,
+   "across_conf_sd": 3.8631191230235356
+  },
+  {
+   "protein": "4C26",
+   "N": 62,
+   "analytic_mean": 32.03121083439088,
+   "ensemble_mean": 29.12736356171675,
+   "mean_abs_gap": 10.962739593475066,
+   "across_conf_sd": 8.476174390377968
+  },
+  {
+   "protein": "2L33",
+   "N": 71,
+   "analytic_mean": 34.69634518532445,
+   "ensemble_mean": 30.59823247816186,
+   "mean_abs_gap": 10.361536489819521,
+   "across_conf_sd": 6.18540232899524
+  },
+  {
+   "protein": "6EWU",
+   "N": 56,
+   "analytic_mean": 30.16431929880701,
+   "ensemble_mean": 22.575116052380675,
+   "mean_abs_gap": 9.708274270139228,
+   "across_conf_sd": 4.01732740229363
+  },
+  {
+   "protein": "2WXC",
+   "N": 44,
+   "analytic_mean": 26.15963713972735,
+   "ensemble_mean": 25.59388113239873,
+   "mean_abs_gap": 7.554718153561044,
+   "across_conf_sd": 5.95004186977493
+  },
+  {
+   "protein": "HEEH_KT_rd6_0793",
+   "N": 42,
+   "analytic_mean": 25.4498288935647,
+   "ensemble_mean": 21.315372050511506,
+   "mean_abs_gap": 8.09662754519315,
+   "across_conf_sd": 4.935936706038277
+  },
+  {
+   "protein": "r11_1081_TrROS_Hall",
+   "N": 49,
+   "analytic_mean": 27.877523395349993,
+   "ensemble_mean": 21.981619169944047,
+   "mean_abs_gap": 7.969833512221108,
+   "across_conf_sd": 2.5646205424798967
+  },
+  {
+   "protein": "2K28",
+   "N": 50,
+   "analytic_mean": 28.212167631128292,
+   "ensemble_mean": 26.320074338029098,
+   "mean_abs_gap": 8.717335952216189,
+   "across_conf_sd": 6.498331608806605
+  },
+  {
+   "protein": "2BTH",
+   "N": 43,
+   "analytic_mean": 25.806457638357617,
+   "ensemble_mean": 20.62820982538809,
+   "mean_abs_gap": 8.273082410482377,
+   "across_conf_sd": 5.311567659092806
+  },
+  {
+   "protein": "r18_3_TrROS_Hall",
+   "N": 52,
+   "analytic_mean": 28.873203534240968,
+   "ensemble_mean": 24.864730190394653,
+   "mean_abs_gap": 8.318209639027438,
+   "across_conf_sd": 4.37282029146039
+  },
+  {
+   "protein": "2K1B",
+   "N": 49,
+   "analytic_mean": 27.877523395349993,
+   "ensemble_mean": 22.85750528800682,
+   "mean_abs_gap": 7.720842235367555,
+   "across_conf_sd": 4.167887707134713
+  },
+  {
+   "protein": "2KXD",
+   "N": 71,
+   "analytic_mean": 34.69634518532445,
+   "ensemble_mean": 26.9457788889665,
+   "mean_abs_gap": 10.4297379077159,
+   "across_conf_sd": 2.6507402350065328
+  },
+  {
+   "protein": "2KVS",
+   "N": 67,
+   "analytic_mean": 33.53026587744345,
+   "ensemble_mean": 25.881023620771906,
+   "mean_abs_gap": 11.464353472450199,
+   "across_conf_sd": 7.3128518494655514
+  },
+  {
+   "protein": "2LQK",
+   "N": 62,
+   "analytic_mean": 32.03121083439088,
+   "ensemble_mean": 22.2583823581313,
+   "mean_abs_gap": 11.728494141333073,
+   "across_conf_sd": 4.737625672021024
+  },
+  {
+   "protein": "HEEH_KT_rd6_0746",
+   "N": 42,
+   "analytic_mean": 25.4498288935647,
+   "ensemble_mean": 17.37121034256964,
+   "mean_abs_gap": 9.487931271000194,
+   "across_conf_sd": 3.191619031500222
+  }
+ ],
+ "mean_gap": 9.599197234149921,
+ "mean_sd": 5.148947732342963
+}

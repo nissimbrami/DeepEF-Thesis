@@ -173,3 +173,16 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       Writer verified on real output: 18 residue types present, |CB-CA| median 1.534 A,
       scale correctly detected as 1.0 (already Angstrom) on all 368, glycine CB dropped not faked.
       -> results/03_levers/W15_PROGRESS.md
+
+- [x] W15 FEATURES **BUILT AND VALIDATED** for all 368 proteins (19,512 residues, 12 MB).
+      CHECK A -- reconstruction is real: corr(sc_sasa, existing burial) = -0.6820, exactly the
+      strong negative physics requires; a wrong reconstruction would give ~0. contacts +0.6994,
+      clash +0.0853 (nearly orthogonal to burial -- information the model has no access to).
+      CHECK B -- THE DECISIVE TEST. Any per-residue descriptor table is one_hot @ T and cannot
+      add information (this killed LORO, W6, and 2 of W12's 4 columns). R2 explainable from
+      one-hot alone: sc_sasa 0.443, buried_frac 0.668, contacts 0.488, clash 0.245.
+      W15 PASSES: 33-76% of each column is geometry residue identity cannot express. Residual sd
+      after removing everything one-hot predicts: 75%, 58%, 72%, 87% of raw sd survives.
+      CAVEAT: FASPR PREDICTS the mutant conformation; nobody measured it. Inference, not observation.
+      Confidence it carries new information 90%; confidence it improves the score 55%.
+      -> results/03_levers/W15_VALIDATION.md

@@ -316,6 +316,48 @@ def _solv_or_none(x, one_hot, mask, folded):
     return solvation_features(x, one_hot, mask, folded=folded)
 
 
+def _w15_or_none(x, one_hot, mask, folded):
+    """W15: the [N,4] side-chain packing block, or None when the lever is off.
+
+    Sits immediately AFTER the W12 block. folded=False returns exact zeros -- an extended
+    chain has no packing, so folded-minus-unfolded IS the packing term. Columns 0/2/3 read
+    one_hot, so they change at the mutated position and survive ddG; a block computed from
+    coordinates alone would be identical across the ~4000 variants sharing one backbone.
+    """
+    if not getattr(CFG, 'w15_features', False):
+        return None
+    import sys as _s, os as _o
+    _p = _o.path.join(_o.path.dirname(_o.path.abspath(__file__)), 'scripts')
+    if _p not in _s.path: _s.path.insert(0, _p)
+    from w15_block import w15_block
+    return w15_block(x, one_hot, mask, folded=folded, device=x.device, dtype=x.dtype)
+
+
+def _sidechain_or_none(x, one_hot, mask, folded):
+    """W12: the [N,4] side-chain chemistry block, or None when the lever is off.
+
+    Sits immediately after the W6 descriptor block, i.e. at 48 + solv_dim + desc_dim,
+    and BEFORE the W11 ligand block -- so hydro_net._sibling_block_dims and
+    ligand_features.ligand_start must both count these 4 columns, or W11 slices four
+    columns off its real start and reads them WITHOUT crashing.
+
+    folded=False forces the burial-weighted columns (1 and 3) to zero. That is the whole
+    point of the lever: burial is a FOLDED-state quantity, so the folded-minus-unfolded
+    difference IS the hydrophobic driving force. If those columns were nonzero unfolded
+    they would cancel in E_u - E_f and the block would be inert -- the W5 bug exactly.
+    """
+    if not getattr(CFG, 'sidechain_features', False):
+        return None
+    from sidechain_features import sidechain_block
+    if folded:
+        fn = compute_hse if getattr(CFG, 'burial_mode', 'count') == 'hse' else compute_burial
+        bur = fn(x, mask).to(one_hot.dtype)
+    else:
+        bur = None
+    return sidechain_block(one_hot, bur, folded=folded,
+                           device=one_hot.device, dtype=one_hot.dtype)
+
+
 def _desc_or_none(one_hot):
     """W6: the [N,K] descriptor block, or None when --aa_descriptors none (default)."""
     return desc_or_none(one_hot, CFG)
@@ -359,8 +401,10 @@ def get_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     _S = _solv_or_none(x, one_hot, mask, folded=True)
     _Dsc = _desc_or_none(one_hot)                     # W6: [N,K] or None
     _oh = _onehot_block(one_hot)                      # W6: zeroed under pca16_only
+    _Sc = _sidechain_or_none(x, one_hot, mask, folded=True)   # W12: [N,4] or None
+    _W15 = _w15_or_none(x, one_hot, mask, folded=True)        # W15: [N,4] or None
     _L = _lig_or_none(x, mask, folded=True)   # W11: [N,10] or None
-    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + ([] if _L is None else [_L]) + [emb, _oh]
+    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + ([] if _Sc is None else [_Sc]) + ([] if _W15 is None else [_W15]) + ([] if _L is None else [_L]) + [emb, _oh]
     Fh = torch.cat(_blocks, dim=1)  # N,16+32[+3][+K]+emb_size+20
     
     return Fh
@@ -626,8 +670,12 @@ def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     # chemistry is supposed not to differ, and does not.
     _Dsc = _desc_or_none(one_hot)
     _oh = _onehot_block(one_hot)
+    # W12: the burial-weighted columns are ZERO here -- the folded-minus-unfolded
+    # difference IS the hydrophobic driving force. Nonzero would make it inert.
+    _Sc = _sidechain_or_none(x, one_hot, mask, folded=False)  # W12: [N,4] or None
+    _W15 = _w15_or_none(x, one_hot, mask, folded=False)       # W15: [N,4] or None
     _L = _lig_or_none(x, mask, folded=False)   # W11: [N,10] or None
-    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + ([] if _L is None else [_L]) + [emb, _oh]
+    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + ([] if _Sc is None else [_Sc]) + ([] if _W15 is None else [_W15]) + ([] if _L is None else [_L]) + [emb, _oh]
     Fh = torch.cat(_blocks, dim=1)
 
     return Fh
@@ -685,8 +733,12 @@ def _flory_unfolded_graph(x, one_hot, emb, mask, gaussian_coef):
     _S = _solv_or_none(x, one_hot, mask, folded=False)   # W5: burial is ZERO unfolded
     _Dsc = _desc_or_none(one_hot)                        # W6: state-independent
     _oh = _onehot_block(one_hot)
+    # W12: the burial-weighted columns are ZERO here -- the folded-minus-unfolded
+    # difference IS the hydrophobic driving force. Nonzero would make it inert.
+    _Sc = _sidechain_or_none(x, one_hot, mask, folded=False)  # W12: [N,4] or None
+    _W15 = _w15_or_none(x, one_hot, mask, folded=False)       # W15: [N,4] or None
     _L = _lig_or_none(x, mask, folded=False)   # W11: [N,10] or None
-    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + ([] if _L is None else [_L]) + [emb, _oh]
+    _blocks = [D, Fb] + ([] if _S is None else [_S]) +               ([] if _Dsc is None else [_Dsc]) + ([] if _Sc is None else [_Sc]) + ([] if _W15 is None else [_W15]) + ([] if _L is None else [_L]) + [emb, _oh]
     Fh = torch.cat(_blocks, dim=1)
 
     return Fh

@@ -186,3 +186,16 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       CAVEAT: FASPR PREDICTS the mutant conformation; nobody measured it. Inference, not observation.
       Confidence it carries new information 90%; confidence it improves the score 55%.
       -> results/03_levers/W15_VALIDATION.md
+
+- [x] W15 **WIRED, GATED 10/10, SUBMITTED** (21145399-403). THE BLOCKER I FOUND BEFORE WIRING:
+      coordinates are SHARED across variants -- 2PTL has ONE [62,4,3] backbone and 3,949 variants
+      differing only in one_hot. A feature from the packed WT structure alone is IDENTICAL for
+      every variant and cancels EXACTLY in ddG. Building it that way would have been inert.
+      FIX: cols 0/2/3 read one_hot so they change at the mutated position; col2 = reach*env_density
+      is the load-bearing interaction (bulky residue in a crowded pocket).
+      GATE 10/10: block differs WT vs mutant max|delta| 0.6222, difference LOCAL to exactly 1
+      position, env_density unchanged by mutation, TRP crowded 1.1667 vs open 0.2800, unfolded
+      EXACTLY zero (folded sum 102.03 vs unfolded 0.0 on the real graph), width 1093->1097.
+      gate_g4_cpu ALL PASS at 1092 with flag off. Flag proven parsed.
+      Two wiring bugs caught and fixed: W15 was nested inside W12's conditional (so it only
+      appeared when W12 was also on), and a regex corrupted a getattr call in hydro_net.

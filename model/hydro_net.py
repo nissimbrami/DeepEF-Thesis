@@ -357,6 +357,13 @@ def _ligand_block_dim(cfg):
             'imported. Refusing to run with a silently-zero-width block.')
 
 
+def _w15_block_dim(cfg=None):
+    """W15: 4 columns when the packing lever is on, else 0."""
+    if cfg is None:
+        from model.model_cfg import CFG as cfg
+    return 4 if getattr(cfg, 'w15_features', False) else 0
+
+
 def _sidechain_block_dim(cfg):
     """W12 side-chain block width: 4 when --sidechain_features, else 0.
 
@@ -400,7 +407,7 @@ def _sibling_block_dims(cfg):
     # between W6 and W11, so unlike the RETIRED W9 its width is genuinely present in
     # the feature vector and MUST be counted here -- otherwise --ligand_nodes would
     # slice four columns early and read the wrong data WITHOUT crashing.
-    total += _sidechain_block_dim(cfg)
+    total += (_sidechain_block_dim(cfg) + _w15_block_dim(cfg))
     return total
 
 
@@ -481,7 +488,7 @@ class PEM(torch.nn.Module):
         # block, at 48 + solv_dim + desc_dim, and BEFORE the W11 ligand block. Its width
         # is counted by _sibling_block_dims so lig_start moves with it; without that the
         # ligand slice would start 4 columns early and read them without crashing.
-        self.sc_dim = _sidechain_block_dim(CFG)
+        self.sc_dim = (_sidechain_block_dim(CFG) + _w15_block_dim(CFG))
         self.sc_start = self.desc_start + self.desc_dim
         _cd = self.sc_dim
         self.lig_dim = _ligand_block_dim(CFG)

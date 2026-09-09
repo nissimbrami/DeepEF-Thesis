@@ -95,7 +95,7 @@ N_CANONICAL = len(ORDER)
 # would silently keep producing logs whose mode string is ambiguous across the rename
 # boundary, which is exactly the failure being fixed. A hard error makes every old
 # invocation visible instead of quietly reinterpreting it.
-MODES = ('none', 'mordred726', 'mordred_pca16', 'mordred_pca16_only')
+MODES = ('none', 'mordred726', 'mordred_pca16', 'mordred_pca16_only', 'mordred_pca16_unit')
 
 # Retired names -> why. Looked up ONLY to produce a good error; never resolved to a file.
 RETIRED_MODES = {
@@ -116,7 +116,7 @@ RETIRED_MODES = {
 }
 
 # The single arm that REPLACES one-hot instead of appending to it.
-DESC_REPLACES_ONEHOT = ('mordred_pca16_only',)
+DESC_REPLACES_ONEHOT = ('mordred_pca16_only', 'mordred_pca16_unit')
 
 # Default filenames, relative to the repo root. Every filename now CONTAINS the mode's
 # defining word ('mordred', and 'pca16' where it is a projection), so a mismatch between
@@ -127,6 +127,10 @@ _DEFAULT_FILES = {
     'mordred726': 'data/aa_descriptors_mordred.csv',
     'mordred_pca16': 'data/aa_descriptors_mordred_pca16.csv',
     'mordred_pca16_only': 'data/aa_descriptors_mordred_pca16.csv',
+    # UNIT: same 16 PCA components, rescaled by 1/sqrt(K) so the block carries the
+    # SAME per-residue L2 energy as one-hot (1.04x vs 3.65x). The two earlier arms
+    # froze at RMSE 2.541 for 15 epochs; this is the table built to prevent that.
+    'mordred_pca16_unit': 'data_fixed/aa_descriptors_mordred_pca16_unit.csv',
 }
 
 # PROVENANCE EXPECTATIONS, checked by _assert_provenance() on every load.
@@ -159,6 +163,12 @@ _PROVENANCE = {
         requires=('REAL Mordred pipeline', 'arm=pca16', 'pca_requested=16'),
         forbids=('arm=full', 'curated literature table'),
         describe='the 16-component PCA projection of the Mordred matrix '
+                 '(one-hot REPLACED)'),
+    'mordred_pca16_unit': dict(
+        n_cols=16,
+        requires=('W6-UNIT',),
+        forbids=('arm=full', 'curated literature table'),
+        describe='the 16-component PCA projection rescaled to unit one-hot energy '
                  '(one-hot REPLACED)'),
 }
 

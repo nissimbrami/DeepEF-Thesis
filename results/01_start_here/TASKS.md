@@ -301,3 +301,17 @@
       2-6 seeds, are 10-20x the noise band.
       ACTION: submitted three control seeds (21149840/41/42) so the comparator becomes a mean.
       -> results/02_findings/MULTISEED_SCOREBOARD.md
+
+- [x] **DESCRIPTOR ARM FIXED AND SUBMITTED (third attempt, 21150162/63).** Added a new mode
+      mordred_pca16_unit pointing at data_fixed/aa_descriptors_mordred_pca16_unit.csv. The three
+      existing modes are UNTOUCHED, so every previous run stays reproducible byte-for-byte.
+      VERIFIED by pushing a real one-hot through the loader, not by reading code:
+        mordred_pca16_only  block (20,16) median L2 3.653 -> 3.65x one-hot
+        mordred_pca16_unit  block (20,16) median L2 1.045 -> 1.04x one-hot
+        descriptor_path -> data_fixed/..._unit.csv, dim 16, keeps_onehot=False
+        gate_g4_cpu ALL PASS at width 1092; scontrol confirms both jobs carry the flag.
+      PREDICTION ON RECORD: the arm will now TRAIN (RMSE will move, val PCC will climb like the
+      one-hot arm's 0.548->0.712) but will NOT beat one-hot by more than the 0.0344 seed band,
+      because ProtT5 already predicts held-out-residue hydropathy at R^2=0.704.
+      FALSIFIER: if RMSE freezes at a single value again, the scale hypothesis is WRONG and no
+      fourth arm should run without a different diagnosis.

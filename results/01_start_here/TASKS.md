@@ -341,3 +341,16 @@
       - slope 0.2: three of four slope-1.0 seeds land at s ~ 0.52, far under the s=1.0 target,
         so if the lever has an interior optimum it is not at 1.0.
       All flags verified with scontrol.
+
+- [x] **W13 VERIFIED ACROSS ALL 52 HEALTHY RUNS -- it is the project's most reproducible result.**
+      k=0 0.5845 -> k=5 0.6534 -> k=20 0.6993. Gain +0.1149 with sd 0.0286 across 52 runs, which
+      is SMALLER than the seed sd of the scores themselves (0.0344). Not one run fails to improve.
+      No lever comes close to that reproducibility.
+      CORRECTION TO THE RECORD: the offset-removal oracle is NOT a ceiling. W13 at k=20 scores
+      0.7371 against the oracle's 0.7017 ON THE SAME held-out evaluation set (+0.035). The oracle
+      removes each protein's exact mean error; W13 removes a noisy k-subset estimate, and the
+      residual noise is uncorrelated with the labels. Calling it "the ceiling if b_p were solved"
+      overstates it -- the real ceiling is label noise (~0.3-0.5 kcal/mol in MegaScale).
+      AND the k=5 figures reconcile: 70.0% of the k=20 gain, 99.1% of the oracle-recoverable gain.
+      Both earlier numbers were right; neither was stated with its denominator.
+      -> results/02_findings/W13_UNIVERSAL.md

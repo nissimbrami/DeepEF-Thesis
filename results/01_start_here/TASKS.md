@@ -325,3 +325,19 @@
       says every lever tested so far moves only the dispersion, while pooled correlates with r
       (+0.399) more than with s (+0.281). W12 adds INFORMATION rather than rescaling, so it is
       the first arm that could move r at all.
+
+- [x] WAVE 10 SUBMITTED (21150263-70). Lane is now 50 jobs: 8 running, 42 queued. SLURM starts
+      each arm the instant a card frees, with no intervention -- a deep queue IS the automation.
+      TIME LEFT on the running cards: 2:19 to 11:23 (12h limit each). Full drain of 42 pending
+      across 8 cards is ~6 waves x 12h = ~72h.
+      EVERY ARM JUSTIFIED BY A MEASUREMENT MADE TODAY:
+      - W12 seeds 3,4 and HSE seeds 2,3: the slope lever looked proven at n=1 (+0.058) and died
+        at n=4 (+0.0179 vs seed sd 0.0344) because seed 42 was an outlier (s=1.053 vs 0.515-0.532).
+        Any n=1 arm is untrustworthy by default, so the two information levers get their seeds
+        UP FRONT rather than after a false positive.
+      - anchor 0.1, 0.03 (x2 seeds): the anchor sweep is monotone decreasing,
+        corr(weight,pooled) = -0.999 over w=0.3/1.0/3.0, so its best tested weight is the SMALLEST
+        tried and the optimum was never bracketed.
+      - slope 0.2: three of four slope-1.0 seeds land at s ~ 0.52, far under the s=1.0 target,
+        so if the lever has an interior optimum it is not at 1.0.
+      All flags verified with scontrol.

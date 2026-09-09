@@ -1,6 +1,33 @@
 # TASKS — main session only, no background agents. Loop: task -> test -> record -> next.
 
 ## OPEN
+- [x] K24 **ALL 79 SCORED CSVs ANALYSED (2026-09-09).** Uniform rescore of every eval CSV to
+      results/SCORE_ALL76.tsv (pooled / per-protein mean r / a_p / offset-oracle / k=20 ridge).
+      THREE new arms landed and are now read: w12_s1_e14, w5_dg_s2_e14, p3_a0_d0_s1_D0_coil_seed42_e13.
+      -> results/SCORE_ALL76.tsv
+- [x] K25 **W12 AT TWO SEEDS = the best-replicated lever in the project.** pooled 0.6191/0.6159,
+      mean 0.6175, spread 0.0032, gain +0.0540 = 1.57 sigma. ONLY lever that also gains at k=20
+      (+0.0072) and the only one raising per-protein r (+0.0217). BUT protein-level bootstrap CI
+      includes zero (P=0.88) -- top 5 proteins carry 98.4% of the gain, top 2 carry 79%.
+      -> results/02_findings/W12_TWO_SEEDS.md
+- [x] K26 **FACTOR A IS HARMFUL AT k=20 -- found only because of the new k=0/k=20 rule.**
+      Pooled: +0.0058 (t=0.71, "neutral"). k=20: -0.0259, paired t=-7.34, negative 12/12 pairs.
+      Epoch confound runs the WRONG way (A=1 trains longer: e12.7 vs e9.8). B and C really are
+      flat on both. A must be OFF for few-shot use. -> results/02_findings/FACTOR_A_K20.md
+- [x] K27 **W5_DG AT THREE SEEDS: a_p 0.667 does NOT replicate.** a_p 0.664/0.507/0.543,
+      mean 0.572 sd 0.082, t=1.59 on 2df (need 4.30). Pooled +0.0353 = 1.03 sigma. k=20 -0.0069.
+      -> results/02_findings/W5_DG_SEED2.md
+- [x] K28 **SLOPE1.0 AT FOUR SEEDS: +0.0280 = 0.81 sigma, seed sd 0.0407.** k=20 -0.0014.
+      Weakest of the three replicated levers; a_p mean 0.380 BELOW control 0.496.
+- [x] K29 **W12/W13 SIGN REVERSAL RETRACTED.** Two estimator errors: free affine fit unstable at
+      small k (max|a|=3.2e3), and UNPAIRED draws. Paired ridge: W12 never significantly loses,
+      significantly WINS at k=50. -> results/02_findings/W12_W13_RETRACTION.md, CALIB_SHRINKAGE.md
+- [x] K30 **AUDIT vs cluster ground truth (9 agents, 4 slices, adversarially verified).**
+      TWO headline errors found: (a) per-protein 0.798 is a MEDIAN reported as a mean -- the
+      control's mean is 0.7262; (b) oracle 0.7534 belongs to sigma_seed2_e10, NOT the control
+      (control offset-oracle 0.7364, affine 0.7792). gate_g4_cpu 8/8 PASS, Shahar tree clean
+      (0 files owned by nissimb), 0 credential leaks, all 22 claimed artifacts exist.
+
 > **CANONICAL BASIS (P8).** Every headline number in this document is computed on:
 > **27 test proteins (2K5H excluded) | ddG metric | the 9 original-population eval CSVs |
 > the val-selected epoch only.** That basis is `pooled 0.5772 / oracle 0.7156 / gain +0.1384`.

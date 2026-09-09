@@ -394,3 +394,22 @@
 - [x] D5 Ligands/metals/complexes: 21/21 of our PDB-coded proteins are monomeric, ligand-free,
       metal-free. Untestable HERE -- a benchmark property, not a refutation.
       -> results/01_start_here/IMPLEMENTATION_DEBT.md
+
+- [~] N1 **FireProtDB CONTAINS OUR PROTEINS -- confirmed with real mutation rows.** The scan
+      matched 22 of our proteins, and extraction shows genuine entries:
+      1W4H_A:L167A, 1W4H_A:H142W, 1W4H_A:L131A, 1W4H_A:S132G, 1W4H_A:I149V ...
+      The "exactly 2 hits per protein" pattern was an artefact of head-truncation in my own scan,
+      not a property of the data. Decisive question now running as 21150501: do those rows carry
+      a MEASURED ddG NUMBER? A mutation identifier alone is useless for W13.
+- [x] N4 MegaScale checked and RULED OUT for the PDB-coded proteins. mega_test/val/train contain
+      554/982/10000 distinct proteins and ZERO of our 21 PDB-coded ones. Five of our 28 DO appear
+      -- but they are the DESIGNED sequences (HHH_rd1_0244, HEEH_KT_rd6_0793, r11_1081_TrROS_Hall,
+      HHH_rd1_0142, HEEH_KT_rd6_0746), which is expected since MegaScale is where they come from.
+      No new measured data for the 21 real PDB entries.
+- [x] RULE ADDED (Nissim, 2026-09-09): before ANY GPU submission -- think the method through from
+      every angle, find the OPTIMAL embedding, write a deep plan, verify the plan END-TO-END, run
+      deep tests, and only then submit. Unless Nissim says otherwise. Saved to memory.
+      Justification is this project's own history: LORO died twice to a scale clash while the
+      corrected table sat unused; every width-changing lever was unscorable through three separate
+      bugs; W15 was nearly built inert; slope was "proven" for weeks at n=1. The cost of skipping
+      it is not GPU-hours, it is WRONG CONTEXT -- a broken arm reads as a failed idea.

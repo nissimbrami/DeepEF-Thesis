@@ -38,7 +38,7 @@ Per protein, the prediction is an affine function of the truth:
 |---|---|---|
 | **std(b_p)** | **1.5741** | the per-protein OFFSET, a dG-space wild-type error |
 | **a_p median** | **0.4990** | the per-protein SLOPE — the model compresses ddG by half |
-| **per-protein ddG PCC** | **0.798** | ranking quality WITHIN a protein |
+| **per-protein ddG PCC** | **0.7262 mean / 0.7928 median** | ranking quality WITHIN a protein. **The long-quoted 0.798 was the MEDIAN reported as a mean** -- see `results/02_findings/PERPROT_DEFINITION.md`. |
 | **pooled ddG PCC** | **~0.59** | ranking quality ACROSS all proteins together |
 | corr(a_p, per-protein PCC) | **+0.5714** | the slope is the strongest per-protein quality predictor |
 | ICC(b_p) | **0.898** | b_p is protein-attributable, not seed noise |

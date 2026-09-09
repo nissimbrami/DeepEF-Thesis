@@ -2823,3 +2823,50 @@ identity delta survives ddG. **It acts on BOTH channels and must be reported on 
 `scripts/score_all.sh` scores **every** run trained to epoch 14 with no CSV — factorial cells and
 golden arms alike — on the CPU partition at zero GPU cost, verifying the ARTIFACT with `ls` after
 each cell rather than trusting the `DONE` line.
+
+# CHECKPOINT 29 — 2026-09-09 — SEED REPLICATION OVERTURNS THE HEADLINE LEVER
+
+The three-seed replication of `--slope_weight 1.0` landed. Each seed read at its OWN
+validation-selected epoch (s1->e9 argmax 0.8240, s2->e13 argmax 0.8010, s42->e10):
+
+    pooled 0.5853 / 0.6242 / 0.5798    mean 0.5964 sd 0.0242
+    control 0.5635    gain +0.0329    seed sd 0.0344  -> INSIDE the band
+    per-protein PCC WORSE than control in all three (0.7809/0.7920/0.7878 vs 0.7929)
+
+The lever reported for weeks as "+0.058, the only proven lever" was an n=1 result.
+
+ANOMALY THAT EXPLAINS IT: a_p is 0.78 for seed 42 but 0.39 for seeds 1 and 2 (s = 1.053 vs
+0.532/0.525). Same configuration; initialisation alone decides which side of perfect
+calibration it lands on. The earlier "s crosses 1.0 between e4 and e8" was a property of
+seed 42, not of the lever.
+
+SIX ANALYSES written during a 3.5-hour cluster outage, all now uploaded:
+  PROTEIN_DIFFICULTY   difficulty is intrinsic to the protein (rank corr 0.837 across 15
+                       conditions); length and true dG contribute independently (partial 0.472
+                       each); and a correction -- global compression explains only 30.4% of
+                       b_p, so 69.6% is genuinely per-protein
+  NOISE_DECOMPOSITION  seed sd 0.0344 vs epoch sd 0.0074 (4.6x). The headline 0.6382 is the
+                       MAXIMUM of five seeds whose mean is 0.5781
+  DOSE_RESPONSE        slope has an interior optimum at w=1.0; anchor is monotone decreasing
+                       (corr -0.999), so its optimum is below 0.3 and was never tested
+  FACTORIAL_D0         within D0, A/B/C effects are ~0.01 and epoch is a confound
+                       (corr(epoch,pooled)=+0.543). corr(a_p, pooled) = -0.087
+  D1_CONFIRMED         Welch t = 9.93 (record said 3.9), zero overlap, a_p ~0 in all 8 cells
+  RS_DECOMPOSITION     sd(r)=0.0223 vs sd(s)=0.2441 over 29 runs. Every lever moves s, none
+                       moves r, and r is what correlates with pooled. Also a correction:
+                       corr(pooled,oracle)=+0.992 was inflated by collapsed D1 runs; real +0.515
+
+THE SCORING BUG, in three parts, each of which looked applied and did nothing:
+  1. run_calib_eval.sh never passed the training flags to evaluate.py
+  2. evaluate.py accepted no block-lever flags at all
+  3. the CFG setter went into run_training(), which __main__ never calls
+Now fixed and verified: zero "Missing key" errors in the current scoring run.
+CONSEQUENCE: no width-changing arm had EVER been scorable in this project until today.
+
+LIGANDS CLOSED WITH PRIMARY EVIDENCE: all 21 PDB-coded test proteins fetched from RCSB.
+0 ligands, 0 metals, 21/21 monomeric, 19 of 21 solution NMR. Unmeasurable here -- a property
+of the benchmark, not of the idea.
+
+BLOCKER FOR THE USER: 12 built-and-gated arms (W15 x5, K21 x4, K20 x3) have never run for a
+second. All held at MaxGRESPerAccount behind four older jobs, one of which (sa_uembmean_seed4)
+is a uemb arm from the D1 half already settled at t=9.93. Not cancelling without approval.

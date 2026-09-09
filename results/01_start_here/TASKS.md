@@ -30,55 +30,8 @@
           no overlap, a_p 0.37-0.72 vs 0.005-0.020. ~190 GPU-h would confirm a visible negative.
 - [x] K11 **CANCELLED — same refuted claim as K22.** See CHECKPOINT 25: the 2,356 2-point
       rows are all 2K5H single mutations on the _G11S/_G23A backgrounds, not double mutants.
-- [ ] K15 results/FINDINGS.md — the single thesis-facing document, updated with corrected numbers.
-- [ ] K16 CONTEXT.md checkpoint + push after every batch (running continuously).
-
-## DONE — verified by the main session, not by agent report
-V K1  2K5H reference row fixed. Its file concatenates 3 backgrounds and the mutant _G11S sorts
-      first; true WT is at index 2738. Shift +3.0824. Corrected copy in data_fixed/ (Shahar's
-      tree is read-only). CANONICAL HEADLINE (9 original-population CSVs, 27 proteins):
-      pooled 0.5772, oracle 0.7156, gain +0.1384. The earlier, now-retired figures over 22
-      mixed CSVs (0.4899 / 0.6443 / +0.1544) were the wrong population — see
-      results/05_infrastructure/HEADLINE_BASIS.md.
-V K2  r18_3_TrROS_Hall is CLEAN: single background, row 0 is the true WT; its low percentile is
-      legitimate for a designed protein with many stabilising mutations.
-V K3  gate_refrow hardened: counts distinct WT backgrounds per protein, which is the decisive
-      test. Reports "3 distinct backgrounds" for 2K5H, no longer false-flags r18_3.
-V K4  The "1/sqrt(N) embedding artifact" does NOT reproduce: claimed -0.9938, measured -0.3927
-      (20 proteins) and -0.2946 (our 28). Below the n=28 threshold of 0.392. Lever dropped.
-V K5  Dropped as a consequence of K4.
-V K6  --dg_length_norm is DEGENERATE: /n converges to 0.905 for every checkpoint because
-      std(true WT dG) = 0.9042 — it deletes the prediction rather than removing a bias. And
-      corr(N, b_p) = +0.0252, so b_p is not length-driven.
-V K7  Scoring pipeline unblocked (3 bugs) and running on the CPU partition at zero GPU cost.
-      10/48 factorial CSVs; job 21108561 scoring 4 more.
-V K12 a_p = r*s decomposed: a_p 0.364 = r 0.653 x s 0.504. Ranking error is 54.6% of the gap
-      (unfixable by the slope term), spread 77.9% (fixable). Ceiling a_p = r. The three slope
-      arms confirm the mechanism: r flat at 0.795-0.809 while s swings 0.47-0.76; weight 1.0 is
-      best (+0.063 over control), weight 3.0 OVERSHOOTS and is worse than no lever.
-V K13 The model is worst at burying hydrophobics: slope 0.28-0.31 to hydrophobic destinations vs
-      0.53-0.57 to charged/polar. corr(slope, KD) = -0.734, sign-consistent 10/10. And
-      corr(spearman, KD) = -0.740 — ranking degrades in LOCKSTEP, so it is LOST INFORMATION, not
-      a rescalable calibration error. Mechanism: only 4 backbone atoms are stored, so side-chain
-      packing is invisible. W and Y are the telling exceptions (bulk, not hydropathy).
-V K14 Distribution shift verified: our regime was 0.1206% of pre-training RESIDUES (1 in 830);
-      NMR 77.4% vs 8.6%, monomer 88.2% vs 31.9%, complexes 11.8% vs 68.1%. Real and large — but
-      NOT the cause of b_p (r = +0.043, p = 0.829; nothing survives Bonferroni over 25 features).
-V     Attenuation DEAD by 200x: sigma = 0.0327 kcal/mol over 28,312 mutations predicts a_p
-      = 0.9985 against measured ~0.50 (28/28 proteins joined via ThermoMPNN/mega_test.csv).
-V     ProtT5 is CONTEXTUAL and per-variant; it predicts held-out-residue hydropathy at R^2 0.704,
-      so W6 descriptors are largely redundant with what the embedding already carries.
-V     a_p logging added to validate() — 40 slope runs had been unfalsifiable because pooled dG
-      PCC is scale-invariant and cannot see a spread change.
-V     13 gate suites green throughout; gate_g4_cpu prints dG=-0.0030 width=1092 after every edit.
-
-## THE STANDING RULE THAT KEEPS PAYING
-Score a lever on the metric it acts on. It has now caught FIVE: the coil, BSA, W5 burial,
-ligands, and our own model-selection metric. And: always compute the degenerate baseline —
-K6 looked like a 31% improvement and was the model predicting nothing.
-
-## Added 2026-09-08 — after the ν sweep and the b_p decomposition
-
+- [x] K15 **DONE** -> THESIS_SUMMARY.md + THESIS_UPDATE.md (the post-replication amendment). 
+- [x] K16 **DONE** -> CONTEXT.md CHECKPOINT 29, recording the seed replication, the six outage analyses, the three-part scoring bug, and the ligand closure. 
 - [x] K17 ν sweep (0.5→0.65 × b) — **DONE, REJECTED.** All 10 cells worse than no coil on
       std(b_p): best 1.1036 vs base 0.9972. Correct physics does not rescue the coil.
       → `results/02_findings/NU_SWEEP.md`
@@ -120,10 +73,7 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       D.sum(dim=1) at 381. Correction: my earlier "line 607" was wrong - that is inside
       _coil_expand_channels. Adds a LOSS not columns, so width stays 1092.
       -> results/03_levers/K21_DISTOGRAM_PLAN.md
-- [ ] ANNOTATE OUR 21 PDB PROTEINS DIRECTLY from the PDB (oligomeric state, HETATM, interface
-      area). Bounded job, 21 structures. This is the only honest route to testing the
-      ligand/complex ideas and it has never been attempted.
-
+- [x] ANNOTATE OUR 21 PDB **DONE** -- 0 ligands, 0 metals, 21/21 monomeric, see LIGANDS_FINAL.md. 
 - [x] W13b **DONE — slope and the measured offset do NOT compose.** At k=20 the arms converge to
       0.7106-0.7337 and the ORDER SCRAMBLES: the best-slope arm (a_p 0.782) finishes LAST, the
       worst (0.448) ties for first. They overlap rather than add.

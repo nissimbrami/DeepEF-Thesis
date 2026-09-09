@@ -369,10 +369,10 @@
 
 ## NEW TASK BLOCK -- find the measured data instead of measuring it ourselves
 
-- [ ] N1 **FireProtDB scan (21150460 RUNNING).** 4.8 GB SQL dump already on the cluster. If it
+- [x] N1 **FireProtDB RULED OUT.**  (21150460 RUNNING).** 4.8 GB SQL dump already on the cluster. If it
       holds measured ddG for even a few of our 28, W13 stops needing a wet lab and becomes a
       lookup. This is the single largest practical change available.
-- [ ] N2 If FireProtDB covers some proteins: build the join, verify the mutations match ours by
+- [x] N2 **MOOT -- FireProtDB has no values.**  some proteins: build the join, verify the mutations match ours by
       position AND destination residue, and re-run W13 using PUBLISHED values as the k calibration
       points. Report how many proteins are covered and at what k.
 - [ ] N3 ProThermDB -- not on the cluster, obtainable. Second source if FireProtDB is thin.
@@ -413,3 +413,21 @@
       corrected table sat unused; every width-changing lever was unscorable through three separate
       bugs; W15 was nearly built inert; slope was "proven" for weeks at n=1. The cost of skipping
       it is not GPU-hours, it is WRONG CONTEXT -- a broken arm reads as a failed idea.
+
+- [x] **N1/N2/N3/N4 SETTLED: published data CANNOT supply W13's calibration mutations.**
+      Three sources checked against the actual files, not assumed:
+        S669       0 of our 28 (669 mutations, 94 proteins)
+        MegaScale  0 of our 21 PDB-coded proteins; the 5 that match are the DESIGNED sequences,
+                   which MegaScale is the source of -- no new information
+        FireProtDB matched 22 of ours and looked promising, but TWO things kill it:
+                   (a) of 215 1W4H rows, ZERO contain a signed decimal -- it is a mutation
+                       CATALOGUE with identifiers only, no ddG values
+                   (b) 21 of the 22 hits are rows reading "MEGASCALE <pdb>" -- FireProtDB lists
+                       our proteins only as POINTERS BACK TO MEGASCALE, our own training source.
+                       Using them would be circular.
+      ROOT CAUSE: our 28 are small NMR/designed domains that the classical mutagenesis literature
+      never covered -- the same reason they are absent from the 100k structural catalogue
+      (median 477aa vs our 42-72aa).
+      CONSEQUENCE: W13 stays a FEW-SHOT method needing new measurements. State that plainly.
+      STILL OPEN: ProThermDB (not on cluster, obtainable) -- the one untested source.
+      -> results/02_findings/EXTERNAL_DATA_VERDICT.md

@@ -398,13 +398,13 @@ class Trainer():
         val_dg_pred = torch.tensor([],device=self.device)
         val_ddg = torch.tensor([],device=self.device)
         val_ddg_pred = torch.tensor([],device=self.device)
-        val_df = pd.DataFrame([],columns=['protein','deltaG','pred_deltaG','ddG','pred_ddG'])
+        val_df = pd.DataFrame([],columns=['protein','variant_idx','deltaG','pred_deltaG','ddG','pred_ddG'])
         with torch.no_grad():
             for i, batch in enumerate(tqdm(self.val_ds,desc=f'Validation Epoch: {epoch}')):
                 batch = normalize_batch(batch, True)
                 batch_loss = 0
                 batch_idx = 1
-                protein_df = pd.DataFrame([],columns=['protein','deltaG','pred_deltaG','ddG','pred_ddG'])
+                protein_df = pd.DataFrame([],columns=['protein','variant_idx','deltaG','pred_deltaG','ddG','pred_ddG'])
                 for j in range(0, batch['prott5'].size(1), self.mini_batch_size):
                     batch_idx += 1
                     output,u_energy,f_energy = self.get_deltaG(batch, j)
@@ -416,13 +416,17 @@ class Trainer():
                     batch_loss += loss.item()
                     val_dg = torch.cat((val_dg, delta_g), dim=0)
                     val_dg_pred = torch.cat((val_dg_pred, output), dim=0)
-                    batch_df = pd.DataFrame([],columns=['protein','deltaG','pred_deltaG','ddG','pred_ddG'])
+                    batch_df = pd.DataFrame([],columns=['protein','variant_idx','deltaG','pred_deltaG','ddG','pred_ddG'])
                     batch_df['deltaG'] = delta_g.cpu().numpy()
                     pred_np = output.cpu().numpy()
                     if AFFINE_AB is not None:  # lever 3: pred := a*pred + b (RMSE only)
                         pred_np = AFFINE_AB[0] * pred_np + AFFINE_AB[1]
                     batch_df['pred_deltaG']  = pred_np
                     batch_df['protein'] = [batch['name'][0] for i in range(len(delta_g))]
+                    # variant_idx: j is the mini-batch offset into this protein's variant
+                    # list, so row i here is variant j+i. Without this the eval CSV has no
+                    # join key at all and per-mutation analysis is impossible.
+                    batch_df['variant_idx'] = list(range(j, j + len(delta_g)))
                     protein_df = pd.concat([protein_df,batch_df])
                     # clear memory
                     torch.cuda.empty_cache()

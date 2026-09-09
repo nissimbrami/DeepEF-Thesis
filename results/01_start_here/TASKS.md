@@ -237,3 +237,15 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       A constant-zero column contributes nothing to any gradient, so these levers are UNMEASURABLE
       on this benchmark -- a property of the BENCHMARK, not evidence against the idea.
       -> results/02_findings/LIGANDS_FINAL.md, results/08_data/pdb_annotations.json
+
+- [x] K15 **THESIS SUMMARY WRITTEN** -> results/01_start_here/THESIS_SUMMARY.md. Seven sections
+      with every number on a stated basis: headline 0.6382 pooled / 0.8034 PP; W13 measured offset
+      0.7334 at k=20 (FEW-SHOT, k=5 gives 60%, k=1 harmful with the noise/signal mechanism
+      measured at 1.47 and break-even k=2.2); the dG-vs-ddG space correction (96.3% global in dG,
+      only 38-55% in ddG); the slope lever OVERSHOOTS (s crosses 1.0 between e4 and e8);
+      ligands closed with primary PDB evidence (21/21 monomeric); and the finding that FIVE of
+      SEVEN recorded failures were execution or metric faults, not refuted ideas.
+- [x] variant_idx ADDED to evaluate.py. The eval CSV had NO join key, so per-mutation analysis
+      was impossible (2K28: 920 CSV rows vs 2,838 variants). The index was already in scope --
+      j is the mini-batch offset, so row i is variant j+i. One line, adds a column, changes no
+      existing value. Future eval CSVs carry it; the 53 existing ones do not.

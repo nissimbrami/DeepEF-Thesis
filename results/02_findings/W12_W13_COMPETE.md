@@ -1,3 +1,7 @@
+> **RETRACTED 2026-09-09.** The k=5/k=20 sign reversal below is an artifact of a free
+> per-protein affine fit (unstable at small k) scored on UNPAIRED draws. Corrected paired
+> ridge measurement: no significant loss at any k. See `W12_W13_RETRACTION.md`.
+
 # W12 and W13 do NOT stack — they compete, and W12 becomes a LIABILITY once W13 is applied
 
 Direct test rather than inference: apply W13 to the control and to W12, and see whether the gains

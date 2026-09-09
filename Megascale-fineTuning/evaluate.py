@@ -41,6 +41,9 @@ parser.add_argument('--aa_descriptors', default=None, help='W6: must match train
 parser.add_argument('--sidechain_features', action='store_true', help='W12: must match training')
 parser.add_argument('--w15_features', action='store_true', help='W15: must match training')
 parser.add_argument('--ligand_nodes', action='store_true', help='W11: must match training')
+parser.add_argument('--edge_features', action='store_true', help='W7-edge: must match training (adds lin_edge weights to every GAT layer)')
+parser.add_argument('--gcn_bidir', action='store_true', help='U10: must match training (changes GCN edge construction)')
+parser.add_argument('--gcn_span', type=int, default=1, help='W7-span: must match training (chain span for GCN edges)')
 parser.add_argument('--dg_length_norm', default='none', choices=['none','n','sqrtn'], help='lever 2: MUST match training — length-normalize predicted dG')
 parser.add_argument('--affine', default=None, help='lever 3: path to affine.json {a,b}; pred_deltaG := a*pred+b before ddG (RMSE only). Defaults to env DEEPEF_AFFINE.')
 
@@ -500,13 +503,31 @@ def run_training():
         setattr(CFG, _lv, bool(getattr(args, _lv, False)))
     CFG.burial_mode = getattr(args, 'burial_mode', 'count')
     CFG.aa_descriptors = getattr(args, 'aa_descriptors', None)
+    # Graph-topology levers change the PARAMETER SET (edge_features adds lin_edge to each
+    # GAT layer), so a checkpoint trained with them cannot load into a model built without.
+    CFG.edge_features = bool(getattr(args, 'edge_features', False))
+    CFG.gcn_bidir = bool(getattr(args, 'gcn_bidir', False))
+    CFG.gcn_span = int(getattr(args, 'gcn_span', 1))
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
                 light_attention=LIGHT_ATTENTION, readout=args.readout).to(DEVICE)
     if PRETRAINED: 
         try:
             model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
-        except:
-            model.load_state_dict(torch.load(TRAINED_MODEL_PATH))
+        except Exception as _e_wrap:
+            # A bare `except` here swallowed genuine shape mismatches and retried a load
+            # that could not work, so the run printed DONE and wrote no CSV.
+            _sd = torch.load(TRAINED_MODEL_PATH, map_location='cpu')
+            if isinstance(_sd, dict) and 'model_state_dict' in _sd:
+                _sd = _sd['model_state_dict']
+            try:
+                model.load_state_dict(_sd)
+            except Exception as _e_raw:
+                raise RuntimeError(
+                    'checkpoint does not match the model built from these flags. '
+                    'wrapper-load error: %s | state_dict error: %s | '
+                    'HINT: pass the SAME lever flags used in training '
+                    '(--edge_features/--gcn_bidir/--gcn_span/--burial_features/...)'
+                    % (_e_wrap, _e_raw))
     
     # Train the model
     trainer = Trainer(model, train_ds, test_ds)
@@ -556,6 +577,11 @@ def run_validation_metrics():
         setattr(CFG, _lv, bool(getattr(args, _lv, False)))
     CFG.burial_mode = getattr(args, 'burial_mode', 'count')
     CFG.aa_descriptors = getattr(args, 'aa_descriptors', None)
+    # Graph-topology levers change the PARAMETER SET (edge_features adds lin_edge to each
+    # GAT layer), so a checkpoint trained with them cannot load into a model built without.
+    CFG.edge_features = bool(getattr(args, 'edge_features', False))
+    CFG.gcn_bidir = bool(getattr(args, 'gcn_bidir', False))
+    CFG.gcn_span = int(getattr(args, 'gcn_span', 1))
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
                 light_attention=LIGHT_ATTENTION, readout=args.readout).to(DEVICE)
     if PRETRAINED: 

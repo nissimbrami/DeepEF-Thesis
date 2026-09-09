@@ -249,3 +249,18 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       was impossible (2K28: 920 CSV rows vs 2,838 variants). The index was already in scope --
       j is the mini-batch offset, so row i is variant j+i. One line, adds a column, changes no
       existing value. Future eval CSVs carry it; the 53 existing ones do not.
+
+- [!] **SCORING BUG THAT SILENTLY VOIDED EVERY WIDTH-CHANGING ARM.** run_calib_eval.sh never
+      passed the lever flags to evaluate.py -- it called it with only --readout sum
+      --dg_length_norm none. So any arm whose flags change the FEATURE WIDTH cannot be scored:
+      the checkpoint has a wider fc1 than the freshly built model and load_state_dict reports
+      EVERY layer as "Missing key(s)". The script then printed "DONE ... -> file.csv" anyway and
+      the file did not exist.
+      DIAGNOSIS BY CONTRAST: slope_anchor_s42 scored fine (slope/anchor are LOSS terms, width
+      unchanged) while loroWdesc2_s42 (--aa_descriptors) and w5_dg_s1/s2 (--burial_features)
+      both failed. All three had the SAME wrapper checkpoint format, so format was not the cause.
+      FIX: run_calib_eval.sh now takes a 4th argument EVAL_FLAGS and forwards it. Rescoring as
+      21145919. This affects W12, W15, HSE, ligands and every future block lever -- they would
+      all have failed to score.
+- [x] slope_anchor_s42 scored at e14 (28,315 rows) -- the only one of the four that could work
+      without the fix.

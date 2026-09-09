@@ -42,10 +42,16 @@ if [ ! -f "${CKPT}" ]; then echo "ERROR: checkpoint ${CKPT} not found"; ls -1 "$
 #    flags -> identical 28314-variant set). Affine applied via DEEPEF_AFFINE; length-norm OFF.
 export WANDB_MODE=offline
 if [ -f "${AFFINE}" ]; then export DEEPEF_AFFINE="${AFFINE}"; echo "applying affine ${AFFINE}"; fi
+# EVAL_FLAGS: 4th arg = the lever flags this run was TRAINED with. Any flag that
+# changes the FEATURE WIDTH (--burial_features, --aa_descriptors,
+# --sidechain_features, --w15_features, --ligand_nodes) MUST be repeated here or
+# the freshly built model is narrower than the checkpoint and load_state_dict
+# reports EVERY layer as a missing key.
+EVAL_FLAGS="${4:-}"
 python Megascale-fineTuning/evaluate.py \
   --trained_model_path "${CKPT}" \
   --model_name "eval_results/abl_${RUN_TAG}_e${BEST_E}" \
-  --readout sum --dg_length_norm none
+  --readout sum --dg_length_norm none ${EVAL_FLAGS}
 
 # 3) score (per-epoch ddG curve for this run tag)
 python validation/score_runs.py "${RUN_TAG}"

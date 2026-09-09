@@ -447,3 +447,19 @@
       Consistent with the robustness result (dropping 2 proteins leaves 42%) and the k=1 threshold
       (noise/signal 1.47, break-even k=2.2). Three analyses, one mechanism.
       -> results/02_findings/W13_CONCENTRATION.md
+
+- [~] **W12 FIRST RESULT: ranks #1 of 53 on r -- the quantity no lever had ever moved.**
+      w12_s2_e12: pooled 0.6159 (+0.0524 vs control), PP 0.8046 (highest recorded),
+      r 0.7485 (+0.0224), a_p 0.3805, s 0.5005.
+      WHY r MATTERS: across 53 healthy runs r has mean 0.7156 and sd 0.0297 -- every lever moved
+      s and none moved r, yet r correlates with pooled (+0.399) more than s does (+0.281).
+      W12 is 1.11 sd above the population mean and ranks FIRST of 53. It is the first lever whose
+      mechanism is INFORMATION rather than rescaling, and the first to move the quantity that
+      rescaling cannot touch -- exactly what the r/s decomposition predicted was required.
+      BUT n=1. The slope lever looked like +0.058 at n=1 and died at n=4. The warning sign is
+      already present: a_p 0.3805 and s 0.5005 match the seeds-1/2/3 pattern that the slope arm
+      showed outside its outlier seed 42.
+      PRE-REGISTERED CRITERION: W12 is established if across >=3 seeds mean r exceeds the
+      control's 0.7262 by more than one population sd (0.0297) AND mean pooled beats a properly
+      averaged control. Rejected if mean r lands inside +-0.0297.
+      Four more seeds training. -> results/02_findings/W12_FIRST.md

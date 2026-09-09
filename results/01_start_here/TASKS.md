@@ -267,3 +267,15 @@
       it was a claim about one initialisation -- including "a_p 0.496 -> 0.740" and "s crosses
       1.0 between e4 and e8". In three of four seeds the lever LOWERS a_p below control.
       The project's one "proven" lever joins the eleven rejections. -> SLOPE_VERDICT.md
+
+- [~] LANE STATUS 2026-09-09 10:35, checked against squeue not memory:
+      RUNNING (8 golden): all 5 W12 arms (w12_s42/s1/s2 at 8/11/12 epochs of 15, w12_dg_s42 at 8,
+      w12_slope_s42 at 7), plus w5_dg_s3 at 9 and slope0.5_s42. ~4h to completion.
+      STILL BLOCKED, never started: all 5 W15, all 4 distogram, all 3 ensemble -- twelve arms.
+      The two remaining old jobs holding cards are 21049394 and 21049396 (D0 factorial, 5h49).
+      The uemb/D1 blocker cleared on its own.
+      SCORING: two jobs (21147408, 21147479) have been running 1h13 and OVERLAP on three arms --
+      score_all6 covers all six while rescore3 redoes loroWdesc2 and w5_dg_s1/s2. They will race
+      on the same output paths. Not killing either (running-job rule); the loser simply rewrites
+      an identical file. Noted so the duplication is not mistaken for a bug later.
+      Scoring is slow because the descriptor arm needs 450s/protein vs 158s for a plain arm.

@@ -279,3 +279,19 @@
       on the same output paths. Not killing either (running-job rule); the loser simply rewrites
       an identical file. Noted so the duplication is not mistaken for a bug later.
       Scoring is slow because the descriptor arm needs 450s/protein vs 158s for a plain arm.
+
+- [x] **THE COMPARATOR ITSELF IS A SINGLE RUN -- and that invalidates every positive claim.**
+      Every gain in this project is measured against calib_ctrl_repro2 (pooled 0.5635), ONE draw
+      from a distribution with seed sd 0.0344. The sigma family -- five seeds of the same
+      control-like config -- averages 0.5781, i.e. 0.0146 higher.
+      Re-scoring the multi-seed families against that mean instead:
+        p3_a0_d0_s0_D0_coil  +0.0457 -> +0.0311
+        p3_a0_d1_s0_D0_coil  +0.0365 -> +0.0219
+        slope1.0 (n=10)      +0.0163 -> +0.0017
+      NOT ONE family clears 0.0344 against a properly-averaged control. The four rows that looked
+      like they beat noise did so only because the comparator was a lucky single draw -- the same
+      error as quoting 0.6382 as the headline, an extremum treated as an estimate.
+      SOLID: the negatives. dg_coil -0.3511 and the D1/uemb families -0.40 to -0.63, each across
+      2-6 seeds, are 10-20x the noise band.
+      ACTION: submitted three control seeds (21149840/41/42) so the comparator becomes a mean.
+      -> results/02_findings/MULTISEED_SCOREBOARD.md

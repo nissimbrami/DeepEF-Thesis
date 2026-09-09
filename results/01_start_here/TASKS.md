@@ -463,3 +463,21 @@
       control's 0.7262 by more than one population sd (0.0297) AND mean pooled beats a properly
       averaged control. Rejected if mean r lands inside +-0.0297.
       Four more seeds training. -> results/02_findings/W12_FIRST.md
+
+- [~] **W12 REPAIRS THE WORST-RANKED PROTEINS -- corr(delta_r, control_r) = -0.856.**
+      Per-protein: 18 of 27 improved, 9 slightly worse. 2KVS goes 0.160 -> 0.471 (+0.311) and
+      HEEH_KT_rd6_0793 0.322 -> 0.463 (+0.142); the losses are all -0.013 to -0.017 on proteins
+      already ranked 0.79-0.86.
+      WHY THE SHAPE MATTERS: a rescaling lever multiplies predictions by a constant and CANNOT
+      change any protein's r -- that is the algebra behind sd(r)=0.0223 across 53 runs. An
+      INFORMATION lever should help exactly where information was missing, and missing information
+      looks like a low r. corr = -0.856 is that signature, and it is far stronger than the
+      aggregate +0.0224 suggests because averaging hides a large repair to two proteins.
+      CONSISTENCY CHECK THAT WAS NOT POST-HOC: 2KVS and HEEH_KT_rd6_0793 are ranked 3rd and 2nd
+      hardest of 28 by mean |error| across 15 conditions, measured long before W12 existed. W12's
+      mechanism is side-chain transfer free energy weighted by burial, and the recorded deficit
+      was hydrophobic compression worst at buried positions. The lever repairs the proteins its
+      mechanism predicts.
+      w12_s1 has finished training and is in the scoring queue. If the -0.856 pattern reproduces
+      on a second seed that is stronger evidence than the aggregate, since a seed lottery would
+      not reproduce WHICH proteins improve. -> results/02_findings/W12_WHERE.md

@@ -365,3 +365,32 @@
       seeds of one configuration. The explored design space is flat.
       Six factorial jobs remain queued; they add cells to a question answered at n=22.
       -> results/02_findings/FACTORIAL_FINAL.md (supersedes FACTORIAL_D0.md)
+
+
+## NEW TASK BLOCK -- find the measured data instead of measuring it ourselves
+
+- [ ] N1 **FireProtDB scan (21150460 RUNNING).** 4.8 GB SQL dump already on the cluster. If it
+      holds measured ddG for even a few of our 28, W13 stops needing a wet lab and becomes a
+      lookup. This is the single largest practical change available.
+- [ ] N2 If FireProtDB covers some proteins: build the join, verify the mutations match ours by
+      position AND destination residue, and re-run W13 using PUBLISHED values as the k calibration
+      points. Report how many proteins are covered and at what k.
+- [ ] N3 ProThermDB -- not on the cluster, obtainable. Second source if FireProtDB is thin.
+- [ ] N4 Check whether a held-out slice of MegaScale itself already contains measurable mutations
+      for our 28. It is our own training source, so coverage is plausible and free.
+- [x] N0 S669 checked: 669 mutations over 94 proteins, **0 of our 28**. Ruled out.
+
+## IMPLEMENTATION DEBT -- the levers that were never fairly tested (my bugs, not the ideas)
+
+- [x] D1 LORO/Ofir descriptors: two collapses, ONE cause (block energy 13.8x then 3.65x one-hot).
+      Correctly-scaled table existed all along and was never wired. Fixed, submitted 21150162/63.
+- [x] D2 Every width-changing lever (W12/W15/HSE/ligands) was UNSCORABLE -- scoring broken in
+      three separate places, each of which looked applied and did nothing. Fixed and verified.
+- [x] D3 W15 was nearly built inert: coordinates are shared across variants, so a WT-structure
+      feature cancels exactly in ddG. Caught before submission.
+- [x] D4 Single-seed reporting: slope was "proven" for weeks at n=1 and died at n=4. The CONTROL
+      has the same flaw (single run 0.5635 vs five-seed mean 0.5781). Three control seeds
+      submitted. Standing rule: n=1 is untrustworthy by default.
+- [x] D5 Ligands/metals/complexes: 21/21 of our PDB-coded proteins are monomeric, ligand-free,
+      metal-free. Untestable HERE -- a benchmark property, not a refutation.
+      -> results/01_start_here/IMPLEMENTATION_DEBT.md

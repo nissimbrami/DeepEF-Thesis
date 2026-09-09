@@ -24,8 +24,14 @@
 - [ ] K8  Read out the 8 golden-lane arms when they finish (now at epoch 7-11 of 14):
           dg_coil, slope, w5_dg, w7edge, u10bidir, w7span4, loroW_onehot, loroW_desc.
           Each answers a lever that had NEVER been run.
-- [ ] K9  LORO prediction ON RECORD before readout: the descriptor arm should NOT beat one-hot
-          by much, because ProtT5 already predicts held-out-residue hydropathy at R^2 0.704.
+- [x] K9 **DONE. Prediction HOLDS, but the arm never trained.** descriptors -0.0026 vs
+      one-hot 0.5744 (diff -0.5770). Diagnosis: RMSE frozen at 2.541 for ALL 15 epochs, val PCC
+      pure noise around zero, r=-0.015, a_p=0.0006 -- predictions independent of labels.
+      ROOT CAUSE FOUND: mordred_pca16_only loads a table at 3.65x one-hot energy. The
+      unit-normalised table built to fix exactly this (data_fixed/..._unit.csv, 1.04x) was
+      NEVER WIRED to any run. Same failure mode as the scoring bugs: the fix existed, looked
+      applied, and was not in the executing path. The descriptor hypothesis remains UNTESTED
+      after two attempts. -> results/02_findings/LORO_VERDICT.md
 - [ ] K10 Decide on the D1 half of the factorial: D0 coil scores 0.58-0.62, D1 uemb -0.08 to 0.31,
           no overlap, a_p 0.37-0.72 vs 0.005-0.020. ~190 GPU-h would confirm a visible negative.
 - [x] K11 **CANCELLED — same refuted claim as K22.** See CHECKPOINT 25: the 2,356 2-point

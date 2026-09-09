@@ -481,3 +481,20 @@
       w12_s1 has finished training and is in the scoring queue. If the -0.856 pattern reproduces
       on a second seed that is stronger evidence than the aggregate, since a seed lottery would
       not reproduce WHICH proteins improve. -> results/02_findings/W12_WHERE.md
+
+- [x] **W12 AND W13 COMPETE -- and W12 becomes a LIABILITY once W13 is applied.**
+      Direct test: control k=0/k=5/k=20 = 0.5635/0.6830/0.7213; W12 = 0.6159/0.6566/0.7160.
+      W12 alone +0.0524, W13 alone +0.1578, additive would be +0.2101, ACTUAL +0.1525 --
+      sub-additive by 0.058, almost exactly W12's whole standalone gain.
+      SIGN REVERSAL: at k=0 W12 beats control by +0.0524; at k=5 it LOSES by -0.0264 and at k=20
+      by -0.0053. With any measured calibration the plain control is better.
+      MECHANISM: corr(W12 r-gain, |offset| W13 removes) = +0.744, and 3 of each lever's top-5
+      proteins are the same. Both target the badly-calibrated proteins; once W13 removes the
+      offset outright there is nothing left for W12 to recover, and W12's cost (a_p 0.38 vs 0.52,
+      s 0.50 vs 0.70) becomes pure loss.
+      CONSEQUENCE: the two headline results are MUTUALLY EXCLUSIVE. Report them as alternatives --
+      zero-shot use W12 (0.6159), few-shot use control+W13 (0.6830-0.7213). Do NOT report a
+      combined pipeline.
+      IT ALSO EXPLAINS W13b: the best-slope arm finished LAST at k=20 for the same reason.
+      GENERAL RULE: any calibration-improving lever must be reported with BOTH its k=0 and k=20
+      numbers, or the comparison is incomplete. -> results/02_findings/W12_W13_COMPETE.md

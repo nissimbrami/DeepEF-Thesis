@@ -71,3 +71,60 @@ ddG PCC.** The measured contributions are:
 **Confidence: 90%.** Three seeds, each at its own val-selected epoch, on the canonical basis.
 The one caveat is that n=3 is small — but it is exactly the n that was demanded, and it answers
 the question that was asked.
+
+---
+
+# UPDATE — the fourth seed lands, and it strengthens the verdict
+
+`slope1.0_s3` scored at e7. Four seeds now:
+
+| run | pooled | PP | a_p | s |
+|---|---|---|---|---|
+| s1 (e9) | 0.5853 | 0.7809 | 0.390 | 0.532 |
+| s2 (e13) | 0.6242 | 0.7920 | 0.395 | 0.525 |
+| **s3 (e7)** | **0.5363** | 0.7822 | 0.377 | 0.515 |
+| s42 (e10) | 0.5798 | 0.7878 | **0.782** | **1.053** |
+| **control** | 0.5635 | **0.7929** | 0.521 | 0.698 |
+
+```
+n=4   pooled mean 0.5814   sd 0.0360
+gain over control: +0.0179      seed sd 0.0344
+```
+
+**The gain halved when the fourth seed arrived: +0.0329 (n=3) → +0.0179 (n=4).** That is the
+behaviour of a null effect — adding data pulls it toward zero, not toward significance.
+
+**Seed 3 scores 0.5363, BELOW the control (0.5635).** So the lever spans from clearly worse than
+control to clearly better, purely by initialisation. **Per-protein PCC remains worse than control
+in all four seeds** (0.781, 0.792, 0.782, 0.788 vs 0.793).
+
+## The `s` anomaly is now unambiguous
+
+```
+s:   0.532   0.525   0.515   1.053
+a_p: 0.390   0.395   0.377   0.782
+```
+
+**Three seeds cluster tightly at s ≈ 0.52; seed 42 sits at 1.053 — twice as high.** sd(s) = 0.265
+across four runs of one configuration.
+
+**Seed 42 is not a typical run of this lever — it is an outlier.** Every earlier statement built
+on it is a statement about one initialisation:
+
+- "`--slope_weight 1.0` lifts a_p 0.496 → 0.740/0.782" — **that was seed 42 alone.** The other
+  three give 0.377–0.395, *below* the control's 0.521.
+- "`s` crosses 1.0 between e4 and e8, so the lever overshoots" — **seed 42 alone.** The others
+  never approach 1.0.
+
+**The lever does not reliably raise `a_p` at all.** In three of four seeds it *lowers* it.
+
+## Final verdict
+
+**`--slope_weight 1.0` is rejected.** At n=4 the pooled gain is +0.018 against a seed sd of
+0.034, per-protein PCC is uniformly worse, and its headline effect on `a_p` was a single
+outlying seed.
+
+**This was the project's one "proven" lever. It joins the eleven rejections.**
+
+**Confidence: 95%** — four seeds, each at its own validation-selected epoch, canonical basis, and
+the effect shrinks as n grows.

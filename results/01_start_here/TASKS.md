@@ -257,3 +257,13 @@
       NOT CANCELLING WITHOUT APPROVAL -- recorded for your decision.
 - [x] 6 unscored trained arms found and submitted: slope1.0_s3, slope_w5_s42, w5_dg_s1/s2,
       loroWdesc2_s42, loroW_desc_s42 -- each with its own training flags.
+
+- [x] **SLOPE LEVER REJECTED at n=4.** The fourth seed (s3, e7) scores 0.5363 -- BELOW the control
+      0.5635. Four seeds: 0.5853 / 0.6242 / 0.5363 / 0.5798, mean 0.5814 sd 0.0360.
+      Gain fell from +0.0329 (n=3) to +0.0179 (n=4) -- the signature of a null effect.
+      Per-protein PCC worse than control in ALL FOUR (0.781/0.792/0.782/0.788 vs 0.793).
+      THE a_p ANOMALY IS RESOLVED: s = 0.532/0.525/0.515 for seeds 1,2,3 but 1.053 for seed 42.
+      a_p = 0.390/0.395/0.377 vs 0.782. Seed 42 is an OUTLIER, and every earlier claim built on
+      it was a claim about one initialisation -- including "a_p 0.496 -> 0.740" and "s crosses
+      1.0 between e4 and e8". In three of four seeds the lever LOWERS a_p below control.
+      The project's one "proven" lever joins the eleven rejections. -> SLOPE_VERDICT.md

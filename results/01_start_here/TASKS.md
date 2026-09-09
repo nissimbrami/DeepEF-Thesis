@@ -315,3 +315,12 @@
       because ProtT5 already predicts held-out-residue hydropathy at R^2=0.704.
       FALSIFIER: if RMSE freezes at a single value again, the scale hypothesis is WRONG and no
       fourth arm should run without a different diagnosis.
+
+- [~] K23 W12 READOUT STARTED. gld_w12_s2 reached 15/15 epochs -- the FIRST W12 arm to finish.
+      Scoring submitted as 21150204 with --sidechain_features --burial_features (the script
+      self-skips arms without an epoch-14 checkpoint, so it will pick up the others as they land).
+      Remaining: w12_s1 13/15, w12_s42 10/15, w12_dg_s42 10/15, w12_slope_s42 8/15, w5_dg_s3.
+      WHY THIS ARM MATTERS: the r/s decomposition (sd(r)=0.0223 vs sd(s)=0.2441 over 29 runs)
+      says every lever tested so far moves only the dispersion, while pooled correlates with r
+      (+0.399) more than with s (+0.281). W12 adds INFORMATION rather than rescaling, so it is
+      the first arm that could move r at all.

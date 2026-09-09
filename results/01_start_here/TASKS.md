@@ -431,3 +431,19 @@
       CONSEQUENCE: W13 stays a FEW-SHOT method needing new measurements. State that plainly.
       STILL OPEN: ProThermDB (not on cluster, obtainable) -- the one untested source.
       -> results/02_findings/EXTERNAL_DATA_VERDICT.md
+
+- [x] **W13'S GAIN IS CARRIED BY TWO PROTEINS, and correcting 16 of 27 makes things WORSE.**
+      Per-protein isolation on p3_slope1.0_s42_e13 (base 0.6202): correcting HEEH_KT_rd6_0793
+      alone gives +0.0397 and 3DKM alone +0.0241 -- together 92.8% of the total 0.0687.
+      Sixteen of twenty-seven proteins have NEGATIVE individual gain: their offsets are small, so
+      the k-sample estimate is mostly noise and subtracting noise decorrelates prediction from
+      label. Same mechanism as the k=1 harm.
+      corr(|offset|, gain) = +0.812 -- the gain is proportional to how mis-calibrated the protein
+      already was.
+      REVISED RECOMMENDATION: not "measure 5 mutants for every protein" but "measure 2-3, check
+      whether the offset is large, and correct ONLY where it is". Cheaper and better.
+      AND IT CAPS THE METHOD: W13 cannot improve a well-calibrated protein. Its ceiling is set by
+      how many badly-offset proteins the benchmark contains -- ours contains two.
+      Consistent with the robustness result (dropping 2 proteins leaves 42%) and the k=1 threshold
+      (noise/signal 1.47, break-even k=2.2). Three analyses, one mechanism.
+      -> results/02_findings/W13_CONCENTRATION.md

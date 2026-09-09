@@ -35,6 +35,12 @@ parser.add_argument('--freeze_layers',action = 'store_true', help ='Freeze model
 parser.add_argument('--trained_model_path',type=str,default = "./res/trianed_models-light_attention/43_final_model.pt",help='Trained model path')
 parser.add_argument('--dg_ml', action='store_true', help='Change deltaG threshold to [-1,5]')
 parser.add_argument('--readout', default='sum', choices=['sum','attention','gated'], help='per-residue energy aggregation')
+parser.add_argument('--burial_features', action='store_true', help='W5: must match training or load_state_dict fails')
+parser.add_argument('--burial_mode', default='count', choices=['count','hse'])
+parser.add_argument('--aa_descriptors', default=None, help='W6: must match training')
+parser.add_argument('--sidechain_features', action='store_true', help='W12: must match training')
+parser.add_argument('--w15_features', action='store_true', help='W15: must match training')
+parser.add_argument('--ligand_nodes', action='store_true', help='W11: must match training')
 parser.add_argument('--dg_length_norm', default='none', choices=['none','n','sqrtn'], help='lever 2: MUST match training — length-normalize predicted dG')
 parser.add_argument('--affine', default=None, help='lever 3: path to affine.json {a,b}; pred_deltaG := a*pred+b before ddG (RMSE only). Defaults to env DEEPEF_AFFINE.')
 
@@ -489,6 +495,11 @@ def run_training():
     test_ds = DataLoader(test_ds, batch_size=1, shuffle=True)
 
     # Create the model
+    # Block levers MUST be set on CFG before PEM is constructed: they change fc1 width.
+    for _lv in ('burial_features','sidechain_features','w15_features','ligand_nodes'):
+        setattr(CFG, _lv, bool(getattr(args, _lv, False)))
+    CFG.burial_mode = getattr(args, 'burial_mode', 'count')
+    CFG.aa_descriptors = getattr(args, 'aa_descriptors', None)
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
                 light_attention=LIGHT_ATTENTION, readout=args.readout).to(DEVICE)
     if PRETRAINED: 

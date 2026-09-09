@@ -264,3 +264,16 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       all have failed to score.
 - [x] slope_anchor_s42 scored at e14 (28,315 rows) -- the only one of the four that could work
       without the fix.
+
+- [!] **SECOND HALF OF THE SCORING BUG.** Passing EVAL_FLAGS was necessary but not sufficient:
+      evaluate.py ACCEPTS NO BLOCK-LEVER FLAGS AT ALL. Its argparse knows only affine,
+      dataset_type, debug, dg_length_norm, dg_ml, epochs, freeze_layers, model_name, one_mut,
+      readout, trained_model_path, unstable_mut -- and it never sets any block lever on CFG, so
+      PEM was always built at the BASELINE width regardless of the checkpoint.
+      Error after the first fix was explicit: "unrecognized arguments: --aa_descriptors".
+      FIX: added --burial_features, --burial_mode, --aa_descriptors, --sidechain_features,
+      --w15_features, --ligand_nodes, and a CFG setter that runs BEFORE PEM is constructed.
+      All defaults OFF so existing behaviour is byte-identical; gate_g4_cpu ALL PASS.
+      Verified with --help that all five parse. Resubmitted as 21146012.
+      CONSEQUENCE: no width-changing arm has EVER been scorable in this project until now.
+      W12, W15, HSE and ligands would all have failed silently.

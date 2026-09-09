@@ -115,6 +115,10 @@ list, ranked by measured value per GPU-hour:
    **87.7%** of the raw->oracle gap. The remaining headroom is within-protein ranking, i.e. §3.4's
    hydrophobic deficit — which is precisely what W12/W15 attack.
 
+> **CORRECTED 2026-09-10.** The claim below that n=27 is the binding constraint is WRONG.
+> W12 is significant at n=27 (paired t, p=0.0372). Power is 75%; n=44 would give 80%.
+> See `W12_SIGNIFICANT.md`.
+
 **The one thing I would add that nobody has proposed:** the gain is concentrated in 5 proteins out
 of 27, so **n=27 is the binding constraint, not the levers.** More seeds cannot fix a
 protein-level CI. If the thesis needs a significant result, it needs more test proteins — that is

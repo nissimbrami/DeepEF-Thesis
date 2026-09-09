@@ -67,6 +67,10 @@ essentially nothing — very slightly negative — on the proteins that already 
 oracle (78% from two proteins). It is the project's recurring structure: **gains concentrate in
 a handful of hard proteins, so n=27 cannot resolve them.**
 
+> **CORRECTED 2026-09-10.** The 'CI includes zero (P=0.88)' below used a bootstrap on the
+> POOLED correlation, which is dominated by between-protein offsets. The correct paired
+> per-protein test gives **p=0.0372, both CIs excluding zero**. See `W12_SIGNIFICANT.md`.
+
 ## 4. Verdict
 
 **W12 is the strongest lever in the project on every metric that matters** (pooled, k=20,

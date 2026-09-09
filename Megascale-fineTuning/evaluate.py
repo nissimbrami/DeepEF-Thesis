@@ -549,6 +549,13 @@ def run_validation_metrics():
     train_ds = DataLoader(train_ds, batch_size=1, shuffle=True)
     test_ds = DataLoader(test_ds, batch_size=1, shuffle=True)
     # Create the model
+    # Block levers MUST be set on CFG before PEM is built here too: __main__ calls
+    # run_validation_metrics(), NOT run_training(), so a setter placed only in the latter
+    # is dead code and the model is silently built at baseline width.
+    for _lv in ('burial_features','sidechain_features','w15_features','ligand_nodes'):
+        setattr(CFG, _lv, bool(getattr(args, _lv, False)))
+    CFG.burial_mode = getattr(args, 'burial_mode', 'count')
+    CFG.aa_descriptors = getattr(args, 'aa_descriptors', None)
     model = PEM(layers=CFG.num_layers, gaussian_coef=CFG.gaussian_coef, dropout_rate=CFG.dropout_rate,
                 light_attention=LIGHT_ATTENTION, readout=args.readout).to(DEVICE)
     if PRETRAINED: 

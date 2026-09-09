@@ -291,3 +291,19 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       -> results/02_findings/SLOPE_VERDICT.md
 - [x] Six local findings uploaded (written during the 3.5h cluster outage): PROTEIN_DIFFICULTY,
       NOISE_DECOMPOSITION, DOSE_RESPONSE, FACTORIAL_D0, D1_CONFIRMED, RS_DECOMPOSITION.
+
+- [!] **THIRD AND FINAL PART OF THE SCORING BUG.** My CFG setter went into run_training(), which
+      __main__ NEVER CALLS. __main__ calls run_validation_metrics() (line 540), whose PEM is at
+      line 552. So the flags parsed correctly, the setter existed, and the model was STILL built
+      at baseline width -- the change looked applied, raised no error, and did nothing.
+      Same class of bug as the two before it. Setter now in BOTH functions (lines 499 and 555,
+      each before its own PEM). gate_g4_cpu ALL PASS. Resubmitted as 21147408 and 21147479.
+- [x] STATUS OF LAST NIGHT'S PLAN, verified against squeue rather than memory:
+      W15 (5 arms), K21 distogram (4 arms), K20 ensemble (3 arms) are all BUILT, GATED and QUEUED
+      -- but NOT ONE has run for even a second. All 12 sit at MaxGRESPerAccount.
+      BLOCKER FOUND: four OLD jobs hold the golden cards -- 21050159 sa_uembmean_seed4 (7h09,
+      a D1/uemb arm already settled at t=9.93), 21050157 sa_coil_seed42 (7h42), 21049396 and
+      21049394 (both D0 factorial, 4h31). They are starving every new lever.
+      NOT CANCELLING WITHOUT APPROVAL -- recorded for your decision.
+- [x] 6 unscored trained arms found and submitted: slope1.0_s3, slope_w5_s42, w5_dg_s1/s2,
+      loroWdesc2_s42, loroW_desc_s42 -- each with its own training flags.

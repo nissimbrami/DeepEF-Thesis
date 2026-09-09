@@ -354,3 +354,14 @@
       AND the k=5 figures reconcile: 70.0% of the k=20 gain, 99.1% of the oracle-recoverable gain.
       Both earlier numbers were right; neither was stated with its denominator.
       -> results/02_findings/W13_UNIVERSAL.md
+
+- [x] **FACTORIAL COMPLETE AND ANALYSED: 22 D0 cells, 8 configurations, 3 seeds. ALL EFFECTS ZERO.**
+      A +0.0013+-0.0082 (t=0.16), B +0.0052+-0.0082 (t=0.63), C -0.0089+-0.0075 (t=-1.18).
+      All inside the 0.0344 band by 4-25x; no |t| above 1.2. A measured null, not an underpowered one.
+      TWO CORRECTIONS TO MY OWN EARLIER ANALYSIS (which used only 6 cells):
+        epoch is NOT a confound -- corr(epoch,pooled) = -0.091 at n=22, not +0.543 at n=6
+        seed is NOT a confound -- seed means 0.5944 / 0.5980 / 0.5883, spread 0.0097
+      Cell-to-cell sd is 0.0177, HALF the seed sd: eight configurations are more alike than two
+      seeds of one configuration. The explored design space is flat.
+      Six factorial jobs remain queued; they add cells to a question answered at n=22.
+      -> results/02_findings/FACTORIAL_FINAL.md (supersedes FACTORIAL_D0.md)

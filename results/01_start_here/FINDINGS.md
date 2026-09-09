@@ -36,7 +36,7 @@ Per protein, the prediction is an affine function of the truth:
 
 | quantity | value | what it is |
 |---|---|---|
-| **std(b_p)** | **1.5741** | the per-protein OFFSET, a dG-space wild-type error |
+| **std(b_p)** | **1.5741 (dG-space WT error) / 0.1853 (ddG intercept)** | the per-protein OFFSET. **These are different quantities differing 8.5x** and the table's equation is the ddG one -- see `results/02_findings/BP_TRUE_INTERCEPT.md`. |
 | **a_p median** | **0.4990** | the per-protein SLOPE — the model compresses ddG by half |
 | **per-protein ddG PCC** | **0.7262 mean / 0.7928 median** | ranking quality WITHIN a protein. **The long-quoted 0.798 was the MEDIAN reported as a mean** -- see `results/02_findings/PERPROT_DEFINITION.md`. |
 | **pooled ddG PCC** | **~0.59** | ranking quality ACROSS all proteins together |

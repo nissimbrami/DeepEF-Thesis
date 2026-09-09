@@ -17,10 +17,7 @@
 - [x] P0b **DONE.** OPEN_PROBLEMS.md P0 step 3 claimed canonical e14 for BOTH trajectory runs.
       Verified from the val logs: gld_slope1.0_s42 -> e10 (argmax 0.740, tied at e12, first-max
       wins; e14 is 8th-best at 0.722) and gld_dg_coil_s42 -> e14 (0.769, unique). Text corrected.
-- [ ] P0c Rescore loroW_onehot_s42 and p3_a1_d1_s0_D1_uemb_seed42 at e14 (both were scored
-          at e12, not their val argmax; both near-zero arms, error runs against them).
-          Detector: scripts/audit_epoch_provenance.py.
-
+- [x] P0c **DONE.** Both runs now scored at e14: loroW_onehot_s42_e14 (pooled 0.5773) and p3_a1_d1_s0_D1_uemb_seed42_e14. Verified by ls. 
 - [ ] K8  Read out the 8 golden-lane arms when they finish (now at epoch 7-11 of 14):
           dg_coil, slope, w5_dg, w7edge, u10bidir, w7span4, loroW_onehot, loroW_desc.
           Each answers a lever that had NEVER been run.
@@ -32,8 +29,12 @@
       NEVER WIRED to any run. Same failure mode as the scoring bugs: the fix existed, looked
       applied, and was not in the executing path. The descriptor hypothesis remains UNTESTED
       after two attempts. -> results/02_findings/LORO_VERDICT.md
-- [ ] K10 Decide on the D1 half of the factorial: D0 coil scores 0.58-0.62, D1 uemb -0.08 to 0.31,
-          no overlap, a_p 0.37-0.72 vs 0.005-0.020. ~190 GPU-h would confirm a visible negative.
+- [x] K10 **DECIDED: the D1 half is settled and NOTHING is pending.** Recomputed on all
+      scored factorial cells: D0 n=25 pooled 0.5917+-0.0216, D1 n=12 pooled 0.1311+-0.1344.
+      Welch t = 11.80, ZERO overlap -- D0's worst cell (0.5362) is 6.3 seed-sigma above D1's best
+      (0.3204). a_p is 0.0152 in D1 vs 0.4721 in D0, i.e. the model does not respond to true ddG
+      at all. And the queue check shows 0 pending D1 jobs: the arm drained on its own, so there
+      is nothing left to cancel and no GPU-hours to reclaim. Question closed at zero cost. 
 - [x] K11 **CANCELLED — same refuted claim as K22.** See CHECKPOINT 25: the 2,356 2-point
       rows are all 2K5H single mutations on the _G11S/_G23A backgrounds, not double mutants.
 - [x] K15 **DONE** -> THESIS_SUMMARY.md + THESIS_UPDATE.md (the post-replication amendment). 

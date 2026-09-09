@@ -277,3 +277,17 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       Verified with --help that all five parse. Resubmitted as 21146012.
       CONSEQUENCE: no width-changing arm has EVER been scorable in this project until now.
       W12, W15, HSE and ligands would all have failed silently.
+
+- [x] **THE DECISIVE MEASUREMENT: the slope lever does NOT survive seed replication.**
+      Three seeds, each at its OWN val-selected epoch (s1->e9 argmax 0.8240, s2->e13 argmax
+      0.8010, s42->e10): pooled 0.5853 / 0.6242 / 0.5798, mean 0.5964 sd 0.0242, control 0.5635.
+      Gain +0.0329 against a seed sd of 0.0344 -- INSIDE THE NOISE BAND.
+      And per-protein PCC is WORSE than control in all three (0.7809/0.7920/0.7878 vs 0.7929).
+      ANOMALY: a_p is 0.78 for s42 but 0.39 for s1 and s2 -- s = 1.053 vs 0.532/0.525. Same
+      config, opposite sides of perfect calibration, depending only on initialisation. The
+      earlier 's crosses 1.0 between e4 and e8' was a property of seed 42 alone.
+      CONSEQUENCE: after replication, NO lever in this project has a reproducible gain in pooled
+      ddG PCC. Only D0 survives, and it is a constraint (t=9.93) rather than a gain.
+      -> results/02_findings/SLOPE_VERDICT.md
+- [x] Six local findings uploaded (written during the 3.5h cluster outage): PROTEIN_DIFFICULTY,
+      NOISE_DECOMPOSITION, DOSE_RESPONSE, FACTORIAL_D0, D1_CONFIRMED, RS_DECOMPOSITION.

@@ -209,3 +209,18 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       The other 4 (slope1.0 s1/s2/s3, slope_w5_s42) are at 13 epochs after 7h31m.
       Headline unchanged over 52 scored runs: best pooled 0.6382 (sigma_seed2_e10),
       best PP 0.8034 (p3_slope1.0_s42_e13), control 0.5635 / 0.7929.
+
+- [x] hydrophobic_failure.py **BLOCKED, NOT FIXABLE BY PATCHING.** It needs df["mut"] to group
+      mutations by destination residue. Our eval schema is protein,deltaG,pred_deltaG,ddG,pred_ddG
+      with NO variant identifier. Three join routes tested: (a) a mut column -- absent everywhere;
+      (b) decode the mutation from one_hot vs WT -- WORKS (2PTL variant 5 decodes as E1Q);
+      (c) join by row order -- FAILS, 2K28 has 920 CSV rows vs 2,838 variants. The mutation is
+      recoverable but the LINK between an eval row and a variant index does not exist: evaluation
+      writes a filtered subset and never records which. Fix requires adding a variant index to
+      evaluate.py and regenerating ~52 CSVs. Nothing is lost -- the finding it would re-derive is
+      already measured (hydrophobic slope 0.27-0.31 vs polar 0.53-0.57, KD corr -0.734/-0.740,
+      buried gap 0.095 vs exposed 0.024, p<0.002). -> results/05_infrastructure/HYDROPHOBIC_BLOCKED.md
+- [!] SCORING BUG FOUND: sbatch --job-name carries the gld_ prefix but --run_tag strips it, so
+      model dirs are ..._w5_dg_s1 NOT ..._gld_w5_dg_s1. Job 21145481 failed on all four arms with
+      "no model dir" and the DONE line still printed. Fixed in scripts/score_done.sh, resubmitted
+      as 21145583.

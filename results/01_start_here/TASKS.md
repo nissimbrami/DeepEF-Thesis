@@ -224,3 +224,16 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       model dirs are ..._w5_dg_s1 NOT ..._gld_w5_dg_s1. Job 21145481 failed on all four arms with
       "no model dir" and the DONE line still printed. Fixed in scripts/score_done.sh, resubmitted
       as 21145583.
+
+- [x] LIGANDS/METALS/COMPLEXES **CLOSED WITH PRIMARY EVIDENCE.** Fetched all 21 PDB-coded test
+      proteins directly from the RCSB REST API (the other 7 are designed sequences with no PDB
+      entry). Result is unanimous: 0 real ligands (crystallisation additives excluded), 0 bound
+      metals, 0 multi-chain entries, 21/21 monomeric single-chain. 19 of 21 are solution NMR,
+      which explains the uniformity.
+      This took three attempts to settle honestly: (1) "zero variance" taken from an agent report
+      without verification; (2) the catalogue DOES have 67,856 complexes -- but 0 of our 28 and 0
+      of 247 PDB-like training proteins appear in it (catalogue median 477aa vs our 42-72aa);
+      (3) fetched our own structures. The conclusion never changed, but only now is it evidence.
+      A constant-zero column contributes nothing to any gradient, so these levers are UNMEASURABLE
+      on this benchmark -- a property of the BENCHMARK, not evidence against the idea.
+      -> results/02_findings/LIGANDS_FINAL.md, results/08_data/pdb_annotations.json

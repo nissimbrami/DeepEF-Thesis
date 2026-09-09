@@ -199,3 +199,13 @@ K6 looked like a 31% improvement and was the model predicting nothing.
       gate_g4_cpu ALL PASS at 1092 with flag off. Flag proven parsed.
       Two wiring bugs caught and fixed: W15 was nested inside W12's conditional (so it only
       appeared when W12 was also on), and a regex corrupted a getattr call in hydro_net.
+
+- [x] P0c **DONE.** loroW_onehot_s42 rescored at e14: pooled 0.5773, PP 0.7895, oracle 0.6793
+      (was read at e12: 0.5716 / 0.7917 / 0.6790). The difference is 0.006 -- well inside the
+      +/-0.060 seed band, so the earlier non-canonical read did NOT distort any conclusion.
+      This is now the baseline the LORO descriptor arm must beat.
+- [~] K8/K9 IN PROGRESS. 4 of the 8 original golden arms have finished 15 epochs
+      (gld_loroWdesc2_s42, gld_w5_dg_s1, gld_w5_dg_s2, gld_slope_anchor_s42); scoring job 21145481.
+      The other 4 (slope1.0 s1/s2/s3, slope_w5_s42) are at 13 epochs after 7h31m.
+      Headline unchanged over 52 scored runs: best pooled 0.6382 (sigma_seed2_e10),
+      best PP 0.8034 (p3_slope1.0_s42_e13), control 0.5635 / 0.7929.

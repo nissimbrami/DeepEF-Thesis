@@ -1,79 +1,113 @@
-# THE CHECKLIST — 10 tasks, each with its own 3-stage checklist
+# THE CHECKLIST — built from the FULL review (Parts A-G), not just Part E
 
-**Created 2026-09-10.** Derived from the planner's work-order (Part E) and executed under
-`PROTOCOL.md`. **One task active at a time. No parallelism except background GPU jobs.**
+**Rebuilt 2026-09-10** after the first version was found to cover only Part E's work order and to
+drop Parts A-D and F-G entirely. **One task active at a time. GPU jobs in the background are fine.**
 
-Each task carries the same inner checklist:
-`[ ] PLAN (question / hypothesis / falsifier / metric / config / "if X then Y")`
-`[ ] EXECUTE (end to end, no deviation)`
-`[ ] VERIFY (criterion met? did it train? did the mechanism occur?)`
-`[ ] DONE (mean AND median + training-health line reported)`
+Inner checklist for every task:
+`[ ] PLAN` (question / hypothesis / falsifier / metric / config / "if X then Y" written in advance)
+`[ ] EXECUTE` (end to end, no deviation)
+`[ ] VERIFY` (criterion met? did it train? did the predicted mechanism occur?)
+`[ ] DONE` (mean AND median + training-health line)
 
-Status: `[ ]` open · `[x]` done · `[~]` blocked (reason recorded) · `[>]` in progress
+Status: `[ ]` open · `[x]` done · `[~]` blocked · `[>]` active
 
 ---
 
-## T1 — Training curves for the two Flory arms and the descriptor arm
-- [x] PLAN — Q: did these arms train? Falsifier registered in advance: *a flat or diverging
-      curve is an optimisation failure and the rejection is void.* Metric: val RMSE + train loss
-      per epoch. If flat -> rejection void; if monotone -> rejection stands on merit.
-- [x] EXECUTE — read 4 training logs
-- [x] VERIFY — Flory 1.450->1.086 and 2.313->1.628, loss falling = HEALTHY.
-      Descriptors RMSE 2.541/2.529 x15, loss constant to 5 decimals = NEVER TRAINED.
-- [x] DONE -> `W6_ROOT_CAUSE.md` §Task 1. **Cost: 10 min. Outcome: the wave produced 2 findings, not 3.**
+# PART A — the four structural errors (must be fixed as POLICY, not as tasks)
 
-## T2 — Descriptor block: folded vs unfolded, `torch.equal`
-- [x] PLAN — H: the block is state-independent and cancels in dG. Falsifier: if `torch.equal`
-      is False the hypothesis dies. If True -> root cause, and no descriptor arm can ever work as wired.
-- [x] EXECUTE — direct tensor comparison
-- [x] VERIFY — W6 `torch.equal`=True, max|d|=0.000e+00; W12 False, max|d|=1.501e+00.
-      Corroborated by `train_utils.py:734` comment and the 5-decimal-constant loss.
-- [x] DONE -> `W6_ROOT_CAUSE.md` + `scripts/gate_state_dependence.py` (W5/W12/W15 PASS, both W6 modes FAIL)
+- [x] **A1 screen vs confirm never mixed.** A screen is 1 seed, NO multiplicity correction, and
+      yields a ranking only. Confirmation is 5 seeds with one pre-registered test at 0.05.
+      -> in `PROTOCOL.md` §2 Q5. **Consequence: `slope 0.7` was a screen and must NOT have been
+      BH-corrected. Its verdict is "leading candidate", not "miss".**
+- [x] **A2 power before submission.** Control SE 0.0027, single-arm SE 0.0065, difference SE
+      ~0.0070; a 0.011 effect is 1.6σ at n=1. **3 seeds minimum for a claim, 5 for a headline,
+      7 for 3σ.** -> `PROTOCOL.md` §2 Q6.
+- [x] **A3 "collapsed" and "harmful" are different verdicts.** Every arm reports a training-health
+      line before its score; a frozen loss is a build failure, not a result. -> `PROTOCOL.md` §4.
+- [x] **A4 rejections are written "rejected in configuration X".** -> `PROTOCOL.md` §3.
 
-## T3 — Verify the distance kernel is monotone in the W7 runs
-- [x] PLAN — Falsifier: if k(2A)>k(8A)>k(15A) fails, the model is distance-blind and both W7
-      nulls are void. If monotone -> the nulls stand on merit.
-- [x] EXECUTE — kernel read from train_utils.py:390/:652, evaluated at 2-20 A
-- [x] VERIFY — **falsifier did NOT fire**: strictly decreasing (0.726 -> 1.5e-08). But it
-      SATURATES: past 12 A it is at float32 eps. Also CORRECTED the review: span and bidir are
-      separate flags (hydro_net.py:720-722 + branch), so span4 is NOT confounded, and the
-      requested bidirectional span-1 control already exists and ran (u10bidir, also null).
-- [x] DONE -> `T3_KERNEL_AND_SPAN.md`. **New actionable lever: `gaussian_coef`, not `gcn_span`.**
+---
 
-## T4 — BSA vs `b_p` and `a_p` on the 27 test proteins
-- [x] PLAN - Falsifier: if no interface feature is significant vs b_p, the direction is closed.
-- [x] EXECUTE - every structural feature vs b_p/a_p/r, 27 proteins, 58 healthy runs, 201 tests
-- [x] VERIFY - falsifier FIRED: interface/SASA null for b_p (best n_hbond -0.446 p=0.020, vs
-      Bonferroni 0.00025). NEW: packing_frac vs a_p -0.662 (p=0.0002) and void_vol_per_res
-      +0.652 both SURVIVE Bonferroni. Tightly packed proteins compress hardest.
-- [x] DONE -> T4_INTERFACE_NULL.md. Predicts W12 helps most on tightly packed proteins (T8).
+# PART B — the six levers, each with the review's own "what to do"
 
-## T5 — `pub_w5_ddg_s42`: separate the objective from the block
-- [~] BLOCKED — arm is training (GPU, background). Not an active task.
+## B1 Flory / the coil
+- [x] read the loss curves of both Flory arms  -> HEALTHY (1.450->1.086, 2.313->1.628)
+- [x] confirm only the map was swapped -> docstring "value-only lever, no new parameters";
+      map is `b*|i-j|^nu`, never reads one_hot; zero learnable params -> `FLORY_QUARTER_TESTED.md`
+- [x] **B1c DONE V** - ratio is 1.45 (nu=.5) and 1.29 (nu=.588): NOT a scale problem, `b`
+      recalibration ruled out by measurement. Real mechanism found: SPARSITY. Baseline is a hard
+      tridiagonal mask (3.3% of pairs nonzero at 0.3150); the coil smears the same mass over 39%
+      of pairs at 0.0391 each - 12x denser, 8x weaker per contact. Next config: a TRUNCATED coil
+      (cutoff restores sparsity, keeps the distance profile). -> `B1C_RESULT.md`
+- [ ] **B1d distogram head on the unfolded state**, weight **0.1** (never IFUM's 100: their aux
+      loss matches their primary; ours is CE ~ln(32)=3.5 vs MSE ~1). Attach via
+      `hydro_net.py f_type='features'`.
+- [x] representation mismatch recorded: our coil broadcasts one CA distance across all 16
+      atom-pair channels, making them identical. -> `FLORY_QUARTER_TESTED.md`
 
-## T6 — `slope 0.7` at 5 seeds (the only positive candidate the wave produced)
-- [ ] PLAN
-- [ ] EXECUTE
-- [ ] VERIFY
-- [ ] DONE
+## B2 descriptors
+- [x] `torch.equal(folded, unfolded)` -> **True**, max|d|=0.000e+00 = ROOT CAUSE
+- [ ] **B2b confirmation run: zero the block in the UNFOLDED pass only, one epoch. If RMSE moves
+      off 2.529, proved.**
+- [x] the rule it generalises to -> `gate_state_dependence.py`
+- [ ] **B2d the EDGE case the algebra does not cover:** descriptors on edges (hydropathy
+      difference, volume sum, distance) — a function of a PAIR, a space the network never sees.
 
-## T7 — W12 pooled score, 2 seeds, canonical basis
-- [ ] PLAN
-- [ ] EXECUTE
-- [ ] VERIFY
-- [ ] DONE
+## B3 W5 burial
+- [~] **B3a NOTHING may be concluded about W5 until `pub_w5_ddg_s42` lands.** All four W5 seeds
+      ran `--loss_mode dg`; every dG-trained arm has a negative median, so the objective and the
+      block are confounded. (arm training now)
+- [ ] **B3b decompose per protein: does W5 help exactly at BURIED positions?** The review's
+      prediction: gap 0.095 buried vs 0.024 exposed. If it helps there, the mechanism holds and
+      the rejection was an artifact of summarising with one number.
+- [x] report mean AND median always -> `PROTOCOL.md` §4
 
-## T8 — W12 mechanism: slope gap buried vs exposed
-- [ ] PLAN
-- [ ] EXECUTE
-- [ ] VERIFY
-- [ ] DONE
+## B4 W7 edges
+- [x] verify the kernel is monotone -> **it is** (0.726 -> 1.5e-08), so the nulls are genuine
+- [x] the span/bidir confound claim -> **WRONG**, flags are independent; u10bidir IS the control
+- [ ] **B4c edge-level descriptors** (same as B2d)
 
-## T9 — W15 real side-chain reconstruction
-- [~] BLOCKED — `pub_w15b_s42` resuming on GPU.
+## B5 BSA / complexity
+- [x] correlate BSA against `b_p`/`a_p` on the 27 test proteins, not against the pre-training loss
+      -> interface NULL for b_p; **packing_frac -0.662 and void_vol_per_res +0.652 vs a_p survive
+      Bonferroni** -> `T4_INTERFACE_NULL.md`
 
-## T10 — Distogram head at weight 0.1
-- [~] BLOCKED — `disto0.01/0.1/1.0` running/queued on GPU.
+## B6 ligands / metals
+- [x] recorded as "not measurable on this dataset", never "dead"
+- [ ] **B6b decide explicitly:** either evaluate on ProTherm/FireProtDB (noting S669 leakage binds
+      only if S669 stays the test set — a decision, not a fact), or record the direction as
+      untestable here and say so in the thesis. **This is Nissim's call, not mine.**
+
+---
+
+# PART E — the work order
+
+- [x] E1 training curves (= B1a, B2a)
+- [x] E2 descriptor block folded vs unfolded (= B2a)
+- [x] E3 kernel monotonicity (= B4a)
+- [x] E4 BSA vs b_p/a_p (= B5)
+- [~] E5 `pub_w5_ddg_s42` — training on GPU
+- [ ] **E6 `slope 0.7` at 5 seeds** — the only positive candidate the wave produced. **It is a
+      SCREEN result; treat as leading candidate (A1).**
+- [ ] E7 W12 pooled score, 2 seeds, canonical basis
+- [ ] E8 W12 mechanism: slope gap buried vs exposed (tied to B3b and to T4's packing finding)
+- [~] E9 W15 — `pub_w15b_s42` resuming on GPU
+- [~] E10 distogram head at 0.1 (= B1d) — `disto0.01/0.1/1.0` on GPU
+
+---
+
+# PART F — the 19 lessons about the MODEL (kept because they survive the levers)
+
+Recorded in `results/02_findings/MODEL_LESSONS.md`. These are what remains when a lever falls.
+
+---
+
+# PART G — protocol
+
+- [x] one active task; GPU background jobs are not tasks
+- [x] plan / execute / verify, uninterrupted, with a written definition of DONE
+- [x] the 8-question pre-flight test (4 from the review + 4 the wave exposed)
+- [x] written to memory so it survives compaction
 
 ---
 

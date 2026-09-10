@@ -76,9 +76,16 @@ Status: `[ ]` open · `[x]` done · `[~]` blocked · `[>]` active
 - [~] **B3a NOTHING may be concluded about W5 until `pub_w5_ddg_s42` lands.** All four W5 seeds
       ran `--loss_mode dg`; every dG-trained arm has a negative median, so the objective and the
       block are confounded. (arm training now)
-- [ ] **B3b decompose per protein: does W5 help exactly at BURIED positions?** The review's
-      prediction: gap 0.095 buried vs 0.024 exposed. If it helps there, the mechanism holds and
-      the rejection was an artifact of summarising with one number.
+- [x] **B3b DONE V** - prediction HALF confirmed. 19/27 proteins, 76,416 mutation-seed pairs.
+      Buried mean gain +0.03697 vs exposed +0.01051; difference +0.02647, Welch t=4.933,
+      p=1.1e-06 -> the direction is real. BUT the buried MEDIAN is -0.00406 against a mean of
+      +0.037 (the same split as W5 overall); corr(burial,gain)=+0.065 explains 0.4% of the
+      variance; and it helps POLAR destinations MORE than hydrophobic (+0.047 vs +0.024), the
+      opposite of desolvation. The mechanism story does NOT hold. Rejection stands, better
+      characterised: W5 rescues a tail at a cost to the majority, at every stratum.
+      Found a real join bug: eval CSVs are float32, mutation files float64 - an exact deltaG
+      join returns 4 of 1703 rows. B3a still binds (all 4 seeds are loss_mode dg).
+      -> `B3B_BURIED_VS_EXPOSED.md`
 - [x] report mean AND median always -> `PROTOCOL.md` §4
 
 ## B4 W7 edges

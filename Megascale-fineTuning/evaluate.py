@@ -587,8 +587,17 @@ def run_validation_metrics():
     if PRETRAINED: 
         try:
             model, _, _, _, _ = load_checkpoint(TRAINED_MODEL_PATH, model)
-        except:
-            model.load_state_dict(torch.load(TRAINED_MODEL_PATH))
+        except Exception as _e_wrap:
+            _sd = torch.load(TRAINED_MODEL_PATH, map_location='cpu')
+            if isinstance(_sd, dict) and 'model_state_dict' in _sd:
+                _sd = _sd['model_state_dict']
+            try:
+                model.load_state_dict(_sd)
+            except Exception as _e_raw:
+                raise RuntimeError(
+                    'checkpoint does not match the model built from these flags. '
+                    'wrapper: %s | raw: %s | HINT: pass the SAME lever flags used in '
+                    'training' % (_e_wrap, _e_raw))
     # Train the model
     trainer = Trainer(model, train_ds, test_ds)
     model, pc_corr,val_df = trainer.validate(0)

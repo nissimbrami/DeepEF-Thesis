@@ -1,3 +1,9 @@
+> **SCOPED 2026-09-10.** Flory's rejection applies to the configuration *"analytic |i-j| coil
+> map substituted into the unfolded input, no auxiliary loss, no learned reference"* -- which
+> is a quarter of the IFUM method. Training was healthy, so the configuration is genuinely
+> dead, but the idea was never implemented. See `FLORY_QUARTER_TESTED.md`.
+> The descriptor collapse now has a root cause: `W6_ROOT_CAUSE.md`.
+
 # Full analysis of everything that finished: 12 arms, and only the failures are significant
 
 **Date:** 2026-09-10. Every arm scored since the last wave, on the **ranking channel**

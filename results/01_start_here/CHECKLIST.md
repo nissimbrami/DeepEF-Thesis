@@ -102,9 +102,21 @@ Status: `[ ]` open · `[x]` done · `[~]` blocked · `[>]` active
 
 ## B6 ligands / metals
 - [x] recorded as "not measurable on this dataset", never "dead"
-- [ ] **B6b decide explicitly:** either evaluate on ProTherm/FireProtDB (noting S669 leakage binds
-      only if S669 stays the test set — a decision, not a fact), or record the direction as
-      untestable here and say so in the thesis. **This is Nissim's call, not mine.**
+- [~] **B6b FACT HALF DONE V - decision half is Nissim's.**
+      MEASURED: S669 is already on disk fully preprocessed (all_coords/masks/mutations/ids.pt,
+      669 mutations, 94 distinct PDBs). Joined to the 100k catalogue and classified with the
+      project's own het table (208 codes count as a bound ligand):
+        18 of 62 matched S669 proteins carry a REAL bound ligand (HEM, FES, ZN, MG, GSH...)
+        13 of 62 carry a METAL
+        our 27 MegaScale test proteins: 0 of 27
+      So the ligand/metal direction is TESTABLE, not untestable - writing 'untestable' in the
+      thesis would now be wrong. (Caught a parsing bug first: counts_as_bound_ligand holds
+      'yes'/'no' strings, so an == True comparison returned 0 ligands.)
+      OPEN FOR NISSIM: (1) variance check only - run the existing model on the 18 ligand-bearing
+      proteins with --ligand_nodes on/off; leakage does NOT invalidate a variance check, and it
+      would confirm W11 is not a 6th silent no-op. (2) full evaluation - adopt S669 as a
+      secondary test set, which requires defending leakage explicitly. Recommend (1). NOT
+      submitted. -> `B6B_LIGANDS_TESTABLE.md`
 
 ---
 

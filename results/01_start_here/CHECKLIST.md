@@ -126,7 +126,16 @@ Status: `[ ]` open · `[x]` done · `[~]` blocked · `[>]` active
       0.7327 +/- 0.0126 against the recorded 0.7156 +/- 0.0474 - a 4x sd discrepancy, not
       rounding. Not fixed here (separate decision, gate_headline.py enforces the basis).
       -> `E7_W12_CANONICAL.md`
-- [ ] E8 W12 mechanism: slope gap buried vs exposed (tied to B3b and to T4's packing finding)
+- [x] **E8 DONE V** - MECHANISM CONFIRMED on both predicted axes.
+      PER PROTEIN (n=27): corr(W12 gain, packing_frac)=+0.4126 p=0.0325; void -0.4138 p=0.0319.
+      Tightly packed proteins gain +0.0366 vs +0.0035 loose = 10x. T4 predicted this in advance
+      (packing predicts slope collapse -0.662), so it is confirmation, not discovery.
+      PER MUTATION (37,852 pairs, 19 proteins): to HYDROPHOBIC +0.02894 (median +0.0023) vs to
+      POLAR +0.00341 (median -0.0060) = 8.5x. Buried+hydrophobic (the FINDINGS 3.4 deficit)
+      +0.02687. Burial ALONE is not the discriminator (p=0.36) - destination chemistry is.
+      DECISIVE CONTRAST: W5 helps POLAR more (+0.047 vs +0.024); W12 helps HYDROPHOBIC 8.5x
+      more. Both were built to attack burial; only W12's gain matches its intended mechanism.
+      -> `E8_W12_MECHANISM.md`
 - [~] E9 W15 — `pub_w15b_s42` resuming on GPU
 - [~] E10 distogram head at 0.1 (= B1d) — `disto0.01/0.1/1.0` on GPU
 

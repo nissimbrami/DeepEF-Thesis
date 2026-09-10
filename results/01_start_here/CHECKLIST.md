@@ -61,8 +61,16 @@ Status: `[ ]` open · `[x]` done · `[~]` blocked · `[>]` active
 - [ ] **B2b confirmation run: zero the block in the UNFOLDED pass only, one epoch. If RMSE moves
       off 2.529, proved.**
 - [x] the rule it generalises to -> `gate_state_dependence.py`
-- [ ] **B2d the EDGE case the algebra does not cover:** descriptors on edges (hydropathy
-      difference, volume sum, distance) — a function of a PAIR, a space the network never sees.
+- [x] **B2d DONE V** - an edge path ALREADY exists: edge_features.py builds
+      [src_onehot(20) | dst_onehot(20) | rbf(16)] fed to GATv2Conv's LINEAR lin_edge.
+      Measured: hydropathy DIFFERENCE R2=1.0000 and volume SUM R2=1.0000 from the existing
+      edge_attr -> both REDUNDANT (lin_edge absorbs any table T). Distance is already the
+      RBF block. Only a PRODUCT h_src*h_dst is outside the span (R2=0.1970).
+      Corrected item: the gap is NOT 'edge descriptors' but 'no MULTIPLICATIVE pair term
+      exists anywhere'. Same shape as W5 (bur*hyd), W15 col2 (reach*env) and W12 - every
+      mechanism with signal in this project is multiplicative. Arm specified, not run:
+      w7edge is null across 2 seeds, so the edge channel is inert today.
+      -> `B2D_EDGE_DESCRIPTORS.md`
 
 ## B3 W5 burial
 - [~] **B3a NOTHING may be concluded about W5 until `pub_w5_ddg_s42` lands.** All four W5 seeds

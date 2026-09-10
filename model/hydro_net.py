@@ -411,6 +411,93 @@ def _sibling_block_dims(cfg):
     return total
 
 
+class DistogramHead(nn.Module):
+    """Predict binned CA-CA distances from per-residue latents.
+
+    Auxiliary only. Never used at inference; its purpose is to stop the row-sum from
+    being the sole consumer of pair geometry.
+    """
+
+    def __init__(self, d_model=128, n_bins=32, d_hidden=128,
+                 min_dist=2.0, max_dist=22.0, max_sep=64):
+        super().__init__()
+        self.n_bins = n_bins
+        self.register_buffer("bin_edges", torch.linspace(min_dist, max_dist, n_bins - 1))
+        self.max_sep = max_sep
+
+        # |i-j| as a small learned embedding: sequence separation is the single strongest
+        # predictor of distance and giving it explicitly frees the latents for the rest.
+        self.sep_emb = nn.Embedding(max_sep + 1, 32)
+
+        self.mlp = nn.Sequential(
+            nn.Linear(2 * d_model + 32, d_hidden), nn.ReLU(),
+            nn.Linear(d_hidden, d_hidden), nn.ReLU(),
+            nn.Linear(d_hidden, n_bins),
+        )
+
+    def forward(self, h):
+        """h: [B, N, d_model] -> logits [B, N, N, n_bins]."""
+        B, N, D = h.shape
+        hi = h.unsqueeze(2).expand(B, N, N, D)
+        hj = h.unsqueeze(1).expand(B, N, N, D)
+
+        idx = torch.arange(N, device=h.device)
+        sep = (idx.unsqueeze(0) - idx.unsqueeze(1)).abs().clamp(max=self.max_sep)
+        s = self.sep_emb(sep).unsqueeze(0).expand(B, N, N, -1)
+
+        # Symmetrise: d(i,j) == d(j,i), so learning that separately wastes capacity.
+        return 0.5 * (self.mlp(torch.cat([hi, hj, s], dim=-1))
+                      + self.mlp(torch.cat([hj, hi, s], dim=-1)))
+
+    def bin_distances(self, d):
+        """Continuous distances -> bin indices. Everything beyond max_dist lands in the
+        last bin, which is correct: past ~22 A the exact value carries little signal."""
+        return torch.bucketize(d, self.bin_edges)
+
+    def loss(self, h, coords, mask, ignore_local=2):
+        """Cross-entropy against true CA-CA distances.
+
+        ignore_local=2 drops |i-j| <= 2, whose distances are fixed by covalent geometry and
+        are therefore free to predict -- including them inflates accuracy without teaching
+        anything.
+        """
+        B, N, _ = h.shape
+        ca = coords[..., 1, :] if coords.dim() == 4 else coords[:, 1, :].unsqueeze(0)
+        d_true = torch.cdist(ca, ca)                       # [B, N, N]
+        target = self.bin_distances(d_true)
+
+        logits = self(h)
+
+        m = (mask > 0).float()
+        pair_mask = m.unsqueeze(1) * m.unsqueeze(2) if m.dim() == 2 else \
+            m.unsqueeze(0).unsqueeze(0) * m.unsqueeze(0).unsqueeze(2)
+        idx = torch.arange(N, device=h.device)
+        sep = (idx.unsqueeze(0) - idx.unsqueeze(1)).abs()
+        pair_mask = pair_mask * (sep > ignore_local).float().unsqueeze(0)
+
+        ce = F.cross_entropy(
+            logits.reshape(-1, self.n_bins),
+            target.reshape(-1).clamp(0, self.n_bins - 1),
+            reduction="none",
+        ).reshape(B, N, N)
+
+        denom = pair_mask.sum().clamp(min=1.0)
+        return (ce * pair_mask).sum() / denom
+
+    @torch.no_grad()
+    def accuracy(self, h, coords, mask, tol_bins=1):
+        """Fraction of pairs predicted within tol_bins. For monitoring, not for training."""
+        B, N, _ = h.shape
+        ca = coords[..., 1, :] if coords.dim() == 4 else coords[:, 1, :].unsqueeze(0)
+        target = self.bin_distances(torch.cdist(ca, ca))
+        pred = self(h).argmax(-1)
+        m = (mask > 0).float()
+        pm = (m.unsqueeze(1) * m.unsqueeze(2)) if m.dim() == 2 else \
+            m.unsqueeze(0).unsqueeze(0) * m.unsqueeze(0).unsqueeze(2)
+        hit = ((pred - target).abs() <= tol_bins).float()
+        return float((hit * pm).sum() / pm.sum().clamp(min=1.0))
+
+
 class PEM(torch.nn.Module):
     """Protein energy model"""
 
@@ -531,6 +618,11 @@ class PEM(torch.nn.Module):
         self.light_attention = light_attention
         if self.light_attention:
             self.LA = LightAttention(embeddings_dim=fc_in_dim)
+        # B1d: distogram auxiliary head on the UNFOLDED state (IFUM's learned half).
+        # Built ONLY when the weight is > 0, so weight 0 is bit-identical to baseline.
+        self.distogram_weight = float(getattr(CFG, 'distogram_weight', 0.0))
+        self.distogram_head = (DistogramHead(d_model=128)
+                               if self.distogram_weight > 0 else None)
         
     
     def forward(self,x,f_type = 'Default', ca_coords=None, n_folded=None):

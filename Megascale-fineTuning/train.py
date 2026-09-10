@@ -755,6 +755,8 @@ class Trainer():
                         slope_loss = torch.abs(slope_pred_ddg.std(unbiased=False) - slope_true_ddg.std(unbiased=False))
                     data_loss = l1_loss if LOSS_MODE == 'dg' else (ddg_loss if LOSS_MODE == 'ddg' else l1_loss + DDG_WEIGHT * ddg_loss)
                     loss = data_loss + reg_loss + energy_reg + WT_ANCHOR_WEIGHT * wt_anchor_loss
+                    if getattr(self, '_distogram_loss', None) is not None:
+                        loss = loss + self.model.distogram_weight * self._distogram_loss
                     if SLOPE_WEIGHT > 0 and output.numel() >= 2:
                         loss = loss + SLOPE_WEIGHT * slope_loss
                     loss.backward()
@@ -980,6 +982,22 @@ class Trainer():
             range(prott5_embedding_minibatch.size(0))])
 
         all_graph_minibatch = torch.cat([folded_graph_minibatch, unfolded_graph_minibatch], dim=0)
+        # B1d: IFUM's LEARNED half -- train the network to predict the UNFOLDED
+        # distance distribution. Computed here because unfolded_graph_minibatch is local
+        # to this method. Stashed on self and consumed at the loss site.
+        # Guarded exactly like SLOPE_WEIGHT: at weight 0 nothing is built.
+        self._distogram_loss = None
+        if getattr(self.model, 'distogram_head', None) is not None:
+            # MEMORY: a second full forward pass OOMs on a 24 GB card (the first pass
+            # already holds ~21 GB). The head only needs the per-residue latents, so
+            # take a SINGLE unfolded protein (all variants share the same coords and
+            # the same unfolded reference) instead of the whole minibatch.
+            _one = unfolded_graph_minibatch[:1]
+            _h_unf = self.model(_one, f_type='features', n_folded=0)
+            _c = batch['coords'].squeeze()
+            _m = batch['masks'].squeeze()
+            self._distogram_loss = self.model.distogram_head.loss(
+                _h_unf, _c.unsqueeze(0), _m.unsqueeze(0))
 
         # U5/U6: the batch is [folded; unfolded] concatenated along dim 0, and nothing in
         # the tensor marks the boundary -- so tell the model where it is. This is the only

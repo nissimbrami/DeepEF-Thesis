@@ -39,9 +39,20 @@ Status: `[ ]` open · `[x]` done · `[~]` blocked · `[>]` active
       tridiagonal mask (3.3% of pairs nonzero at 0.3150); the coil smears the same mass over 39%
       of pairs at 0.0391 each - 12x denser, 8x weaker per contact. Next config: a TRUNCATED coil
       (cutoff restores sparsity, keeps the distance profile). -> `B1C_RESULT.md`
-- [ ] **B1d distogram head on the unfolded state**, weight **0.1** (never IFUM's 100: their aux
-      loss matches their primary; ours is CE ~ln(32)=3.5 vs MSE ~1). Attach via
-      `hydro_net.py f_type='features'`.
+- [x] **B1d DONE V** - the flag was a FIFTH SILENT NO-OP: DistogramHead was absent from the
+      live model (grep count 0 in hydro_net.py / train.py / train_utils.py) and
+      --distogram_weight was only parsed, stored and logged. Proof: three arms spanning a
+      100x weight range gave identical RMSE trajectories. ~32 GPU-hours trained a baseline
+      under four names. BUILT IT: head copied into hydro_net.py, instantiated in
+      PEM.__init__ only when weight>0 (SLOPE_WEIGHT guard pattern), loss computed on the
+      UNFOLDED graph inside get_deltaG, consumed at the loss site, weight 0.1 not IFUM's 100.
+      Four integration faults fixed: indentation, out-of-scope var, missing n_folded=0,
+      CUDA OOM (fixed by a single-protein forward - all variants share the unfolded state).
+      VERIFIED: gate_g4_cpu ALL PASS after every fix; B=64 shape test loss 3.4536 finite,
+      |grad| 31.60; untrained loss 3.4800 vs ln(32)=3.4657 = random guess, as expected;
+      job 21175008 running clean at 19/306 steps. -> `B1D_DISTOGRAM_NOOP.md`
+      CAVEAT: target is the coords the model receives. If the ens* arms show sampling works,
+      the target should move to SAMPLED conformations (predicting a formula teaches nothing).
 - [x] representation mismatch recorded: our coil broadcasts one CA distance across all 16
       atom-pair channels, making them identical. -> `FLORY_QUARTER_TESTED.md`
 

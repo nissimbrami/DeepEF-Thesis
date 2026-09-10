@@ -1,3 +1,9 @@
+> **ATTRIBUTION CAVEAT 2026-09-10.** All four W5 seeds were trained with `--loss_mode dg`.
+> Every dG-trained arm in the project has a negative median on the ranking channel, so the
+> negative median may belong to the OBJECTIVE rather than to the burial block. The dG-vs-ddG
+> difference is itself not significant (n=5, p=0.59). `pub_w5_ddg_s42` is queued to separate
+> them. The rejection stands; the attribution to W5 does not. See `W12_W5_CONFOUNDED.md`.
+
 # W5 (burial on dG) is REJECTED at four seeds — it helps the average protein by hurting most of them
 
 **Date:** 2026-09-10. `w5_dg_s3_e12` landed, giving four independent seeds. This closes W5.

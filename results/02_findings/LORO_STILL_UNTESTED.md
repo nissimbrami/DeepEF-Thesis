@@ -1,3 +1,8 @@
+> **ROOT CAUSE FOUND 2026-09-10.** The block is bit-identical between the folded and
+> unfolded passes (`torch.equal` = True, max|diff| = 0.000e+00), so it cancels exactly in
+> dG and has no gradient path. Train loss is constant to five decimals across all 15
+> epochs. See `W6_ROOT_CAUSE.md` and `scripts/gate_state_dependence.py`.
+
 # The LORO descriptor arm scored — and it collapsed AGAIN. The hypothesis remains untested.
 
 **Date:** 2026-09-10. `loroW_desc_s42_e14` finally produced a CSV (after today's `evaluate.py`

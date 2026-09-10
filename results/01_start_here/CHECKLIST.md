@@ -91,9 +91,11 @@ Status: `[ ]` open · `[x]` done · `[~]` blocked · `[>]` active
 ## B4 W7 edges
 - [x] verify the kernel is monotone -> **it is** (0.726 -> 1.5e-08), so the nulls are genuine
 - [x] the span/bidir confound claim -> **WRONG**, flags are independent; u10bidir IS the control
-- [ ] **B4c edge-level descriptors** (same as B2d)
-
-## B5 BSA / complexity
+- [x] **B4c DONE V (same as B2d)** - closed by measurement: hydropathy difference and
+      volume sum are fit at R2=1.0000 from the existing edge_attr, so lin_edge absorbs
+      any table T; distance is already the RBF block. Only a PRODUCT h_src*h_dst is
+      outside the span (R2=0.1970). Arm specified, not run - w7edge is null across 2
+      seeds so the edge channel is inert today. -> `B2D_EDGE_DESCRIPTORS.md`
 - [x] correlate BSA against `b_p`/`a_p` on the 27 test proteins, not against the pre-training loss
       -> interface NULL for b_p; **packing_frac -0.662 and void_vol_per_res +0.652 vs a_p survive
       Bonferroni** -> `T4_INTERFACE_NULL.md`

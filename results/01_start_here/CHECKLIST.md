@@ -58,8 +58,14 @@ Status: `[ ]` open · `[x]` done · `[~]` blocked · `[>]` active
 
 ## B2 descriptors
 - [x] `torch.equal(folded, unfolded)` -> **True**, max|d|=0.000e+00 = ROOT CAUSE
-- [ ] **B2b confirmation run: zero the block in the UNFOLDED pass only, one epoch. If RMSE moves
-      off 2.529, proved.**
+- [x] **B2b DONE V - CONFIRMED BY INTERVENTION.** Registered falsifier fired at epoch 0:
+      descunit (block identical in both states) PCC 0.019 / RMSE 2.529, frozen 15 epochs;
+      descsd_s42 (SAME table, zeroed in the unfolded pass) PCC 0.625 / PCC-PP 0.726 /
+      RMSE 1.966. One guarded line moves PCC 30x and unfreezes the loss. The dG cancellation
+      is the CAUSE, established by intervention rather than correlation.
+      Does NOT yet show descriptors HELP - that needs the val-selected epoch scored against
+      the control family on mean AND median. FINDINGS 8.3's prediction now has its first
+      live test. -> `B2B_CONFIRMED.md`
 - [x] the rule it generalises to -> `gate_state_dependence.py`
 - [x] **B2d DONE V** - an edge path ALREADY exists: edge_features.py builds
       [src_onehot(20) | dst_onehot(20) | rbf(16)] fed to GATv2Conv's LINEAR lin_edge.

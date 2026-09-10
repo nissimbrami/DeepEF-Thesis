@@ -669,6 +669,8 @@ def get_unfolded_graph(x, one_hot, emb, mask, gaussian_coef=CFG.gaussian_coef):
     # physics, NOT the W5 cancellation bug: burial was supposed to differ and did not;
     # chemistry is supposed not to differ, and does not.
     _Dsc = _desc_or_none(one_hot)
+    if _Dsc is not None and getattr(CFG, 'desc_unfolded_zero', False):
+        _Dsc = torch.zeros_like(_Dsc)
     _oh = _onehot_block(one_hot)
     # W12: the burial-weighted columns are ZERO here -- the folded-minus-unfolded
     # difference IS the hydrophobic driving force. Nonzero would make it inert.
@@ -731,7 +733,13 @@ def _flory_unfolded_graph(x, one_hot, emb, mask, gaussian_coef):
     D = F.normalize(D, p=2, dim=0)
     emb = F.normalize(_unfolded_emb(emb), p=2, dim=0)   # U2: unfolded pass only
     _S = _solv_or_none(x, one_hot, mask, folded=False)   # W5: burial is ZERO unfolded
-    _Dsc = _desc_or_none(one_hot)                        # W6: state-independent
+    # B2b: W6 descriptors zeroed in the UNFOLDED pass, guarded by --desc_unfolded_zero.
+    # Identical-in-both-states means the block cancels exactly in dG and has no gradient
+    # path (proved: torch.equal -> True, loss constant to 5 decimals). Zeroing it here
+    # makes it state-DEPENDENT, exactly as W5 burial already is one line below.
+    _Dsc = _desc_or_none(one_hot)
+    if _Dsc is not None and getattr(CFG, 'desc_unfolded_zero', False):
+        _Dsc = torch.zeros_like(_Dsc)
     _oh = _onehot_block(one_hot)
     # W12: the burial-weighted columns are ZERO here -- the folded-minus-unfolded
     # difference IS the hydrophobic driving force. Nonzero would make it inert.

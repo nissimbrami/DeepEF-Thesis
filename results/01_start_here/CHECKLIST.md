@@ -115,7 +115,17 @@ Status: `[ ]` open · `[x]` done · `[~]` blocked · `[>]` active
 - [~] E5 `pub_w5_ddg_s42` — training on GPU
 - [ ] **E6 `slope 0.7` at 5 seeds** — the only positive candidate the wave produced. **It is a
       SCREEN result; treat as leading candidate (A1).**
-- [ ] E7 W12 pooled score, 2 seeds, canonical basis
+- [x] **E7 DONE V** - falsifier FIRED. W12 pooled 0.6175 (2 seeds) vs control family
+      0.5757 +/- 0.0314 = **+1.33 sd only**, INSIDE the pooled seed band, while the ranking
+      channel is +3.19 sd. W12 is an information gain WITHOUT a headline pooled number,
+      because pooled is dominated by b_p (96.3% one global constant, unpredictable by 10
+      methods). Do NOT headline 0.6175: it is below the best single canonical run 0.6382,
+      which is a control seed with no lever. Report as: ranking +0.0207 (+3.19 sd, Wilcoxon
+      p=0.0104), pooled +0.042 NOT established.
+      ALSO FLAGGED: recomputing the declared 9-CSV canonical population gives oracle
+      0.7327 +/- 0.0126 against the recorded 0.7156 +/- 0.0474 - a 4x sd discrepancy, not
+      rounding. Not fixed here (separate decision, gate_headline.py enforces the basis).
+      -> `E7_W12_CANONICAL.md`
 - [ ] E8 W12 mechanism: slope gap buried vs exposed (tied to B3b and to T4's packing finding)
 - [~] E9 W15 — `pub_w15b_s42` resuming on GPU
 - [~] E10 distogram head at 0.1 (= B1d) — `disto0.01/0.1/1.0` on GPU
